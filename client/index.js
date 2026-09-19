@@ -61,6 +61,12 @@ const ENDPOINTS = {
   getTasks: 'getTasks',
   runTask: 'runTask',
   growthWrite: 'growthWrite',
+  taskScan: 'taskScan',
+  taskQueueStart: 'taskQueueStart',
+  taskQueueStatus: 'taskQueueStatus',
+  schoolStatusAll: 'schoolStatusAll',
+  schoolVouchersAll: 'schoolVouchersAll',
+  accountMore: 'accountMore',
   accountDisable: 'accountDisable',
   accountEnable: 'accountEnable',
   accountRevive: 'accountRevive',
@@ -391,10 +397,10 @@ function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
 /**
  * 账号折叠面板（账号池与任务 Tab 共用）。
  *
- * @param props - `{account, maxInFlight, channel, onAction, busy, credits, scheduleConfig}`。
+ * @param props - `{account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove}`。
  * @returns React 元素。
  */
-function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig }) {
+function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove }) {
   const state = accountState(account, maxInFlight);
   const dot = (tone[state.tone] ?? tone.idle).fg;
   const label = channelLabel(channel);
@@ -489,6 +495,15 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
                 { disable: '禁用（摘出选号池）', enable: '解除手动停用', revive: '复活（清系统禁用）' }[action],
               ),
             ),
+            ...onRemove
+              ? [React.createElement('button', {
+                  key: 'remove',
+                  type: 'button',
+                  style: { ...s.btnGhost, borderColor: tone.err.fg, color: tone.err.fg },
+                  disabled: busy,
+                  onClick: () => onRemove(account),
+                }, '移除账号（删除凭证）')]
+              : [],
           )
         : null,
       state.key === 'manual+disabled'
@@ -811,7 +826,7 @@ function rateLimitedNotice(list) {
  * @param props - `{status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData}`。
  * @returns React 元素。
  */
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData }) {
+function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData, onRemove }) {
   const [filter, setFilter] = React.useState('all');
   const accounts = status?.accounts ?? [];
 
@@ -909,6 +924,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                   busy: Boolean(busy?.[account.uid]),
                   credits: creditsByUid?.[account.uid],
                   scheduleConfig,
+                  onRemove,
                 }),
               ),
             ),
@@ -951,7 +967,7 @@ function segmentButton(id, label, active, onChange, count) {
  * @param props - `{status, channelOf, maxInFlight, taskData, onRunTask, runningName, onRefresh}`。
  * @returns React 元素。
  */
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable }) {
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
   // taskData 是宿主 getTasks 的 value，形如 {available, tasks:{tasks:[...]}}。
   // 逐层取并把非数组一律当空 —— 形状不符时降级为空表，而不是抛异常炸掉整个 Tab。
@@ -969,6 +985,9 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
   return React.createElement(
     'div',
     null,
+    // 任务中心（panel 对照补齐）：扫描待办 → 执行队列 → 队列进度。
+    React.createElement(TaskCenterCard, { adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }),
+
     // 批量动作区（真实可用）
     React.createElement('div', { style: s.card },
       React.createElement(
@@ -1073,6 +1092,10 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
       accountCount: (accounts || []).length,
       running: runningName === 'school',
       onRunTask,
+      vouchersData,
+      vouchersLoading,
+      onViewVouchers,
+      adminAvailable,
     }),
 
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
@@ -1156,7 +1179,7 @@ const SCHOOL_STATUS = {
  *     而不是让用户以为这个任务永远没了；
  *   - 人工项（学生认证）网关不可代做，如实标注。
  */
-function SchoolTasksCard({ schoolData, accountCount, running, onRunTask }) {
+function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
   if (schoolData && schoolData.available === false) {
     return React.createElement(Unavailable, {
       title: '开学季子任务状态',
@@ -1233,10 +1256,53 @@ function SchoolTasksCard({ schoolData, accountCount, running, onRunTask }) {
           disabled: running, onClick: () => onRunTask('school') },
         running ? '🎓 执行中…' : '🎓 执行开学季',
       ),
+      adminAvailable
+        ? React.createElement('button', {
+            type: 'button', style: { ...s.btnGhost, marginLeft: 8 },
+            disabled: vouchersLoading, onClick: onViewVouchers,
+            title: '查询各账号抽中的第三方券码（KFC/瑞幸/酷狗等，只读）',
+          }, vouchersLoading ? '查询中…' : '🎟 我的券码')
+        : null,
       React.createElement('span', { style: { ...s.muted, marginLeft: 10 } },
         '脚本整体执行（点亮 + 领奖 + 抽奖），执行后刷新可见逐项状态变化。',
       ),
     ),
+    // 券码视图（按需加载；panel 的「我的券码」对照能力，二维码不做 —— 弹窗形态
+    // 与宿主侧边栏不匹配，code 文本可复制即满足核销）。
+    vouchersData
+      ? React.createElement('div', { className: 'dshc-tblwrap', style: { marginTop: 10 } },
+          React.createElement('table', null,
+            React.createElement('thead', null,
+              React.createElement('tr', null,
+                ...['账号', '奖品', '券码', '有效期'].map((h2) => React.createElement('th', { key: h2 }, h2)),
+              ),
+            ),
+            React.createElement('tbody', null,
+              ...(function () {
+                const rows = [];
+                for (const r of vouchersData.rows ?? []) {
+                  if ((r.vouchers ?? []).length === 0) continue;
+                  for (const v of r.vouchers) {
+                    rows.push(React.createElement('tr', { key: `${r.uid}-${v.grant_id}` },
+                      React.createElement('td', null, r.nickname || r.uid.slice(0, 8)),
+                      React.createElement('td', null, v.prize_name || v.sku_code || '—'),
+                      React.createElement('td', { style: { ...s.code, userSelect: 'all' } }, v.code || '—'),
+                      React.createElement('td', null, v.valid_to || '—'),
+                    ));
+                  }
+                }
+                if (rows.length === 0) {
+                  rows.push(React.createElement('tr', { key: 'empty' },
+                    React.createElement('td', { colSpan: 4, style: { ...s.muted, textAlign: 'center' } },
+                      '暂无券码记录。'),
+                  ));
+                }
+                return rows;
+              })(),
+            ),
+          ),
+        )
+      : null,
     React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, data.note ?? ''),
   );
 }
@@ -1279,6 +1345,103 @@ function growthForAccount(growthByUid, accounts) {
  * @param props - `{growthData, accounts, onRefresh}`。
  * @returns React 元素。
  */
+/**
+ * 任务中心卡（panel 对照补齐）：扫描待办 → 启动执行队列 → 进度轮询。
+ * admin 未开启时整卡如实降级（端点在 admin.enabled 门槛内）。
+ * @param props - `{adminAvailable, scanData, scanning, queueData, onScan, onQueueStart}`。
+ */
+function TaskCenterCard({ adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }) {
+  if (!adminAvailable) {
+    return React.createElement(Unavailable, {
+      title: '任务中心',
+      needs: 'GET /admin/tasks/scan + POST /admin/tasks/queue/start（需网关开启 admin.enabled）',
+      hint: '任务中心支持跨账号扫描待办并排队执行（账号内串行、账号间并发）。',
+    });
+  }
+  const scanAccounts = scanData?.accounts ?? [];
+  const totalPending = scanAccounts.reduce(
+    (sum, it) => sum + (it.growth?.length ?? 0) + (it.school?.length > 0 ? 1 : 0), 0);
+  const doneCount = (queueData?.items ?? []).filter((it) => it.status === 'done' || it.status === 'error').length;
+
+  return React.createElement('div', { style: s.card },
+    React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+      React.createElement('div', { style: { ...s.label } }, '🗂 任务中心'),
+      React.createElement('div', { className: 'dshc-row' },
+        React.createElement('button', {
+          type: 'button', style: s.btnGhost, disabled: scanning, onClick: onScan,
+          title: '只读扫描：列出每个账号未完成且可自动化的任务',
+        }, scanning ? '扫描中…' : '扫描待办'),
+        React.createElement('button', {
+          type: 'button', style: s.btnGhost, onClick: onQueueStart,
+          title: '把扫描出的待办排队执行：账号内串行、账号间并发（自动领奖）',
+        }, '执行队列'),
+      ),
+    ),
+    React.createElement('div', { style: { ...s.muted, marginTop: 6, lineHeight: 1.7 } },
+      '扫描是只读的；「执行队列」按扫描结果排队（先 accept 再点亮动作再自动领奖）。' +
+      '对话类码会真实发起对话（消耗少量额度）。',
+    ),
+
+    // 队列进度（若已启动过）
+    queueData
+      ? React.createElement('div', { style: { marginTop: 10 } },
+          React.createElement('div', { className: 'dshc-row', style: { marginBottom: 6 } },
+            React.createElement(Tag, { text: queueData.running ? `执行中 ${doneCount}/${queueData.total}` : `已结束 ${doneCount}/${queueData.total}`, tone: queueData.running ? 'info' : 'ok' }),
+          ),
+          React.createElement('div', { className: 'dshc-tblwrap' },
+            React.createElement('table', null,
+              React.createElement('thead', null,
+                React.createElement('tr', null,
+                  ...['账号', '类型', '任务', '状态', '说明'].map((h2) => React.createElement('th', { key: h2 }, h2)),
+                ),
+              ),
+              React.createElement('tbody', null,
+                ...(queueData.items ?? []).map((it, i) =>
+                  React.createElement('tr', { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
+                    React.createElement('td', null, it.nickname || it.uid.slice(0, 8)),
+                    React.createElement('td', null, it.kind === 'school' ? '开学季' : '成长'),
+                    React.createElement('td', { style: { ...s.code } }, it.code),
+                    React.createElement('td', null,
+                      React.createElement(Tag, {
+                        text: { pending: '待执行', running: '执行中', done: '完成', skipped: '跳过', error: '失败' }[it.status] ?? it.status,
+                        tone: { done: 'ok', error: 'err', running: 'info', skipped: 'idle', pending: 'idle' }[it.status] ?? 'idle',
+                      }),
+                    ),
+                    React.createElement('td', { style: { ...s.muted, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, it.message || '—'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        )
+      : null,
+
+    // 扫描结果
+    scanAccounts.length > 0
+      ? React.createElement('div', { style: { marginTop: 10 } },
+          ...scanAccounts.map((it) =>
+            React.createElement('div', { key: it.uid, style: { marginBottom: 8 } },
+              React.createElement('div', { className: 'dshc-row' },
+                React.createElement('span', { style: { ...s.label, minWidth: 0 } }, it.nickname || it.uid.slice(0, 8)),
+                it.growth?.length > 0
+                  ? React.createElement(Tag, { text: `成长待办 ${it.growth.length}`, tone: 'warn' })
+                  : React.createElement(Tag, { text: '成长无待办', tone: 'ok' }),
+                it.chances > 0 ? React.createElement(Tag, { text: `抽奖 ${it.chances} 次`, tone: 'info' }) : null,
+              ),
+              it.growth?.length > 0
+                ? React.createElement('div', { style: { ...s.code, marginLeft: 12, marginTop: 3 } }, it.growth.join(' · '))
+                : null,
+              it.growthErr ? React.createElement('div', { style: { ...s.muted, marginLeft: 12 } }, `成长查询失败：${it.growthErr}`) : null,
+              it.schoolErr ? React.createElement('div', { style: { ...s.muted, marginLeft: 12 } }, `开学季查询失败：${it.schoolErr}`) : null,
+            ),
+          ),
+        )
+      : scanning ? null : React.createElement('div', { style: { ...s.muted, marginTop: 8 } },
+          `待办合计 ${totalPending} 项（未扫描时显示 0，不代表没有）。点「扫描待办」查看。`,
+        ),
+  );
+}
+
 function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
   if (growthData && growthData.available === false) {
     return React.createElement(Unavailable, {
@@ -2439,6 +2602,112 @@ function ChanhubPanel({ rpcCall }) {
 
   // 成长码写操作的逐码 busy 标记（值 = task_code 或 'claim-claimable'）。
   const [growthWriteBusy, setGrowthWriteBusy] = React.useState('');
+  // 任务中心（panel 对照补齐）：扫描结果 / 扫描中 / 队列状态。
+  const [taskScanData, setTaskScanData] = React.useState(null);
+  const [taskScanning, setTaskScanning] = React.useState(false);
+  const [taskQueueData, setTaskQueueData] = React.useState(null);
+  // 开学季券码（任务 Tab 按需查看）。
+  const [vouchersData, setVouchersData] = React.useState(null);
+  const [vouchersLoading, setVouchersLoading] = React.useState(false);
+
+  /** 全账号任务扫描（只读）。 */
+  const onTaskScan = React.useCallback(
+    async () => {
+      setTaskScanning(true);
+      try {
+        const result = await rpcCall(ENDPOINTS.taskScan, {});
+        if (result?.ok === false) {
+          showToast(`扫描失败：${result.error?.message ?? '未知错误'}`);
+        } else {
+          setTaskScanData(result?.value ?? null);
+        }
+      } catch (error) {
+        showToast(`扫描异常：${error?.message ?? error}`);
+      } finally {
+        setTaskScanning(false);
+      }
+    },
+    [rpcCall, showToast],
+  );
+
+  /** 启动执行队列 + 轮询进度直到收尾。 */
+  const onTaskQueueStart = React.useCallback(
+    async () => {
+      try {
+        const result = await rpcCall(ENDPOINTS.taskQueueStart, { concurrency: 2 });
+        const value = result?.value ?? {};
+        if (result?.ok === false) {
+          showToast(`队列启动失败：${result.error?.message ?? '未知错误'}`);
+          return;
+        }
+        if (value.started === false) {
+          showToast(value.message ?? '没有待办任务，或队列已在执行中');
+          return;
+        }
+        showToast(`队列已启动：${value.total} 项（并发 2）`);
+        const poll = async () => {
+          try {
+            const status = await rpcCall(ENDPOINTS.taskQueueStatus, {});
+            const snap = status?.value ?? null;
+            setTaskQueueData(snap);
+            if (snap?.running) {
+              setTimeout(poll, 5000);
+            } else {
+              showToast('队列执行结束。');
+              await refresh();
+            }
+          } catch { /* 轮询失败静默，下一轮再试 */ }
+        };
+        setTimeout(poll, 2000);
+      } catch (error) {
+        showToast(`队列异常：${error?.message ?? error}`);
+      }
+    },
+    [rpcCall, refresh, showToast],
+  );
+
+  /** 移除账号（删除性操作：出池 + 删凭证文件；window.confirm 已由宿主全局确认兜底）。 */
+  const onRemoveAccount = React.useCallback(
+    async (account) => {
+      const label = account.nickname || account.uid.slice(0, 8);
+      if (typeof window !== 'undefined' && !window.confirm(`移除账号「${label}」将删除池状态与 auths/ 下的凭证文件，且不可恢复。确认移除？`)) {
+        return;
+      }
+      try {
+        const result = await rpcCall(ENDPOINTS.accountMore, { action: 'remove', uid: account.uid });
+        if (result?.ok === false) {
+          showToast(`移除失败：${result.error?.message ?? '未知错误'}`);
+        } else {
+          const fileError = result?.value?.file_error;
+          showToast(fileError ? `已出池，但凭证文件删除失败：${fileError}` : `「${label}」已移除。`);
+          await refresh();
+        }
+      } catch (error) {
+        showToast(`移除异常：${error?.message ?? error}`);
+      }
+    },
+    [rpcCall, refresh, showToast],
+  );
+
+  /** 查看开学季券码（全部账号，只读）。 */
+  const onViewVouchers = React.useCallback(
+    async () => {
+      setVouchersLoading(true);
+      try {
+        const result = await rpcCall(ENDPOINTS.schoolVouchersAll, {});
+        if (result?.ok === false) {
+          showToast(`券码查询失败：${result.error?.message ?? '未知错误'}`);
+        } else {
+          setVouchersData(result?.value ?? { rows: [] });
+        }
+      } catch (error) {
+        showToast(`券码查询异常：${error?.message ?? error}`);
+      } finally {
+        setVouchersLoading(false);
+      }
+    },
+    [rpcCall, showToast],
+  );
 
   /** 单码/批量成长码写操作（点亮 accept / 领取 claim / 全部领取）。 */
   const onGrowthWrite = React.useCallback(
@@ -2615,6 +2884,7 @@ function ChanhubPanel({ rpcCall }) {
           onRunTask,
           runningName: runningTask,
           taskData: tasks,
+          onRemove: onRemoveAccount,
         })
       : null,
     activeTab === 'tasks'
@@ -2632,6 +2902,14 @@ function ChanhubPanel({ rpcCall }) {
           onGrowthWrite: onGrowthWrite,
           growthWriteBusy: growthWriteBusy,
           adminAvailable: adminAvailable,
+          scanData: taskScanData,
+          scanning: taskScanning,
+          queueData: taskQueueData,
+          onScan: onTaskScan,
+          onQueueStart: onTaskQueueStart,
+          vouchersData: vouchersData,
+          vouchersLoading: vouchersLoading,
+          onViewVouchers: onViewVouchers,
         })
       : null,
     activeTab === 'usage'

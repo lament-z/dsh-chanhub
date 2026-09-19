@@ -37,11 +37,17 @@ API key 只在宿主持有：所有网关调用都在宿主侧完成，经 `/dsh
 | `GET /v1/models/probes` | 模型实测输出上限（手动探测结果） | `withAuth` |
 | `GET /admin/tasks/status` | 任务状态 + 签到/余额逐账号结果 | `admin.enabled=true` |
 | `POST /admin/tasks/{name}` | 手动触发一类任务（7 类，含 `balance`） | `admin.enabled=true` |
+| `GET /admin/tasks/scan` | 全账号待办扫描（未完成且可自动化的任务） | `admin.enabled=true` |
+| `POST /admin/tasks/queue/start` | 启动执行队列（账号内串行、账号间并发） | `admin.enabled=true` |
+| `GET /admin/tasks/queue` | 队列进度轮询 | `admin.enabled=true` |
+| `GET /admin/school/status` | 各账号开学季状态 + 抽奖余额 | `admin.enabled=true` |
+| `GET /admin/school/vouchers` | 各账号券码列表（只读） | `admin.enabled=true` |
 | `POST /admin/growth-tasks/{uid}/accept` | 接受成长任务码 | `admin.enabled=true` |
 | `POST /admin/growth-tasks/{uid}/claim` | 领取成长任务奖励 | `admin.enabled=true` |
 | `POST /admin/growth-tasks/{uid}/claim-claimable` | 领取全部已完成未领奖励 | `admin.enabled=true` |
 | `POST /admin/config` | 校验 + 原子写配置；可热改字段就地生效 | `admin.enabled=true` |
 | `POST /admin/accounts/{uid}/{disable,enable,revive}` | 账号动作 | `admin.enabled=true` |
+| `POST /admin/accounts/{uid}/{checkin,balance,remove}` | 单号签到 / 余额 / 移除 | `admin.enabled=true` |
 
 能力探测依据 `ServeMux` 的真实行为：未注册路径返回**纯文本** 404，
 已注册路径返回 **JSON** 信封（方法不符则是 405）。面板按实际探测结果渲染各区块。

@@ -9,6 +9,25 @@
 - 客户端 `client/index.js`：经 `ctx.slots.inject('settings.section', …)` 在设置侧边栏注册「chanhub」项。
 - 视觉令牌与卡片结构对齐 `dsh-bridge-gateway`，保证页面设计一致。
 
+### 任务中心 / 单码点亮 / 券码（panel 对照补齐）
+
+与 panel 分支功能面对照后的全面补齐（execution-report §8）：
+
+- **单码点亮放开**：成长任务进度卡每行按状态出「点亮」（accept）/「领取」
+  （claim，幂等）按钮；「全部领取」走 claim-claimable（只碰 completed，
+  不自动 accept —— 是否点亮由用户逐码决定）。admin 探测不可用时整体隐藏。
+- **任务中心卡**（任务 Tab 顶部）：「扫描待办」（只读，跨账号列出未完成且
+  可自动化的任务码 + 抽奖余额）→「执行队列」（账号内串行、账号间并发 ≤4、
+  逐项状态表 + 进度轮询，动作后自动领奖）。
+- **开学季券码**：「🎟 我的券码」逐账号列出抽中的第三方券（奖品/券码/有效期，
+  券码可复制核销）。
+- **单号移除**：账号面板红色「移除账号（删除凭证）」按钮 + 二次确认；
+  网关侧出池并删除 auths 凭证文件。
+- 网关配套（chanhub 仓）：桌面/小程序行为指纹协议移植（17 码纯 API 动作链）、
+  任务中心调度（ScanAll/StartQueue/QueueStatus）、School 写链、
+  周期余额刷新（schedule.balance_refresh_minutes，可热改）、
+  `/status` 增 version/uptime_sec。
+
 ### 批量动作 / 排程区块 / 配置热生效（audit 收尾）
 
 - **批量动作条接真实端点**（账号池 Tab 置顶）：全量签到 / 查余额 / token 保活 /

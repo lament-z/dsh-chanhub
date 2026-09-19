@@ -727,6 +727,12 @@ var ENDPOINTS = {
   getTasks: "getTasks",
   runTask: "runTask",
   growthWrite: "growthWrite",
+  taskScan: "taskScan",
+  taskQueueStart: "taskQueueStart",
+  taskQueueStatus: "taskQueueStatus",
+  schoolStatusAll: "schoolStatusAll",
+  schoolVouchersAll: "schoolVouchersAll",
+  accountMore: "accountMore",
   accountDisable: "accountDisable",
   accountEnable: "accountEnable",
   accountRevive: "accountRevive",
@@ -990,7 +996,7 @@ function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
     )
   );
 }
-function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig }) {
+function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove }) {
   const state = accountState(account, maxInFlight);
   const dot = (tone[state.tone] ?? tone.idle).fg;
   const label = channelLabel(channel);
@@ -1088,7 +1094,14 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
             },
             { disable: "\u7981\u7528\uFF08\u6458\u51FA\u9009\u53F7\u6C60\uFF09", enable: "\u89E3\u9664\u624B\u52A8\u505C\u7528", revive: "\u590D\u6D3B\uFF08\u6E05\u7CFB\u7EDF\u7981\u7528\uFF09" }[action]
           )
-        )
+        ),
+        ...onRemove ? [React.createElement("button", {
+          key: "remove",
+          type: "button",
+          style: { ...s.btnGhost, borderColor: tone.err.fg, color: tone.err.fg },
+          disabled: busy,
+          onClick: () => onRemove(account)
+        }, "\u79FB\u9664\u8D26\u53F7\uFF08\u5220\u9664\u51ED\u8BC1\uFF09")] : []
       ) : null,
       state.key === "manual+disabled" ? React.createElement(
         "div",
@@ -1391,7 +1404,7 @@ function rateLimitedNotice(list) {
     )
   );
 }
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData }) {
+function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData, onRemove }) {
   const [filter, setFilter] = React.useState("all");
   const accounts = status?.accounts ?? [];
   const counts = React.useMemo(() => {
@@ -1492,7 +1505,8 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
               onAction,
               busy: Boolean(busy?.[account.uid]),
               credits: creditsByUid?.[account.uid],
-              scheduleConfig
+              scheduleConfig,
+              onRemove
             })
           )
         )
@@ -1521,7 +1535,7 @@ function segmentButton(id, label, active, onChange, count) {
     `${label}${count === void 0 ? "" : ` ${count}`}`
   );
 }
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable }) {
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
   const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
   const byName = new Map(taskList.map((task) => [task.task, task]));
@@ -1535,6 +1549,8 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
   return React.createElement(
     "div",
     null,
+    // 任务中心（panel 对照补齐）：扫描待办 → 执行队列 → 队列进度。
+    React.createElement(TaskCenterCard, { adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }),
     // 批量动作区（真实可用）
     React.createElement(
       "div",
@@ -1661,7 +1677,11 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
       schoolData: schoolForAccount(schoolData, accounts),
       accountCount: (accounts || []).length,
       running: runningName === "school",
-      onRunTask
+      onRunTask,
+      vouchersData,
+      vouchersLoading,
+      onViewVouchers,
+      adminAvailable
     }),
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
     React.createElement(GrowthTasksCard, {
@@ -1721,7 +1741,7 @@ var SCHOOL_STATUS = {
   completed: { text: "\u5DF2\u5B8C\u6210", tone: "ok" },
   pending: { text: "\u5F85\u5B8C\u6210", tone: "warn" }
 };
-function SchoolTasksCard({ schoolData, accountCount, running, onRunTask }) {
+function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
   if (schoolData && schoolData.available === false) {
     return React.createElement(Unavailable, {
       title: "\u5F00\u5B66\u5B63\u5B50\u4EFB\u52A1\u72B6\u6001",
@@ -1808,12 +1828,70 @@ function SchoolTasksCard({ schoolData, accountCount, running, onRunTask }) {
         },
         running ? "\u{1F393} \u6267\u884C\u4E2D\u2026" : "\u{1F393} \u6267\u884C\u5F00\u5B66\u5B63"
       ),
+      adminAvailable ? React.createElement("button", {
+        type: "button",
+        style: { ...s.btnGhost, marginLeft: 8 },
+        disabled: vouchersLoading,
+        onClick: onViewVouchers,
+        title: "\u67E5\u8BE2\u5404\u8D26\u53F7\u62BD\u4E2D\u7684\u7B2C\u4E09\u65B9\u5238\u7801\uFF08KFC/\u745E\u5E78/\u9177\u72D7\u7B49\uFF0C\u53EA\u8BFB\uFF09"
+      }, vouchersLoading ? "\u67E5\u8BE2\u4E2D\u2026" : "\u{1F39F} \u6211\u7684\u5238\u7801") : null,
       React.createElement(
         "span",
         { style: { ...s.muted, marginLeft: 10 } },
         "\u811A\u672C\u6574\u4F53\u6267\u884C\uFF08\u70B9\u4EAE + \u9886\u5956 + \u62BD\u5956\uFF09\uFF0C\u6267\u884C\u540E\u5237\u65B0\u53EF\u89C1\u9010\u9879\u72B6\u6001\u53D8\u5316\u3002"
       )
     ),
+    // 券码视图（按需加载；panel 的「我的券码」对照能力，二维码不做 —— 弹窗形态
+    // 与宿主侧边栏不匹配，code 文本可复制即满足核销）。
+    vouchersData ? React.createElement(
+      "div",
+      { className: "dshc-tblwrap", style: { marginTop: 10 } },
+      React.createElement(
+        "table",
+        null,
+        React.createElement(
+          "thead",
+          null,
+          React.createElement(
+            "tr",
+            null,
+            ...["\u8D26\u53F7", "\u5956\u54C1", "\u5238\u7801", "\u6709\u6548\u671F"].map((h2) => React.createElement("th", { key: h2 }, h2))
+          )
+        ),
+        React.createElement(
+          "tbody",
+          null,
+          ...(function() {
+            const rows = [];
+            for (const r of vouchersData.rows ?? []) {
+              if ((r.vouchers ?? []).length === 0) continue;
+              for (const v of r.vouchers) {
+                rows.push(React.createElement(
+                  "tr",
+                  { key: `${r.uid}-${v.grant_id}` },
+                  React.createElement("td", null, r.nickname || r.uid.slice(0, 8)),
+                  React.createElement("td", null, v.prize_name || v.sku_code || "\u2014"),
+                  React.createElement("td", { style: { ...s.code, userSelect: "all" } }, v.code || "\u2014"),
+                  React.createElement("td", null, v.valid_to || "\u2014")
+                ));
+              }
+            }
+            if (rows.length === 0) {
+              rows.push(React.createElement(
+                "tr",
+                { key: "empty" },
+                React.createElement(
+                  "td",
+                  { colSpan: 4, style: { ...s.muted, textAlign: "center" } },
+                  "\u6682\u65E0\u5238\u7801\u8BB0\u5F55\u3002"
+                )
+              ));
+            }
+            return rows;
+          })()
+        )
+      )
+    ) : null,
     React.createElement("div", { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, data.note ?? "")
   );
 }
@@ -1827,6 +1905,126 @@ function growthForAccount(growthByUid, accounts) {
     if (entry) return entry;
   }
   return void 0;
+}
+function TaskCenterCard({ adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }) {
+  if (!adminAvailable) {
+    return React.createElement(Unavailable, {
+      title: "\u4EFB\u52A1\u4E2D\u5FC3",
+      needs: "GET /admin/tasks/scan + POST /admin/tasks/queue/start\uFF08\u9700\u7F51\u5173\u5F00\u542F admin.enabled\uFF09",
+      hint: "\u4EFB\u52A1\u4E2D\u5FC3\u652F\u6301\u8DE8\u8D26\u53F7\u626B\u63CF\u5F85\u529E\u5E76\u6392\u961F\u6267\u884C\uFF08\u8D26\u53F7\u5185\u4E32\u884C\u3001\u8D26\u53F7\u95F4\u5E76\u53D1\uFF09\u3002"
+    });
+  }
+  const scanAccounts = scanData?.accounts ?? [];
+  const totalPending = scanAccounts.reduce(
+    (sum, it) => sum + (it.growth?.length ?? 0) + (it.school?.length > 0 ? 1 : 0),
+    0
+  );
+  const doneCount = (queueData?.items ?? []).filter((it) => it.status === "done" || it.status === "error").length;
+  return React.createElement(
+    "div",
+    { style: s.card },
+    React.createElement(
+      "div",
+      { className: "dshc-row", style: { justifyContent: "space-between" } },
+      React.createElement("div", { style: { ...s.label } }, "\u{1F5C2} \u4EFB\u52A1\u4E2D\u5FC3"),
+      React.createElement(
+        "div",
+        { className: "dshc-row" },
+        React.createElement("button", {
+          type: "button",
+          style: s.btnGhost,
+          disabled: scanning,
+          onClick: onScan,
+          title: "\u53EA\u8BFB\u626B\u63CF\uFF1A\u5217\u51FA\u6BCF\u4E2A\u8D26\u53F7\u672A\u5B8C\u6210\u4E14\u53EF\u81EA\u52A8\u5316\u7684\u4EFB\u52A1"
+        }, scanning ? "\u626B\u63CF\u4E2D\u2026" : "\u626B\u63CF\u5F85\u529E"),
+        React.createElement("button", {
+          type: "button",
+          style: s.btnGhost,
+          onClick: onQueueStart,
+          title: "\u628A\u626B\u63CF\u51FA\u7684\u5F85\u529E\u6392\u961F\u6267\u884C\uFF1A\u8D26\u53F7\u5185\u4E32\u884C\u3001\u8D26\u53F7\u95F4\u5E76\u53D1\uFF08\u81EA\u52A8\u9886\u5956\uFF09"
+        }, "\u6267\u884C\u961F\u5217")
+      )
+    ),
+    React.createElement(
+      "div",
+      { style: { ...s.muted, marginTop: 6, lineHeight: 1.7 } },
+      "\u626B\u63CF\u662F\u53EA\u8BFB\u7684\uFF1B\u300C\u6267\u884C\u961F\u5217\u300D\u6309\u626B\u63CF\u7ED3\u679C\u6392\u961F\uFF08\u5148 accept \u518D\u70B9\u4EAE\u52A8\u4F5C\u518D\u81EA\u52A8\u9886\u5956\uFF09\u3002\u5BF9\u8BDD\u7C7B\u7801\u4F1A\u771F\u5B9E\u53D1\u8D77\u5BF9\u8BDD\uFF08\u6D88\u8017\u5C11\u91CF\u989D\u5EA6\uFF09\u3002"
+    ),
+    // 队列进度（若已启动过）
+    queueData ? React.createElement(
+      "div",
+      { style: { marginTop: 10 } },
+      React.createElement(
+        "div",
+        { className: "dshc-row", style: { marginBottom: 6 } },
+        React.createElement(Tag, { text: queueData.running ? `\u6267\u884C\u4E2D ${doneCount}/${queueData.total}` : `\u5DF2\u7ED3\u675F ${doneCount}/${queueData.total}`, tone: queueData.running ? "info" : "ok" })
+      ),
+      React.createElement(
+        "div",
+        { className: "dshc-tblwrap" },
+        React.createElement(
+          "table",
+          null,
+          React.createElement(
+            "thead",
+            null,
+            React.createElement(
+              "tr",
+              null,
+              ...["\u8D26\u53F7", "\u7C7B\u578B", "\u4EFB\u52A1", "\u72B6\u6001", "\u8BF4\u660E"].map((h2) => React.createElement("th", { key: h2 }, h2))
+            )
+          ),
+          React.createElement(
+            "tbody",
+            null,
+            ...(queueData.items ?? []).map(
+              (it, i) => React.createElement(
+                "tr",
+                { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
+                React.createElement("td", null, it.nickname || it.uid.slice(0, 8)),
+                React.createElement("td", null, it.kind === "school" ? "\u5F00\u5B66\u5B63" : "\u6210\u957F"),
+                React.createElement("td", { style: { ...s.code } }, it.code),
+                React.createElement(
+                  "td",
+                  null,
+                  React.createElement(Tag, {
+                    text: { pending: "\u5F85\u6267\u884C", running: "\u6267\u884C\u4E2D", done: "\u5B8C\u6210", skipped: "\u8DF3\u8FC7", error: "\u5931\u8D25" }[it.status] ?? it.status,
+                    tone: { done: "ok", error: "err", running: "info", skipped: "idle", pending: "idle" }[it.status] ?? "idle"
+                  })
+                ),
+                React.createElement("td", { style: { ...s.muted, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.message || "\u2014")
+              )
+            )
+          )
+        )
+      )
+    ) : null,
+    // 扫描结果
+    scanAccounts.length > 0 ? React.createElement(
+      "div",
+      { style: { marginTop: 10 } },
+      ...scanAccounts.map(
+        (it) => React.createElement(
+          "div",
+          { key: it.uid, style: { marginBottom: 8 } },
+          React.createElement(
+            "div",
+            { className: "dshc-row" },
+            React.createElement("span", { style: { ...s.label, minWidth: 0 } }, it.nickname || it.uid.slice(0, 8)),
+            it.growth?.length > 0 ? React.createElement(Tag, { text: `\u6210\u957F\u5F85\u529E ${it.growth.length}`, tone: "warn" }) : React.createElement(Tag, { text: "\u6210\u957F\u65E0\u5F85\u529E", tone: "ok" }),
+            it.chances > 0 ? React.createElement(Tag, { text: `\u62BD\u5956 ${it.chances} \u6B21`, tone: "info" }) : null
+          ),
+          it.growth?.length > 0 ? React.createElement("div", { style: { ...s.code, marginLeft: 12, marginTop: 3 } }, it.growth.join(" \xB7 ")) : null,
+          it.growthErr ? React.createElement("div", { style: { ...s.muted, marginLeft: 12 } }, `\u6210\u957F\u67E5\u8BE2\u5931\u8D25\uFF1A${it.growthErr}`) : null,
+          it.schoolErr ? React.createElement("div", { style: { ...s.muted, marginLeft: 12 } }, `\u5F00\u5B66\u5B63\u67E5\u8BE2\u5931\u8D25\uFF1A${it.schoolErr}`) : null
+        )
+      )
+    ) : scanning ? null : React.createElement(
+      "div",
+      { style: { ...s.muted, marginTop: 8 } },
+      `\u5F85\u529E\u5408\u8BA1 ${totalPending} \u9879\uFF08\u672A\u626B\u63CF\u65F6\u663E\u793A 0\uFF0C\u4E0D\u4EE3\u8868\u6CA1\u6709\uFF09\u3002\u70B9\u300C\u626B\u63CF\u5F85\u529E\u300D\u67E5\u770B\u3002`
+    )
+  );
 }
 function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
   if (growthData && growthData.available === false) {
@@ -2929,6 +3127,103 @@ function ChanhubPanel({ rpcCall }) {
     [rpcCall, refresh, showToast]
   );
   const [growthWriteBusy, setGrowthWriteBusy] = React.useState("");
+  const [taskScanData, setTaskScanData] = React.useState(null);
+  const [taskScanning, setTaskScanning] = React.useState(false);
+  const [taskQueueData, setTaskQueueData] = React.useState(null);
+  const [vouchersData, setVouchersData] = React.useState(null);
+  const [vouchersLoading, setVouchersLoading] = React.useState(false);
+  const onTaskScan = React.useCallback(
+    async () => {
+      setTaskScanning(true);
+      try {
+        const result = await rpcCall(ENDPOINTS.taskScan, {});
+        if (result?.ok === false) {
+          showToast(`\u626B\u63CF\u5931\u8D25\uFF1A${result.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        } else {
+          setTaskScanData(result?.value ?? null);
+        }
+      } catch (error) {
+        showToast(`\u626B\u63CF\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+      } finally {
+        setTaskScanning(false);
+      }
+    },
+    [rpcCall, showToast]
+  );
+  const onTaskQueueStart = React.useCallback(
+    async () => {
+      try {
+        const result = await rpcCall(ENDPOINTS.taskQueueStart, { concurrency: 2 });
+        const value = result?.value ?? {};
+        if (result?.ok === false) {
+          showToast(`\u961F\u5217\u542F\u52A8\u5931\u8D25\uFF1A${result.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+          return;
+        }
+        if (value.started === false) {
+          showToast(value.message ?? "\u6CA1\u6709\u5F85\u529E\u4EFB\u52A1\uFF0C\u6216\u961F\u5217\u5DF2\u5728\u6267\u884C\u4E2D");
+          return;
+        }
+        showToast(`\u961F\u5217\u5DF2\u542F\u52A8\uFF1A${value.total} \u9879\uFF08\u5E76\u53D1 2\uFF09`);
+        const poll = async () => {
+          try {
+            const status2 = await rpcCall(ENDPOINTS.taskQueueStatus, {});
+            const snap = status2?.value ?? null;
+            setTaskQueueData(snap);
+            if (snap?.running) {
+              setTimeout(poll, 5e3);
+            } else {
+              showToast("\u961F\u5217\u6267\u884C\u7ED3\u675F\u3002");
+              await refresh();
+            }
+          } catch {
+          }
+        };
+        setTimeout(poll, 2e3);
+      } catch (error) {
+        showToast(`\u961F\u5217\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+      }
+    },
+    [rpcCall, refresh, showToast]
+  );
+  const onRemoveAccount = React.useCallback(
+    async (account) => {
+      const label = account.nickname || account.uid.slice(0, 8);
+      if (typeof window !== "undefined" && !window.confirm(`\u79FB\u9664\u8D26\u53F7\u300C${label}\u300D\u5C06\u5220\u9664\u6C60\u72B6\u6001\u4E0E auths/ \u4E0B\u7684\u51ED\u8BC1\u6587\u4EF6\uFF0C\u4E14\u4E0D\u53EF\u6062\u590D\u3002\u786E\u8BA4\u79FB\u9664\uFF1F`)) {
+        return;
+      }
+      try {
+        const result = await rpcCall(ENDPOINTS.accountMore, { action: "remove", uid: account.uid });
+        if (result?.ok === false) {
+          showToast(`\u79FB\u9664\u5931\u8D25\uFF1A${result.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        } else {
+          const fileError = result?.value?.file_error;
+          showToast(fileError ? `\u5DF2\u51FA\u6C60\uFF0C\u4F46\u51ED\u8BC1\u6587\u4EF6\u5220\u9664\u5931\u8D25\uFF1A${fileError}` : `\u300C${label}\u300D\u5DF2\u79FB\u9664\u3002`);
+          await refresh();
+        }
+      } catch (error) {
+        showToast(`\u79FB\u9664\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+      }
+    },
+    [rpcCall, refresh, showToast]
+  );
+  const onViewVouchers = React.useCallback(
+    async () => {
+      setVouchersLoading(true);
+      try {
+        const result = await rpcCall(ENDPOINTS.schoolVouchersAll, {});
+        if (result?.ok === false) {
+          showToast(`\u5238\u7801\u67E5\u8BE2\u5931\u8D25\uFF1A${result.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        } else {
+          setVouchersData(result?.value ?? { rows: [] });
+        }
+      } catch (error) {
+        showToast(`\u5238\u7801\u67E5\u8BE2\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+      } finally {
+        setVouchersLoading(false);
+      }
+    },
+    [rpcCall, showToast]
+  );
   const onGrowthWrite = React.useCallback(
     async (action, code) => {
       const uid = firstGrowthAccountUid(growthByUid);
@@ -3087,7 +3382,8 @@ function ChanhubPanel({ rpcCall }) {
       scheduleConfig: configInfo?.config?.schedule,
       onRunTask,
       runningName: runningTask,
-      taskData: tasks
+      taskData: tasks,
+      onRemove: onRemoveAccount
     }) : null,
     activeTab === "tasks" ? React.createElement(TasksTab, {
       status,
@@ -3102,7 +3398,15 @@ function ChanhubPanel({ rpcCall }) {
       scheduleConfig: configInfo?.config?.schedule,
       onGrowthWrite,
       growthWriteBusy,
-      adminAvailable
+      adminAvailable,
+      scanData: taskScanData,
+      scanning: taskScanning,
+      queueData: taskQueueData,
+      onScan: onTaskScan,
+      onQueueStart: onTaskQueueStart,
+      vouchersData,
+      vouchersLoading,
+      onViewVouchers
     }) : null,
     activeTab === "usage" ? React.createElement(UsageTab, {
       stats,

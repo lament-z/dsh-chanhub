@@ -36,11 +36,17 @@ and are purely additive — `/v1/stats` responds with exactly its previous field
 | `GET /v1/models/probes` | Model measured output limits (manual probe results) | `withAuth` |
 | `GET /admin/tasks/status` | Task status + per-account check-in and balance results | `admin.enabled=true` |
 | `POST /admin/tasks/{name}` | Trigger one task (7 kinds incl. `balance`) | `admin.enabled=true` |
+| `GET /admin/tasks/scan` | Scan all accounts for pending automatable tasks | `admin.enabled=true` |
+| `POST /admin/tasks/queue/start` | Start the task queue (per-account serial, cross-account parallel) | `admin.enabled=true` |
+| `GET /admin/tasks/queue` | Queue progress | `admin.enabled=true` |
+| `GET /admin/school/status` | School-season status + lottery chances per account | `admin.enabled=true` |
+| `GET /admin/school/vouchers` | Voucher codes per account (read-only) | `admin.enabled=true` |
 | `POST /admin/growth-tasks/{uid}/accept` | Accept growth-task codes | `admin.enabled=true` |
 | `POST /admin/growth-tasks/{uid}/claim` | Claim growth-task rewards | `admin.enabled=true` |
 | `POST /admin/growth-tasks/{uid}/claim-claimable` | Claim all completed (unclaimed) rewards | `admin.enabled=true` |
 | `POST /admin/config` | Validate + atomically write config; hot-applies eligible fields | `admin.enabled=true` |
 | `POST /admin/accounts/{uid}/{disable,enable,revive}` | Account actions | `admin.enabled=true` |
+| `POST /admin/accounts/{uid}/{checkin,balance,remove}` | Per-account check-in / balance / removal | `admin.enabled=true` |
 
 Capability probing uses the real `ServeMux` behaviour: an unregistered path returns
 a **plain-text** 404, a registered one returns a **JSON** envelope (or 405 on a method
