@@ -1,0 +1,9 @@
+# dsh-chanhub bundle patch
+# ---------------------------------------------------------------------
+# 单一 cordis row：chanhub 面板（设置侧边栏「chanhub」项）。
+# 前端以 dsh-bridge-gateway 的设计语言渲染，后端与 lament-z/chanhub
+# （WorkBuddy2API 上游网关）通信。
+# ---------------------------------------------------------------------
+- insert:
+    - id: dsh-chanhub
+      name: 'dsh-chanhub'

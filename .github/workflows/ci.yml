@@ -1,0 +1,88 @@
+name: CI
+
+# 与 dsh-bridge-gateway 的 release.yml 的差别：这里**跑测试**。
+# 本插件的致命缺陷（宿主 RPC handler 永不回包）正是「测试只断言 JSON 字段」时漏掉的 ——
+# 一个面板完全不可用的版本可以全绿发出去。所以 CI 必须在发布前跑真实行为测试。
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build client bundle
+        run: npm run build:client
+
+      - name: Install render-test dependencies (React + jsdom)
+        # 插件本身不依赖 React（宿主提供）。渲染测试需要 React 与 jsdom，
+        # 装在独立目录并通过 DSHC_REACT_DIR 指过去，避免污染插件的依赖面。
+        run: |
+          mkdir -p /tmp/dshc-render
+          cd /tmp/dshc-render
+          npm init -y >/dev/null
+          npm install react@19 react-dom@19 jsdom --no-audit --no-fund
+
+      - name: Run tests
+        # 无网关时，依赖真实网关的用例会自动跳过（B1–B6），CI 保持绿色。
+        # 有网关的部署可在 CI 里设 DSH_CHANHUB_TEST_URL 与 WB2API_API_KEY 打开它们。
+        env:
+          DSHC_REACT_DIR: /tmp/dshc-render
+        run: npm test
+
+      - name: Verify packed tarball contains the client bundle
+        # 回归任务 00-B：client/client.js 曾被 .gitignore 与 files 白名单冲突吃掉。
+        run: |
+          npm pack --dry-run 2>&1 | tee /tmp/pack.txt
+          grep -q 'client/client.js' /tmp/pack.txt || {
+            echo "::error::tarball 缺少 client/client.js —— 面板在用户端会完全无法加载"
+            exit 1
+          }
+
+  publish:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js and npm registry
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Publish to npm
+        # prepack 会先跑 build:client，所以发布产物一定带最新 bundle。
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file CHANGELOG.md \
+            || echo "Release already exists or gh unavailable; npm publish already succeeded."

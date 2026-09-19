@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "policy": "dsh-plugin-naming/v1",
+  "plugin": {
+    "namespace": "lament-z",
+    "name": "chanhub",
+    "coordinate": "lament-z/chanhub",
+    "packageName": "dsh-chanhub"
+  },
+  "names": {
+    "pluginNames": [
+      "dsh-chanhub"
+    ],
+    "loaderIds": [
+      "dsh-chanhub"
+    ],
+    "services": [],
+    "tools": [],
+    "commands": [],
+    "skills": [],
+    "skillProviders": [],
+    "events": [],
+    "settingsNamespaces": [
+      "dsh-chanhub"
+    ],
+    "routes": [
+      {
+        "kind": "prefix",
+        "path": "/dsh-chanhub"
+      }
+    ]
+  }
+}

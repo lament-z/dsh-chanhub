@@ -1,0 +1,80 @@
+{
+  "name": "dsh-chanhub",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness 客户端插件：在设置侧边栏接入 chanhub（WorkBuddy2API）上游网关的可视化面板，复用 dsh-bridge-gateway 的设计语言。",
+  "releaseNotes": "【dsh-chanhub 0.1.0】\n• 面板：5 Tab（账号池/任务/用量/日志/配置），对齐 dsh-bridge-gateway 设计语言\n• 批量动作条：签到/查余额/保活/旅行/活跃上报走网关真实任务端点\n• 账号面板排程区块（色块+明细，只表达配置与时间窗，不编造执行状态）\n• 配置保存优先走网关端点：可热改字段即时生效，需重启字段明确列出\n• C 类持久化计数透出：连续12153 / 退避指数 / 快过期积分\n• 配套网关：7 类任务手动触发与逐号结果、逐套餐积分、用量分桶、日志、成长码 accept/claim、模型实测上限透出\n• 无数据源的区块显式标注，不编造推断值",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build:client": "node client/build.mjs",
+    "prepack": "npm run build:client",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": ">=0.1.0-rc.6"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "license": "MIT",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "chanhub",
+    "workbuddy2api",
+    "gateway",
+    "openai-compatible",
+    "panel"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:lament-z/dsh-chanhub.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lament-z/dsh-chanhub/issues"
+  },
+  "homepage": "https://github.com/lament-z/dsh-chanhub",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime / build outputs
+dist/
+build/
+# 注意：client/client.js **不入 gitignore**。
+# 它是构建产物，但被 package.json 的 files 白名单收录 —— 二者冲突会让
+# pacote 打包时跳过它（tarball 缺 bundle），且干净 clone 后 prepack 依赖 esbuild。
+# 与 dsh-bridge-gateway 保持一致：产物 tracked，prepack 只做刷新。
+
+# Environment
+.env
+.env.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# AI agent local data
+.agents/
+.workbuddy/
+
+# Credentials (never commit)
+.credentials
