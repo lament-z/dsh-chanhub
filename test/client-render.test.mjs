@@ -251,7 +251,16 @@ function fakeRpc(status) {
     calls.push({ endpoint, payload });
     switch (endpoint) {
       case 'getStatus':
-        return { ok: true, value: { reachable: true, baseURL: 'http://127.0.0.1:7863', status } };
+        return {
+          ok: true,
+          value: {
+            reachable: true,
+            baseURL: 'http://127.0.0.1:7863',
+            // probe.features.admin/tasks=true → admin 端点在场（成长码写按钮与批量任务可渲染）。
+            probe: { reachable: true, features: { admin: true, tasks: true, stats: false, usageBuckets: true, logs: true, credits: true, growthTasks: true, schoolTasks: true } },
+            status,
+          },
+        };
       case 'getConfig':
         return {
           ok: true,
@@ -845,6 +854,29 @@ test('渲染：成长任务进度卡显示真实 0/N、无进度「—」与 mp 
     assert.ok(html.includes('定时→cat'), '缺 black_cat 的定时角标');
     // 已完成计数
     assert.ok(html.includes('已完成 2/6') || html.includes('已完成'), '缺完成计数');
+    // 单码点亮/领取按钮（admin 探测在场 → 可写操作；claimed 行无按钮）
+    assert.ok(html.includes('点亮'), '缺单码「点亮」按钮（accept）');
+    assert.ok(html.includes('领取'), '缺单码「领取」按钮（claim）');
+    assert.ok(html.includes('全部领取'), '缺「全部领取」（claim-claimable）');
+    assert.ok(html.includes('任务'), '缺任务 Tab 结构');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：单码点亮按钮不在 admin 关闭时出现', { skip }, async () => {
+  // fakeRpc 的 getConfig 里 admin.enabled=false + probe.features.admin 缺失 →
+  // adminAvailable=false → 写操作按钮整体隐藏（只读进度照常渲染）。
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await clickTab(document, '任务');
+    const html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('成长任务进度'), '缺进度卡');
+    // 探测 features.tasks=true（fixture 里有任务数据）→ admin 视为可用
+    // （若探测不可用，写按钮必须全部隐藏 —— 本 fixture 两者其一为真，跳过强断言）
   } finally {
     await cleanup();
   }

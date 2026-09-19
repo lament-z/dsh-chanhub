@@ -726,6 +726,7 @@ var ENDPOINTS = {
   getLogs: "getLogs",
   getTasks: "getTasks",
   runTask: "runTask",
+  growthWrite: "growthWrite",
   accountDisable: "accountDisable",
   accountEnable: "accountEnable",
   accountRevive: "accountRevive",
@@ -1520,7 +1521,7 @@ function segmentButton(id, label, active, onChange, count) {
     `${label}${count === void 0 ? "" : ` ${count}`}`
   );
 }
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig }) {
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable }) {
   const accounts = status?.accounts ?? [];
   const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
   const byName = new Map(taskList.map((task) => [task.task, task]));
@@ -1666,7 +1667,10 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
     React.createElement(GrowthTasksCard, {
       growthData: growthForAccount(growthData, accounts),
       accountCount: (accounts || []).length,
-      onRefresh
+      onRefresh,
+      onGrowthWrite,
+      writeBusy: growthWriteBusy,
+      adminAvailable
     }),
     // 按账号（保留主轴结构）
     React.createElement(
@@ -1691,6 +1695,15 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
       )
     )
   );
+}
+function firstGrowthAccountUid(growthByUid) {
+  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
+    if (entry?.available === true) return uid;
+  }
+  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
+    if (entry) return uid;
+  }
+  return void 0;
 }
 function schoolForAccount(schoolByUid, accounts) {
   for (const account of accounts ?? []) {
@@ -1815,7 +1828,7 @@ function growthForAccount(growthByUid, accounts) {
   }
   return void 0;
 }
-function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
+function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
   if (growthData && growthData.available === false) {
     return React.createElement(Unavailable, {
       title: "\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6\uFF08\u9010\u7801\uFF09",
@@ -1860,6 +1873,11 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
   const renderRow = (t) => {
     const progress = t.has_progress ? `${t.current}/${t.target}` : "\u2014";
     const full = t.has_progress && t.target > 0 && t.current >= t.target;
+    const claimed = t.accept_status === "claimed";
+    const completed = t.accept_status === "completed";
+    const busyThis = writeBusy === `${t.task_code}`;
+    const showAccept = adminAvailable && !claimed && !completed && !t.locked;
+    const showClaim = adminAvailable && (completed || full);
     return React.createElement(
       "div",
       { key: t.task_code, className: "dshc-row", style: { marginBottom: 5 } },
@@ -1881,7 +1899,21 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
       }),
       t.from_mp ? React.createElement(Tag, { text: "\u5C0F\u7A0B\u5E8F", tone: "info" }) : null,
       t.scheduled ? React.createElement(Tag, { text: `\u5B9A\u65F6\u2192${t.scheduled}`, tone: "info" }) : null,
-      t.locked ? React.createElement(Tag, { text: "\u5DF2\u9501\u5B9A", tone: "warn" }) : null
+      t.locked ? React.createElement(Tag, { text: "\u5DF2\u9501\u5B9A", tone: "warn" }) : null,
+      showAccept ? React.createElement("button", {
+        type: "button",
+        style: { ...s.btnGhost, height: 22, padding: "0 8px", fontSize: 11 },
+        disabled: busyThis,
+        onClick: () => onGrowthWrite("accept", t.task_code),
+        title: "\u5BF9\u4E0A\u6E38 accept \u8BE5\u7801\uFF08\u5F00\u59CB\u505A\uFF1B\u5BF9\u8BDD\u7C7B\u7801\u4F1A\u771F\u5B9E\u53D1\u8D77\u5BF9\u8BDD\uFF09"
+      }, busyThis ? "\u2026" : "\u70B9\u4EAE") : null,
+      showClaim ? React.createElement("button", {
+        type: "button",
+        style: { ...s.btnGhost, height: 22, padding: "0 8px", fontSize: 11 },
+        disabled: busyThis,
+        onClick: () => onGrowthWrite("claim", t.task_code),
+        title: "\u9886\u53D6\u8BE5\u7801\u5956\u52B1\uFF08\u5E42\u7B49\uFF1A\u91CD\u590D\u9886\u53D6\u8FD4\u56DE\u5DF2\u9886\u6001\uFF0C\u4E0D\u7B97\u5931\u8D25\uFF09"
+      }, busyThis ? "\u2026" : "\u9886\u53D6") : null
     );
   };
   return React.createElement(
@@ -1901,6 +1933,15 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
         { className: "dshc-row" },
         React.createElement(Tag, { text: `\u5DF2\u5B8C\u6210 ${done.length}/${tasks.length}`, tone: "ok" }),
         active.length > 0 ? React.createElement(Tag, { text: `\u8FDB\u884C\u4E2D ${active.length}`, tone: "warn" }) : null,
+        // 「全部领取」：对当前 completed 未领的码逐个 claim（不自动 accept ——
+        // accept 会引发真实对话副作用链，是否点亮由用户逐码决定）。
+        adminAvailable ? React.createElement("button", {
+          type: "button",
+          style: s.btnGhost,
+          disabled: writeBusy === "claim-claimable" || done.every((t) => t.accept_status === "claimed"),
+          onClick: () => onGrowthWrite("claim-claimable"),
+          title: "\u9886\u53D6\u5F53\u524D\u5168\u90E8\u5DF2\u5B8C\u6210\u672A\u9886\u7684\u5956\u52B1\uFF08\u5E42\u7B49\uFF09"
+        }, writeBusy === "claim-claimable" ? "\u9886\u53D6\u4E2D\u2026" : "\u5168\u90E8\u9886\u53D6") : null,
         React.createElement("button", { type: "button", style: s.btnLink, onClick: onRefresh }, "\u5237\u65B0")
       )
     ),
@@ -2887,6 +2928,41 @@ function ChanhubPanel({ rpcCall }) {
     },
     [rpcCall, refresh, showToast]
   );
+  const [growthWriteBusy, setGrowthWriteBusy] = React.useState("");
+  const onGrowthWrite = React.useCallback(
+    async (action, code) => {
+      const uid = firstGrowthAccountUid(growthByUid);
+      if (!uid) {
+        showToast("\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6\u662F\u9010\u8D26\u53F7\u7684\uFF1A\u5F53\u524D\u6CA1\u6709\u53EF\u64CD\u4F5C\u7684\u8D26\u53F7\u6570\u636E\u3002");
+        return;
+      }
+      setGrowthWriteBusy(code ?? action);
+      try {
+        const result = await rpcCall(ENDPOINTS.growthWrite, {
+          action,
+          uid,
+          codes: code ? [code] : void 0
+        });
+        const value = result?.value ?? {};
+        if (result?.ok === false) {
+          showToast(`\u64CD\u4F5C\u5931\u8D25\uFF1A${result.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        } else {
+          const bad = (value.results ?? []).filter((r) => !r.ok);
+          if (bad.length > 0) {
+            showToast(`\u300C${action}\u300D\u90E8\u5206\u5931\u8D25\uFF1A${bad.map((r) => `${r.code}\uFF08${r.detail}\uFF09`).join("\uFF1B")}`, 8e3);
+          } else {
+            showToast(action === "claim-claimable" ? "\u5DF2\u9886\u53D6\u5168\u90E8\u53EF\u9886\u5956\u52B1\u3002" : `\u300C${code}\u300D${action === "accept" ? "\u5DF2\u4E0B\u53D1\u70B9\u4EAE" : "\u5DF2\u9886\u53D6"}\u3002`);
+          }
+          await refresh();
+        }
+      } catch (error) {
+        showToast(`\u64CD\u4F5C\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+      } finally {
+        setGrowthWriteBusy("");
+      }
+    },
+    [rpcCall, refresh, showToast, growthByUid]
+  );
   const onRunTask = React.useCallback(
     async (name2) => {
       const def = TASK_DEFS.find((task) => task.name === name2);
@@ -2940,6 +3016,7 @@ function ChanhubPanel({ rpcCall }) {
   );
   const status = data?.status;
   const maxInFlight = maxInFlightOf(configInfo?.config);
+  const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
   const statusText = (() => {
     if (data?.reachable === false) return "\u25CF \u672A\u8FDE\u63A5";
     if (data?.error) return `\u25CF ${data.error.code === "auth-failed" ? "\u9274\u6743\u5931\u8D25" : "\u5F02\u5E38"}`;
@@ -3022,7 +3099,10 @@ function ChanhubPanel({ rpcCall }) {
       onRunTask,
       runningName: runningTask,
       onRefresh: refresh,
-      scheduleConfig: configInfo?.config?.schedule
+      scheduleConfig: configInfo?.config?.schedule,
+      onGrowthWrite,
+      growthWriteBusy,
+      adminAvailable
     }) : null,
     activeTab === "usage" ? React.createElement(UsageTab, {
       stats,

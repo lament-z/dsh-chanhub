@@ -60,6 +60,7 @@ const ENDPOINTS = {
   getLogs: 'getLogs',
   getTasks: 'getTasks',
   runTask: 'runTask',
+  growthWrite: 'growthWrite',
   accountDisable: 'accountDisable',
   accountEnable: 'accountEnable',
   accountRevive: 'accountRevive',
@@ -950,7 +951,7 @@ function segmentButton(id, label, active, onChange, count) {
  * @param props - `{status, channelOf, maxInFlight, taskData, onRunTask, runningName, onRefresh}`。
  * @returns React 元素。
  */
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig }) {
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable }) {
   const accounts = status?.accounts ?? [];
   // taskData 是宿主 getTasks 的 value，形如 {available, tasks:{tasks:[...]}}。
   // 逐层取并把非数组一律当空 —— 形状不符时降级为空表，而不是抛异常炸掉整个 Tab。
@@ -1079,6 +1080,9 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
       growthData: growthForAccount(growthData, accounts),
       accountCount: (accounts || []).length,
       onRefresh,
+      onGrowthWrite,
+      writeBusy: growthWriteBusy,
+      adminAvailable,
     }),
 
     // 按账号（保留主轴结构）
@@ -1107,6 +1111,22 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
  * schoolForAccount 取「账号池顺序里第一个有数据」的开学季状态。
  * 与 growthForAccount 同理由：进度逐账号，合并会造出假进度。
  */
+/**
+ * firstGrowthAccountUid 取「进度数据可用的第一个账号 uid」：
+ * 成长码写操作与进度查看同源（同一账号），保证面板显示的进度就是操作的进度。
+ * @param growthByUid - getGrowthTasks 的逐账号结果表。
+ * @returns uid 或 undefined。
+ */
+function firstGrowthAccountUid(growthByUid) {
+  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
+    if (entry?.available === true) return uid;
+  }
+  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
+    if (entry) return uid;
+  }
+  return undefined;
+}
+
 function schoolForAccount(schoolByUid, accounts) {
   for (const account of accounts ?? []) {
     const entry = schoolByUid?.[account.uid];
@@ -1259,7 +1279,7 @@ function growthForAccount(growthByUid, accounts) {
  * @param props - `{growthData, accounts, onRefresh}`。
  * @returns React 元素。
  */
-function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
+function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
   if (growthData && growthData.available === false) {
     return React.createElement(Unavailable, {
       title: '成长任务进度（逐码）',
@@ -1304,6 +1324,15 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
   const renderRow = (t) => {
     const progress = t.has_progress ? `${t.current}/${t.target}` : '—';
     const full = t.has_progress && t.target > 0 && t.current >= t.target;
+    const claimed = t.accept_status === 'claimed';
+    const completed = t.accept_status === 'completed';
+    const busyThis = writeBusy === `${t.task_code}`;
+    // 单码动作（admin.enabled 门槛内；写操作真实推进状态）：
+    //   - accepted（未满）→ 可 accept 重新推进（幂等：上游按码判重）
+    //   - completed / 进度已满 → claim 领奖（幂等：重复领返回已领态不算失败）
+    //   - claimed → 无动作（已完结）
+    const showAccept = adminAvailable && !claimed && !completed && !t.locked;
+    const showClaim = adminAvailable && (completed || full);
     return React.createElement('div', { key: t.task_code, className: 'dshc-row', style: { marginBottom: 5 } },
       // 左侧色条：进行中未满 = 橙（提示还有活干），已满/已领 = 绿
       React.createElement('span', {
@@ -1322,6 +1351,20 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
       t.from_mp ? React.createElement(Tag, { text: '小程序', tone: 'info' }) : null,
       t.scheduled ? React.createElement(Tag, { text: `定时→${t.scheduled}`, tone: 'info' }) : null,
       t.locked ? React.createElement(Tag, { text: '已锁定', tone: 'warn' }) : null,
+      showAccept
+        ? React.createElement('button', {
+            type: 'button', style: { ...s.btnGhost, height: 22, padding: '0 8px', fontSize: 11 },
+            disabled: busyThis, onClick: () => onGrowthWrite('accept', t.task_code),
+            title: '对上游 accept 该码（开始做；对话类码会真实发起对话）',
+          }, busyThis ? '…' : '点亮')
+        : null,
+      showClaim
+        ? React.createElement('button', {
+            type: 'button', style: { ...s.btnGhost, height: 22, padding: '0 8px', fontSize: 11 },
+            disabled: busyThis, onClick: () => onGrowthWrite('claim', t.task_code),
+            title: '领取该码奖励（幂等：重复领取返回已领态，不算失败）',
+          }, busyThis ? '…' : '领取')
+        : null,
     );
   };
 
@@ -1336,6 +1379,16 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh }) {
       React.createElement('div', { className: 'dshc-row' },
         React.createElement(Tag, { text: `已完成 ${done.length}/${tasks.length}`, tone: 'ok' }),
         active.length > 0 ? React.createElement(Tag, { text: `进行中 ${active.length}`, tone: 'warn' }) : null,
+        // 「全部领取」：对当前 completed 未领的码逐个 claim（不自动 accept ——
+        // accept 会引发真实对话副作用链，是否点亮由用户逐码决定）。
+        adminAvailable
+          ? React.createElement('button', {
+              type: 'button', style: s.btnGhost,
+              disabled: writeBusy === 'claim-claimable' || done.every((t) => t.accept_status === 'claimed'),
+              onClick: () => onGrowthWrite('claim-claimable'),
+              title: '领取当前全部已完成未领的奖励（幂等）',
+            }, writeBusy === 'claim-claimable' ? '领取中…' : '全部领取')
+          : null,
         React.createElement('button', { type: 'button', style: s.btnLink, onClick: onRefresh }, '刷新'),
       ),
     ),
@@ -2384,6 +2437,45 @@ function ChanhubPanel({ rpcCall }) {
     [rpcCall, refresh, showToast],
   );
 
+  // 成长码写操作的逐码 busy 标记（值 = task_code 或 'claim-claimable'）。
+  const [growthWriteBusy, setGrowthWriteBusy] = React.useState('');
+
+  /** 单码/批量成长码写操作（点亮 accept / 领取 claim / 全部领取）。 */
+  const onGrowthWrite = React.useCallback(
+    async (action, code) => {
+      const uid = firstGrowthAccountUid(growthByUid);
+      if (!uid) {
+        showToast('成长任务进度是逐账号的：当前没有可操作的账号数据。');
+        return;
+      }
+      setGrowthWriteBusy(code ?? action);
+      try {
+        const result = await rpcCall(ENDPOINTS.growthWrite, {
+          action,
+          uid,
+          codes: code ? [code] : undefined,
+        });
+        const value = result?.value ?? {};
+        if (result?.ok === false) {
+          showToast(`操作失败：${result.error?.message ?? '未知错误'}`);
+        } else {
+          const bad = (value.results ?? []).filter((r) => !r.ok);
+          if (bad.length > 0) {
+            showToast(`「${action}」部分失败：${bad.map((r) => `${r.code}（${r.detail}）`).join('；')}`, 8000);
+          } else {
+            showToast(action === 'claim-claimable' ? '已领取全部可领奖励。' : `「${code}」${action === 'accept' ? '已下发点亮' : '已领取'}。`);
+          }
+          await refresh();
+        }
+      } catch (error) {
+        showToast(`操作异常：${error?.message ?? error}`);
+      } finally {
+        setGrowthWriteBusy('');
+      }
+    },
+    [rpcCall, refresh, showToast, growthByUid],
+  );
+
   /** 触发一类任务（异步：网关立即回执，结果经刷新查看）。 */
   const onRunTask = React.useCallback(
     async (name) => {
@@ -2445,6 +2537,9 @@ function ChanhubPanel({ rpcCall }) {
 
   const status = data?.status;
   const maxInFlight = maxInFlightOf(configInfo?.config);
+  // admin 门槛可用性：探测 /admin/* 路由存在（405 判定）。true = 管理端点已开启，
+  // 成长码写操作（点亮/领取）与批量任务按钮才出现；false = 如实隐藏并说明。
+  const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
 
   /** 顶部连接状态文案。 */
   const statusText = (() => {
@@ -2534,6 +2629,9 @@ function ChanhubPanel({ rpcCall }) {
           runningName: runningTask,
           onRefresh: refresh,
           scheduleConfig: configInfo?.config?.schedule,
+          onGrowthWrite: onGrowthWrite,
+          growthWriteBusy: growthWriteBusy,
+          adminAvailable: adminAvailable,
         })
       : null,
     activeTab === 'usage'
