@@ -1,8 +1,8 @@
 {
   "name": "dsh-chanhub",
-  "version": "0.1.0",
+  "version": "0.1.10",
   "description": "DeepSeek Harness 客户端插件：在设置侧边栏接入 chanhub（WorkBuddy2API）上游网关的可视化面板，复用 dsh-bridge-gateway 的设计语言。",
-  "releaseNotes": "【dsh-chanhub 0.1.0】\n• 面板：5 Tab（账号池/任务/用量/日志/配置），对齐 dsh-bridge-gateway 设计语言\n• 任务中心：跨账号扫描待办 + 执行队列（自动领奖）+ 17 码纯 API 点亮/领取\n• 批量动作条：签到/查余额/保活/旅行/活跃上报走网关真实任务端点\n• 配置保存优先走网关端点：可热改字段即时生效，需重启字段明确列出\n• 开学季券码查询 + 各账号抽奖余额\n• C 类持久化计数透出：连续12153 / 退避指数 / 快过期积分\n• 无数据源的区块显式标注，不编造推断值",
+  "releaseNotes": "【dsh-chanhub 0.1.10】TraeWork 添加账号改为「粘贴地址栏」完成（远端可用）\n• 上一版设想的「回调打到面板」方案已被证伪：Trae 授权页硬性要求回调是 http://127.0.0.1:<port>/authorize，非 loopback 一律显示「网络错误，请刷新页面重试。」（授权页源码里的正则校验，真实原因是这个）\n• 现在：发起登录后弹窗常驻粘贴框，明确说明「浏览器会跳到一个打不开的地址，这是 Trae 的限制不是故障，地址栏里带着凭证，整段复制回来即可」；提交后由网关完成换 token\n• 网关：回调恒为 loopback + 15 分钟 TTL；重复提交拒绝（后来者无法覆盖本次登录）；不含凭证的粘贴明确报错且不污染中间态，用户可立刻重贴\n• 测试 136 用例通过；真机验证「发起 → 粘贴 → 越过 pending 进入真实换 token」全链路",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

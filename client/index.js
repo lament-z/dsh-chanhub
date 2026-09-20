@@ -1,7 +1,8 @@
 // dsh-chanhub —— 客户端面板（浏览器侧，经 dsh.client.inject 加载）
 //
 // 结构（见 `.scratch/chanhub-panel/ui-design.md` §2）：
-//   5 个 Tab：账号池 / 任务 / 用量 / 日志 / 配置，右侧显示连接状态。
+//   5 个 Tab：账号池 / 任务 / 用量 / 日志 / 配置；Tab 栏最右端是「＋ 添加账号」
+//   （连接状态在顶栏，不在 Tab 栏）。
 //
 // 设计风格严格对齐 dsh-bridge-gateway：同一套视觉令牌、同一套 RPC 调用封装、
 // 同样经 ctx.slots.inject('settings.section', …) 注册。
@@ -17,12 +18,9 @@ import { s, tone, FOLD_CSS } from './theme.js';
 import {
   CHANNEL_ORDER,
   GROWTH_CODES,
-  INTUITION_FACTS,
-  SCHOOL_SUBTASKS,
   SCHEDULE_ITEMS,
   accountState,
   channelResolver,
-  codeBadges,
   codeCoverage,
   creditsSummary,
   formatDuration,
@@ -39,6 +37,7 @@ import {
   summaryCounters,
 } from './derive.js';
 import { coerceField, fieldsByGroup, formatFieldValue, getPath } from '../lib/config-spec.js';
+import { AddAccountDialog } from './add-account.js';
 
 const CHANNEL = '/dsh-chanhub';
 const name = 'dsh-chanhub';
@@ -47,6 +46,7 @@ const inject = ['slots', 'connection'];
 /** RPC 端点（与宿主 lib/index.js 的 ENDPOINTS 保持一致）。 */
 const ENDPOINTS = {
   getStatus: 'getStatus',
+  refreshStatus: 'refreshStatus',
   getModels: 'getModels',
   getStats: 'getStats',
   probe: 'probe',
@@ -70,7 +70,12 @@ const ENDPOINTS = {
   accountDisable: 'accountDisable',
   accountEnable: 'accountEnable',
   accountRevive: 'accountRevive',
+  loginStart: 'loginStart',
+  loginPoll: 'loginPoll',
+  loginCallback: 'loginCallback',
+  getChannels: 'getChannels',
   serviceControl: 'serviceControl',
+  revealApiKey: 'revealApiKey',
 };
 
 /** 六类可触发任务（与网关 scheduler 的任务名一一对应）。 */
@@ -125,12 +130,18 @@ const svg = (props, ...children) =>
   );
 
 const Icons = {
-  gateway: (props) =>
+  // 渠道中心主图标：三条汇入一个节点的线（渠道汇聚），与 bridge 的
+  // tunnel/ops/gear、宿主齿轮 fallback 均不重合。
+  hub: (props) =>
     svg(
       { width: 18, height: 18, ...props },
-      React.createElement('circle', { key: 'c', cx: 12, cy: 12, r: 9 }),
-      React.createElement('path', { key: 'a', d: 'M3 12h18' }),
-      React.createElement('path', { key: 'b', d: 'M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z' }),
+      React.createElement('circle', { key: 'c', cx: 12, cy: 12, r: 2.6 }),
+      React.createElement('path', { key: 'a', d: 'M12 9.4V3.5' }),
+      React.createElement('path', { key: 'b', d: 'M9.8 13.4l-5.1 3' }),
+      React.createElement('path', { key: 'd', d: 'M14.2 13.4l5.1 3' }),
+      React.createElement('circle', { key: 'e', cx: 12, cy: 3, r: 1.6 }),
+      React.createElement('circle', { key: 'f', cx: 4, cy: 17, r: 1.6 }),
+      React.createElement('circle', { key: 'g', cx: 20, cy: 17, r: 1.6 }),
     ),
   chart: (props) =>
     svg(
@@ -164,6 +175,42 @@ const Icons = {
       React.createElement('path', { key: 'a', d: 'M21 12a9 9 0 1 1-3-6.7' }),
       React.createElement('path', { key: 'b', d: 'M21 3v6h-6' }),
     ),
+  // v2 新增
+  eye: (props) =>
+    svg(
+      { width: 14, height: 14, ...props },
+      React.createElement('path', { key: 'a', d: 'M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z' }),
+      React.createElement('circle', { key: 'b', cx: 12, cy: 12, r: 3 }),
+    ),
+  eyeOff: (props) =>
+    svg(
+      { width: 14, height: 14, ...props },
+      React.createElement('path', { key: 'a', d: 'M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24' }),
+      React.createElement('line', { key: 'b', x1: 1, y1: 1, x2: 23, y2: 23 }),
+    ),
+  copy: (props) =>
+    svg(
+      { width: 13, height: 13, ...props },
+      React.createElement('rect', { key: 'a', x: 9, y: 9, width: 13, height: 13, rx: 2 }),
+      React.createElement('path', { key: 'b', d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }),
+    ),
+  cardView: (props) =>
+    svg(
+      { width: 13, height: 13, ...props },
+      React.createElement('rect', { key: 'a', x: 3, y: 3, width: 7, height: 7, rx: 1.5 }),
+      React.createElement('rect', { key: 'b', x: 14, y: 3, width: 7, height: 7, rx: 1.5 }),
+      React.createElement('rect', { key: 'c', x: 3, y: 14, width: 7, height: 7, rx: 1.5 }),
+      React.createElement('rect', { key: 'd', x: 14, y: 14, width: 7, height: 7, rx: 1.5 }),
+    ),
+  listView: (props) =>
+    svg(
+      { width: 13, height: 13, ...props },
+      React.createElement('rect', { key: 'a', x: 3, y: 4, width: 18, height: 4, rx: 1 }),
+      React.createElement('rect', { key: 'b', x: 3, y: 10, width: 18, height: 4, rx: 1 }),
+      React.createElement('rect', { key: 'c', x: 3, y: 16, width: 18, height: 4, rx: 1 }),
+    ),
+  bolt: (props) =>
+    svg(props, React.createElement('path', { d: 'M13 2L3 14h7l-1 8 10-12h-7l1-8z' })),
 };
 
 /**
@@ -180,6 +227,23 @@ function Tag({ text, tone: toneName = 'idle', title }) {
       ...(title === undefined ? {} : { title }),
     },
     text,
+  );
+}
+
+/**
+ * 卡片标题行：左标题 + 右次要信息（可选）+ 右侧动作（可选）。
+ *
+ * 统一各卡的标题排版 —— 原先每张卡各写一遍 `{...s.label}` 加手工 margin，
+ * 结果同一页里标题字号/间距/右侧信息位置各不相同。
+ *
+ * @param props - `{title, extra, actions}`。
+ * @returns React 元素。
+ */
+function CardHead({ title, extra, actions }) {
+  return React.createElement('div', { className: 'dshc-cardhead' },
+    React.createElement('span', { style: s.label }, title),
+    extra ? React.createElement('span', { style: s.muted }, extra) : null,
+    actions ? React.createElement('span', { className: 'dshc-row', style: { marginLeft: 'auto', gap: 6 } }, actions) : null,
   );
 }
 
@@ -252,10 +316,10 @@ function Fold({ summary, children, open = false, id }) {
  *   渠道间 1px 竖线。**`.row` 用 center 而不是 baseline** —— 竖排块较高，
  *   baseline 会错位（实测 20px，坑 3）。
  *
- * @param props - `{status, channelOf, onRefresh, refreshing}`。
+ * @param props - `{status, channelOf, showDistribution, onToggleDistribution}`。
  * @returns React 元素。
  */
-function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
+function OverviewCard({ status, channelOf, showDistribution, onToggleDistribution }) {
   const counters = summaryCounters(status);
   const realms = realmAvailability(status?.realm_totals);
   const grouped = groupByChannel(status?.accounts ?? [], channelOf);
@@ -264,64 +328,72 @@ function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
   return React.createElement(
     'div',
     { style: s.card },
+    // KPI 行：账号总数（点击展开渠道分布）+ 健康/冷却/在途满
     React.createElement(
       'div',
-      { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-      React.createElement(
-        'div',
-        { style: { ...s.label, display: 'flex', alignItems: 'center', gap: 8 } },
-        React.createElement(Icons.chart, { style: { width: 16, height: 16 } }),
-        '概览',
-      ),
-      React.createElement(
-        'div',
-        { className: 'dshc-row' },
-        React.createElement(
-          'span',
-          { style: s.muted },
-          `${status?.healthy ?? 0} 可用 · ${formatNumber(grouped.total)} 积分`,
-        ),
-        React.createElement(
+      { className: 'dshc-kpis' },
+      ...counters.map((counter) => {
+        const clickable = counter.key === 'total';
+        return React.createElement(
           'button',
-          { type: 'button', style: s.btnLink, onClick: onRefresh, disabled: refreshing },
-          React.createElement(Icons.refresh, null),
-          refreshing ? '刷新中' : '刷新',
-        ),
-      ),
-    ),
-
-    // 五联
-    React.createElement(
-      'div',
-      { className: 'dshc-five', style: { marginTop: 12 } },
-      ...counters.map((counter) =>
-        React.createElement(
-          'div',
           {
             key: counter.label,
-            style: {
-              background: 'var(--dsw-alias-bg-layer-1,#fff)',
-              border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
-              borderRadius: 8,
-              padding: '8px 10px',
-              minWidth: 0,
-            },
+            type: 'button',
+            className: 'dshc-kpi',
+            onClick: clickable ? onToggleDistribution : undefined,
+            title: clickable ? '点击查看渠道分布' : undefined,
+            style: { ...s.kpi, cursor: clickable ? 'pointer' : 'default' },
           },
-          React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, counter.label),
+          React.createElement('div', { style: { ...s.muted, fontSize: 11 } },
+            counter.label, clickable ? ' ▾' : ''),
           React.createElement(
             'div',
-            { style: { fontSize: 18, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg } },
+            { style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg } },
             String(counter.value),
           ),
+        );
+      }),
+    ),
+
+    // 渠道分布（点「账号总数」展开）
+    showDistribution
+      ? React.createElement(
+          'div',
+          { className: 'dshc-row', style: { marginTop: 10, paddingLeft: 4 } },
+          ...grouped.channels.map((channel) =>
+            React.createElement(Tag, {
+              key: channel.id,
+              text: `${channel.label} ${channel.count} 号`,
+              tone: channel.count > 0 ? 'info' : 'idle',
+            }),
+          ),
+        )
+      : null,
+
+    // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）
+    React.createElement(
+      'div',
+      { className: 'dshc-chancards', style: { marginTop: 10 } },
+      ...grouped.channels.map((channel) =>
+        React.createElement(
+          'div',
+          { key: channel.id, className: `dshc-chancard${channel.count === 0 ? ' dim' : ''}` },
+          React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, channel.label),
+          React.createElement(
+            'div',
+            { style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg } },
+            channel.count > 0 ? formatNumber(channel.credits) : '—',
+          ),
+          React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} 号`),
         ),
       ),
     ),
 
-    // 域可用性条（realm_totals 是 chanhub 独有字段）
+    // 域可用性条（realm_totals 独有数据，保留）
     realms.length > 0
       ? React.createElement(
           'div',
-          { style: { marginTop: 12 } },
+          { style: { marginTop: 10 } },
           ...realms.map((realm) =>
             React.createElement(
               'div',
@@ -350,57 +422,24 @@ function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
           ),
         )
       : null,
-
-    // 总积分 / 渠道（竖排三行并排，center 对齐）
-    React.createElement('div', { style: s.block },
-      React.createElement(
-        'div',
-        { className: 'dshc-totalrow' },
-        React.createElement(
-          'div',
-          null,
-          React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, '总积分（可消耗）'),
-          React.createElement(
-            'div',
-            { style: { fontSize: 24, fontWeight: 700, color: tone.ok.fg, lineHeight: 1.2 } },
-            formatNumber(grouped.total),
-          ),
-        ),
-        React.createElement(
-          'div',
-          { className: 'dshc-channels' },
-          ...grouped.channels.map((channel) =>
-            React.createElement(
-              'div',
-              { key: channel.id, className: 'dshc-chan' },
-              React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, channel.label),
-              React.createElement(
-                'div',
-                { style: { fontSize: 15, fontWeight: 600, color: 'var(--dsw-alias-label-primary,currentColor)' } },
-                formatNumber(channel.credits),
-              ),
-              React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} 号`),
-            ),
-          ),
-        ),
-      ),
-      React.createElement(
-        'div',
-        { style: { ...s.muted, marginTop: 8 } },
-        `上游下发总额 ${formatNumber(grouped.creditsTotal)}；其中不可消耗部分不计入上方总数`,
-        '（Trae 的 ep=1 专用池混算会导致按虚高余额选号）。',
-      ),
-    ),
   );
 }
 
 /**
  * 账号折叠面板（账号池与任务 Tab 共用）。
  *
- * @param props - `{account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove}`。
+ * 现在是两层折叠：外层壳 + 四组（健康/质量/积分/任务）。
+ * 详情抽屉里默认展开外层与健康/质量/积分三组，让「点开卡片就看到明细」；
+ * 任务组保持折叠 —— 它展开是 6 项排程明细 + 说明，ui-design §6 刻意压成
+ * 一行色块省高度（`defaultOpen` 只作用于前四层，不含任务组）。
+ *
+ * 注意「默认展开」≠「锁死展开」：`Fold` 收到的是固定 `open: true`，React 只在
+ * 该值**变化**时写 DOM 属性，故用户手点的折叠在重渲染后保持。
+ *
+ * @param props - `{account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove, defaultOpen}`。
  * @returns React 元素。
  */
-function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove }) {
+function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove, defaultOpen = false }) {
   const state = accountState(account, maxInFlight);
   const dot = (tone[state.tone] ?? tone.idle).fg;
   const label = channelLabel(channel);
@@ -453,14 +492,14 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
 
   return React.createElement(
     Fold,
-    { summary },
+    { summary, open: defaultOpen },
     // 四组折叠：健康 / 质量 / 积分 / 任务。收起时也要能判断状态（摘要带关键数据）。
     React.createElement(
       Fold,
       { summary: React.createElement('span', { className: 'dshc-row', style: { minWidth: 0 } },
         React.createElement('span', { style: s.label }, '健康'),
         React.createElement('span', { style: s.muted }, healthSummary(account, state)),
-      ) },
+      ), open: defaultOpen },
       React.createElement('div', { className: 'dshc-grid' },
         ...accountRow('UID', account.uid),
         ...accountRow('域', account.realm || '—'),
@@ -519,7 +558,7 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
       { summary: React.createElement('span', { className: 'dshc-row', style: { minWidth: 0 } },
         React.createElement('span', { style: s.label }, '质量'),
         React.createElement('span', { style: s.muted }, qualitySummary(account)),
-      ) },
+      ), open: defaultOpen },
       React.createElement('div', { className: 'dshc-grid' },
         ...accountRow('成功次数', String(account.success_count ?? 0)),
         ...accountRow('失败次数', String(account.err_total ?? 0)),
@@ -538,9 +577,10 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
       { summary: React.createElement('span', { className: 'dshc-row', style: { minWidth: 0 } },
         React.createElement('span', { style: s.label }, '积分'),
         React.createElement('span', { style: s.muted }, creditsSummary(account)),
-      ) },
+      ), open: defaultOpen },
       React.createElement('div', { className: 'dshc-grid' },
         ...accountRow('可消耗积分', formatNumber(account.credits ?? 0)),
+        ...(isZeroTime(account.credits_at) ? [] : accountRow('余额更新于', relativeTime(account.credits_at))),
         // 快过期子集（选号第四因子 ×8 权重的快照）：运维核对「为什么它总被选」。
         ...(account.credits_expiring !== undefined
           ? accountRow('快过期积分', formatNumber(account.credits_expiring))
@@ -657,6 +697,7 @@ function CreditsBreakdown({ credits, account }) {
       spent > 0
         ? React.createElement(Tag, { text: `${spent} 个已耗尽`, tone: 'idle' })
         : null,
+
       typeof data.upstream_remain === 'number' && data.upstream_remain !== data.usable_total
         ? React.createElement(Tag, {
             text: `上游合计 ${formatNumber(data.upstream_remain)}（与明细求和不一致）`,
@@ -823,11 +864,14 @@ function rateLimitedNotice(list) {
  * POST /admin/tasks/{name}（与「任务」Tab 同一数据面）。五类手动可触发；
  * 触发后经「刷新」看 /admin/tasks/status 的逐号结果。
  *
- * @param props - `{status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData}`。
+ * @param props - `{status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove}`。
  * @returns React 元素。
  */
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData, onRemove }) {
+function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove }) {
   const [filter, setFilter] = React.useState('all');
+  const [view, setView] = React.useState('card');
+  const [showDistribution, setShowDistribution] = React.useState(false);
+  const [detailAccount, setDetailAccount] = React.useState(null);
   const accounts = status?.accounts ?? [];
 
   const counts = React.useMemo(() => {
@@ -844,91 +888,226 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
     [accounts, channelOf, filter],
   );
 
-  // 任务运行状态（/admin/tasks/status）：批量按钮的运行中标记与触发回执。
-  const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
-  const byName = new Map(taskList.map((task) => [task.task, task]));
-  const tasksUnavailable = taskData && taskData.available === false;
-
-  const batchActions = [
-    { id: 'checkin', label: '📅 全量签到' },
-    { id: 'balance', label: '💰 查余额' },
-    { id: 'keepalive', label: '🔑 token 保活' },
-    { id: 'travel', label: '🐱 猫猫旅行' },
-    { id: 'activity', label: '🗺 活跃上报' },
-  ];
-
   return React.createElement(
     'div',
     null,
     error ? React.createElement('div', { style: { ...s.err, marginBottom: 14 } }, error) : null,
 
-    React.createElement(OverviewCard, { status, channelOf, onRefresh, refreshing }),
+    React.createElement(OverviewCard, {
+      status,
+      channelOf,
+      showDistribution,
+      onToggleDistribution: () => setShowDistribution((v) => !v),
+    }),
 
-    // 批量动作条（置顶，在筛选条上方；ui-design §2 排版要求）
+    // 渠道 / 域筛选 + 视图切换 + 账号列表
     React.createElement('div', { style: s.card },
-      React.createElement('div', { style: { ...s.label, marginBottom: 10 } }, '批量动作'),
-      tasksUnavailable
-        ? React.createElement('div', { className: 'dshc-row' },
-            React.createElement('span', { style: { ...s.tag, background: tone.warn.bg, color: tone.warn.fg } }, '网关未开启'),
-            React.createElement('span', { style: s.muted },
-              '任务端点在网关 admin.enabled 门槛内；开启后这里可批量触发。',
-            ),
-          )
-        : React.createElement('div', { className: 'dshc-row' },
-            React.createElement('span', { style: { ...s.tag, background: tone.ok.bg, color: tone.ok.fg } }, '网关任务端点'),
-            React.createElement('span', { style: s.muted }, '触发后异步执行；逐号结果见「任务」Tab 或点「刷新状态」。'),
+      React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+        React.createElement('div', { className: 'dshc-row' },
+          React.createElement('span', { style: { ...s.muted, marginRight: 4 } }, '渠道'),
+          segmentButton('all', '全部', filter, setFilter, accounts.length),
+          ...CHANNEL_ORDER.filter((id) => (counts.get(id) ?? 0) > 0).map((id) =>
+            segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0),
           ),
-      React.createElement('div', { className: 'dshc-row', style: { marginTop: 10 } },
-        ...batchActions.map((action) => {
-          const state = byName.get(action.id);
-          const isRunning = runningName === action.id || state?.running === true;
-          return React.createElement(
-            'button',
-            {
-              key: action.id,
-              type: 'button',
-              style: { ...s.btnGhost, opacity: isRunning ? 0.5 : 1 },
-              disabled: tasksUnavailable || isRunning,
-              onClick: () => onRunTask(action.id),
-              title: state?.last_end ? `上次执行：${relativeTime(state.last_end)}` : '尚未执行过',
-            },
-            `${action.label}${isRunning ? ' · 运行中' : ''}`,
-          );
-        }),
-      ),
-      React.createElement('div', { style: { ...s.warn, marginTop: 12 } }, INTUITION_FACTS.batchIndependent),
-    ),
-
-    // 渠道 / 域筛选
-    React.createElement('div', { style: s.card },
-      React.createElement('div', { className: 'dshc-row' },
-        React.createElement('span', { style: { ...s.muted, marginRight: 4 } }, '渠道'),
-        segmentButton('all', '全部', filter, setFilter, accounts.length),
-        ...CHANNEL_ORDER.filter((id) => (counts.get(id) ?? 0) > 0).map((id) =>
-          segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0),
         ),
+        React.createElement(ViewToggle, { view, setView }),
       ),
 
-      // 账号折叠面板
+
+      // 账号区：卡片式（默认，点开抽屉详情）或列表式
       React.createElement('div', { style: s.block },
         filtered.length === 0
           ? React.createElement('div', { style: s.muted }, '该筛选下没有账号。')
-          : React.createElement('div', null,
-              ...filtered.map((account) =>
-                React.createElement(AccountFold, {
-                  key: account.uid,
-                  account,
-                  maxInFlight,
-                  channel: channelOf(account),
-                  onAction,
-                  busy: Boolean(busy?.[account.uid]),
-                  credits: creditsByUid?.[account.uid],
-                  scheduleConfig,
-                  onRemove,
-                }),
+          : view === 'card'
+            ? React.createElement('div', { className: 'dshc-acctgrid' },
+                ...filtered.map((account) =>
+                  React.createElement(AccountCard, {
+                    key: account.uid,
+                    account,
+                    maxInFlight,
+                    channel: channelOf(account),
+                    liveCredits: creditsByUid?.[account.uid],
+                    onOpen: () => setDetailAccount(account),
+                  }),
+                ),
+              )
+            : React.createElement('div', { className: 'dshc-tblwrap' },
+                React.createElement('table', null,
+                  React.createElement('thead', null,
+                    React.createElement('tr', null,
+                      ...['账号', '渠道', '状态', '积分', '在途', '成功/失败'].map((h) =>
+                        React.createElement('th', { key: h }, h))),
+                  ),
+                  React.createElement('tbody', null,
+                    ...filtered.map((account) => {
+                      const st = accountState(account, maxInFlight);
+                      return React.createElement('tr', { key: account.uid },
+                        React.createElement('td', null, account.nickname || account.uid.slice(0, 8)),
+                        React.createElement('td', null, channelLabel(channelOf(account)) || '—'),
+                        React.createElement('td', null,
+                          React.createElement(Tag, { text: st.label, tone: st.tone, title: st.detail || undefined })),
+                        React.createElement('td', null, formatNumber(account.credits ?? 0)),
+                        React.createElement('td', null, `${account.in_flight ?? 0}/${maxInFlight ?? '—'}`),
+                        React.createElement('td', null, `${account.success_count ?? 0}/${account.err_total ?? 0}`),
+                      );
+                    }),
+                  ),
+                ),
               ),
-            ),
       ),
+    ),
+
+    // 账号详情抽屉（点卡片弹出；复用 AccountFold 的完整明细）
+    detailAccount
+      ? React.createElement(AccountDrawer, {
+          account: detailAccount,
+          maxInFlight,
+          channel: channelOf(detailAccount),
+          credits: creditsByUid?.[detailAccount.uid],
+          scheduleConfig,
+          onAction,
+          busy,
+          onRemove,
+          onClose: () => setDetailAccount(null),
+        })
+      : null,
+  );
+}
+
+/**
+ * 账号详情抽屉：右侧滑出，承载原 AccountFold 的健康/质量/积分明细。
+ * @param props - `{account, maxInFlight, channel, credits, scheduleConfig, onAction, busy, onRemove, onClose}`。
+ */
+function AccountDrawer({ account, maxInFlight, channel, credits, scheduleConfig, onAction, busy, onRemove, onClose }) {
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return React.createElement(
+    'div',
+    null,
+    React.createElement('div', { className: 'dshc-drawer-mask', onClick: onClose }),
+    React.createElement(
+      'div',
+      { className: 'dshc-drawer' },
+      React.createElement('button', { type: 'button', className: 'dshc-drawer-close', onClick: onClose, title: '关闭' }, '✕'),
+      React.createElement('div', { className: 'dshc-row', style: { marginBottom: 12 } },
+        React.createElement('span', { style: { ...s.label, fontSize: 15 } }, account.nickname || account.uid.slice(0, 8)),
+        channelLabel(channel) ? React.createElement(Tag, { text: channelLabel(channel), tone: 'info' }) : null,
+        account.realm ? React.createElement(Tag, { text: account.realm, tone: 'idle' }) : null,
+      ),
+      // 完整明细：直接复用 AccountFold（四组折叠），保持数据面不丢；动作在抽屉里可用。
+      // `defaultOpen: true` 让「点开卡片即见明细」—— 默认展开外层壳与健康/质量/积分，
+      // 任务组仍折叠（见 AccountFold 的说明）。
+      React.createElement(AccountFold, {
+        account,
+        maxInFlight,
+        channel,
+        onAction,
+        busy: Boolean(busy?.[account.uid]),
+        credits,
+        scheduleConfig,
+        onRemove,
+        defaultOpen: true,
+      }),
+    ),
+  );
+}
+function ViewToggle({ view, setView }) {
+  return React.createElement(
+    'span',
+    { className: 'dshc-viewtoggle' },
+    React.createElement('button', {
+      type: 'button', className: view === 'card' ? 'on' : '', onClick: () => setView('card'), title: '卡片视图',
+    }, React.createElement(Icons.cardView, null), '卡片'),
+    React.createElement('button', {
+      type: 'button', className: view === 'list' ? 'on' : '', onClick: () => setView('list'), title: '列表视图',
+    }, React.createElement(Icons.listView, null), '列表'),
+  );
+}
+
+/**
+ * 账号卡片（一行最主要有用的信息；点开抽屉看全部明细）。
+ * @param props - `{account, maxInFlight, channel, onOpen}`。
+ */
+function AccountCard({ account, maxInFlight, channel, onOpen }) {
+  const state = accountState(account, maxInFlight);
+  // 积分一律取 account.credits —— 刷新时网关已先把余额写回池（见 host 的
+  // refreshStatus），所以它就是最新的。不再做「实时值 vs 缓存值」双源显示。
+  const credits = account.credits ?? 0;
+  // 新鲜度：credits_at 为零值 = 从未刷新过。展示相对时间让人判断该不该刷新。
+  const creditsAt = isZeroTime(account.credits_at) ? undefined : account.credits_at;
+  const target = typeof maxInFlight === 'number' && maxInFlight > 0 ? maxInFlight : undefined;
+  const inFlight = account.in_flight ?? 0;
+  // 在途占用条：有空闲≠满，所以只在有在途时才画（全 0 画一排空条是噪音）。
+  const busyPct = target ? Math.min(100, Math.round((inFlight / target) * 100)) : 0;
+
+  // 成败计数：网关曾对这两个字段用 omitempty，值为 0 时 key 整个不出现 ——
+  // 那样面板只能编造 0，无法区分「0 次成功」与「字段不存在」（已修 chanhub：
+  // 零值也透出，与 consecutive_fails 等同口径）。这里仍按「字段缺失即不显示」
+  // 处理，以兼容未升级的旧网关。
+  const hasOutcome = account.success_count !== undefined || account.err_total !== undefined;
+  const lastSuccess = isZeroTime(account.last_success) ? undefined : account.last_success;
+
+  return React.createElement(
+    'button',
+    { type: 'button', className: 'dshc-acctcard', onClick: onOpen, title: '点击查看详情' },
+    // 顶行：昵称 + 状态
+    React.createElement('div', { className: 'dshc-acctcard-top' },
+      React.createElement('span', { className: 'dshc-acctcard-name' },
+        React.createElement('span', { className: 'dshc-dot', style: { background: (tone[state.tone] ?? tone.idle).fg } }),
+        React.createElement('span', { className: 'dshc-acctcard-nametext' },
+          account.nickname || account.uid.slice(0, 8)),
+      ),
+      React.createElement(Tag, { text: state.label, tone: state.tone, title: state.detail || undefined }),
+    ),
+
+    // 主数值：积分占满宽度，不再被右侧小字挤成半栏
+    React.createElement('div', { className: 'dshc-acctcard-credits' },
+      React.createElement('span', { className: 'dshc-acctcard-credits-num' }, formatNumber(credits)),
+      React.createElement('span', { className: 'dshc-acctcard-credits-unit' }, '积分'),
+      creditsAt
+        ? React.createElement('span', { className: 'dshc-acctcard-updated', title: `余额更新于 ${formatAbsolute(creditsAt)}` },
+            relativeTime(creditsAt))
+        : null,
+      account.credits_expiring > 0
+        ? React.createElement('span', {
+            className: 'dshc-acctcard-expiring',
+            title: '该窗口内即将过期的积分（优先消耗）',
+          }, `${formatNumber(account.credits_expiring)} 将过期`)
+        : null,
+    ),
+
+    // 在途占用：数值 + 细进度条（有在途时才显示）
+    target
+      ? React.createElement('div', { className: 'dshc-acctcard-bar', title: `单号在途上限 ${target}` },
+          React.createElement('span', { className: 'dshc-acctcard-track' },
+            React.createElement('span', {
+              className: `dshc-acctcard-fill${inFlight >= target ? ' full' : ''}`,
+              style: { width: `${busyPct}%` },
+            }),
+          ),
+          React.createElement('span', { className: 'dshc-acctcard-bartext' }, `在途 ${inFlight}/${target}`),
+        )
+      : null,
+
+    // 底行：渠道 · 域 · 成败 —— 从 11px 右下小字改为独立一行，字号可读
+    React.createElement('div', { className: 'dshc-acctcard-foot' },
+      React.createElement('span', { className: 'dshc-chip' }, channelLabel(channel) || '—'),
+      account.realm ? React.createElement('span', { className: 'dshc-chip' }, account.realm === 'global' ? '国际版' : '国内版') : null,
+      // 成败比：新网关恒透出（零值也写），旧网关缺字段时退回在途数、不编造。
+      hasOutcome
+        ? React.createElement('span', { className: 'dshc-chip' },
+            `${account.success_count} 成功 / ${account.err_total} 失败`)
+        : React.createElement('span', {
+            className: 'dshc-chip dshc-chip-dim',
+            title: '该网关版本未透出运行计数（success_count / err_total）；升级 chanhub 后可见',
+          }, '成败计数不可用'),
+      lastSuccess
+        ? React.createElement('span', { className: 'dshc-chip dshc-chip-dim' }, `最近成功 ${relativeTime(lastSuccess)}`)
+        : null,
     ),
   );
 }
@@ -957,6 +1136,63 @@ function segmentButton(id, label, active, onChange, count) {
 }
 
 /**
+ * 任务磁贴：一个任务一格，点即触发，状态就地显示。
+ *
+ * 为什么合并掉原来的「操作台按钮 + 执行历史表」：同一批 7 个任务被列了两遍
+ * （7 个按钮 + 7 行 × 6 列），状态与触发入口分离，读一眼要跨两个区块对照。
+ * 磁贴把两者收进同一格 —— 表整张删除，状态在按下去的地方就有。
+ *
+ * 状态语义（三态，不用 Tag 以免与页面其它标签混淆）：
+ *   未执行 → 灰点 + 「未执行」　　已执行 → 绿点 + 相对时间　　运行中 → 呼吸发光
+ * 错误只在真有错误时出现，且压成一行小字（不占独立列）。
+ *
+ * @param props - `{task, state, busy, onRun, scheduleConfig}`。
+ * @returns React 元素。
+ */
+function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
+  const ran = (state?.run_count ?? 0) > 0;
+  const failed = Boolean(state?.last_error);
+  // 色点优先级：运行中 > 失败 > 已执行 > 未执行。
+  const dot = busy ? tone.info.fg : failed ? tone.err.fg : ran ? tone.ok.fg : tone.idle.fg;
+  // 次要信息压成一行：已执行显示「上次执行 + 耗时」，否则显示计划时刻（若有）。
+  const scheduleItem = SCHEDULE_ITEMS.find((item) => item.id === task.name);
+  // '默认' 是 scheduleHoursText 在「未显式配置」时的占位 —— 它不含信息量，
+  // 显示在磁贴里只会增加噪音。真有无配置差异时，tooltip 已经写明计划时刻。
+  const planned = scheduleItem ? scheduleHoursText(scheduleItem, scheduleConfig) : '';
+  const hours = planned === '默认' ? '' : planned;
+  const meta = busy
+    ? '运行中…'
+    : ran
+      ? `${state?.last_start ? relativeTime(state.last_start) : ''}${typeof state?.duration_sec === 'number' ? ' · ' + formatDuration(state.duration_sec) : ''}`
+      : hours;
+
+  return React.createElement(
+    'button',
+    {
+      type: 'button',
+      className: `dshc-tasktile${busy ? ' running' : ''}${failed ? ' failed' : ''}`,
+      disabled: busy,
+      onClick: () => onRun(task.name),
+      title: [
+        `${task.label}：点即执行`,
+        ran ? `上次执行 ${state?.last_start ? formatAbsolute(state.last_start) : '—'}` : '尚未执行过',
+        state?.run_count != null ? `累计 ${state.run_count} 次` : '',
+        hours ? `计划 ${hours}` : '',
+        failed ? `上次错误：${state.last_error}` : '',
+      ].filter(Boolean).join('\n'),
+    },
+    React.createElement('span', { className: 'dshc-tasktile-ico' }, task.icon),
+    React.createElement('span', { className: 'dshc-tasktile-name' }, task.label),
+    React.createElement(
+      'span',
+      { className: 'dshc-tasktile-meta' },
+      React.createElement('span', { className: 'dshc-dot', style: { background: dot } }),
+      meta || '未执行',
+    ),
+  );
+}
+
+/**
  * 任务 Tab（账号为主轴）。
  *
  * 数据源（chanhub 新增端点，本插件配套实现）：
@@ -967,12 +1203,14 @@ function segmentButton(id, label, active, onChange, count) {
  * @param props - `{status, channelOf, maxInFlight, taskData, onRunTask, runningName, onRefresh}`。
  * @returns React 元素。
  */
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
   // taskData 是宿主 getTasks 的 value，形如 {available, tasks:{tasks:[...]}}。
   // 逐层取并把非数组一律当空 —— 形状不符时降级为空表，而不是抛异常炸掉整个 Tab。
   const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
   const byName = new Map(taskList.map((task) => [task.task, task]));
+  const doneCount = (queueData?.items ?? []).filter((it) => it.status === 'done' || it.status === 'error').length;
+  const pct = queueData?.total > 0 ? Math.round((doneCount / queueData.total) * 100) : 100;
 
   if (taskData && taskData.available === false) {
     return React.createElement(Unavailable, {
@@ -985,111 +1223,108 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
   return React.createElement(
     'div',
     null,
-    // 任务中心（panel 对照补齐）：扫描待办 → 执行队列 → 队列进度。
-    React.createElement(TaskCenterCard, { adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }),
-
-    // 批量动作区（真实可用）
+    // 任务磁贴：一行七个，点即触发，状态就地显示。
+    // 原先「操作台按钮」与「执行历史表」把同一批任务各列一遍（7 按钮 + 7 行 × 6 列），
+    // 状态还得跨区块对照 —— 磁贴把触发与状态收进同一格，整张表随之删除。
     React.createElement('div', { style: s.card },
-      React.createElement(
-        'div',
-        { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-        React.createElement('div', { style: { ...s.label } }, '批量任务'),
-        React.createElement(
-          'button',
-          { type: 'button', style: s.btnLink, onClick: onRefresh },
-          React.createElement(Icons.refresh, null),
-          '刷新状态',
+      React.createElement('div', { className: 'dshc-taskgrid' },
+        ...TASK_DEFS.map((task) =>
+          React.createElement(TaskTile, {
+            key: task.name,
+            task,
+            state: byName.get(task.name),
+            busy: runningName === task.name || byName.get(task.name)?.running === true,
+            onRun: onRunTask,
+            scheduleConfig,
+          }),
         ),
       ),
-      React.createElement('div', { className: 'dshc-row', style: { marginTop: 10 } },
-        ...TASK_DEFS.map((task) => {
-          const state = byName.get(task.name);
-          const busy = runningName === task.name || state?.running === true;
-          return React.createElement(
-            'button',
-            {
-              key: task.name,
-              type: 'button',
-              style: { ...s.btnGhost, opacity: busy ? 0.5 : 1 },
-              disabled: busy,
-              onClick: () => onRunTask(task.name),
-              title: state?.last_end ? `上次执行：${relativeTime(state.last_end)}` : '尚未执行过',
-            },
-            `${task.icon} ${task.label}`,
-            busy ? ' · 运行中' : '',
-          );
-        }),
-      ),
-      React.createElement('div', { style: { ...s.warn, marginTop: 12 } }, INTUITION_FACTS.batchIndependent),
-      React.createElement('div', { style: { ...s.muted, marginTop: 8 } },
-        '任务在网关侧异步执行（脚本类任务可能跑数分钟）；此处显示的是启动回执，结果经「刷新状态」查看。',
-      ),
+      adminAvailable
+        ? React.createElement('div', { className: 'dshc-row', style: { marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--dsw-alias-border-l2,#e5e7eb)' } },
+            React.createElement('button', {
+              type: 'button', style: { ...s.btnGhost, height: 28 },
+              disabled: scanning, onClick: onScan,
+              title: '只读扫描：列出每个账号未完成且可自动化的任务',
+            }, scanning ? '扫描中…' : '扫描待办'),
+            React.createElement('button', {
+              type: 'button', style: { ...s.btnGhost, height: 28 }, onClick: onQueueStart,
+              title: '把扫描出的待办排队执行（账号内串行、账号间并发）',
+            }, '执行队列'),
+            queueData
+              ? React.createElement('span', { className: 'dshc-row', style: { gap: 8, flexGrow: 1, minWidth: 140 } },
+                  React.createElement('span', { className: 'dshc-progress' },
+                    React.createElement('span', { style: { width: `${pct}%` } })),
+                  React.createElement('span', { style: { ...s.muted, whiteSpace: 'nowrap' } },
+                    `${doneCount}/${queueData.total}${queueData.running ? '' : ' 已结束'}`),
+                )
+              : null,
+          )
+        : null,
     ),
 
-    // 执行状态（含签到的逐账号结构化结果）
-    React.createElement('div', { style: s.card },
-      React.createElement('div', { style: { ...s.label, marginBottom: 10 } }, '任务状态'),
-      React.createElement('div', { className: 'dshc-row', style: { marginBottom: 8 } },
-        ...TASK_DEFS.map((task) => {
-          const state = byName.get(task.name);
-          const glyph = state?.running ? '●' : state?.run_count > 0 ? '✓' : '·';
-          const cls = state?.running ? 'dshc-dp run' : state?.run_count > 0 ? 'dshc-dp ok' : 'dshc-dp wait';
-          return React.createElement('span', {
-            key: task.name,
-            className: cls,
-            title: `${task.label}：${state ? `已执行 ${state.run_count} 次` : '尚未执行'}`,
-          }, glyph);
-        }),
-        React.createElement('span', { style: { ...s.muted, marginLeft: 6 } },
-          `${[...byName.values()].filter((t) => t.run_count > 0).length} / ${TASK_DEFS.length} 项执行过`,
-        ),
-      ),
-      React.createElement(
-        'div',
-        { className: 'dshc-tblwrap' },
-        React.createElement('table', null,
-          React.createElement('thead', null,
-            React.createElement('tr', null,
-              ...['任务', '状态', '次数', '上次开始', '耗时', '错误'].map((h) =>
-                React.createElement('th', { key: h }, h),
+    // 签到逐账号结果：摘要常驻（一眼可见），明细折起（默认不占版面）。
+    React.createElement(CheckinOutcomesCard, { task: byName.get('checkin') }),
+
+    // 待办扫描 / 队列明细：只在有数据时出现，且折起。
+    scanData?.accounts?.length > 0
+      ? React.createElement('div', { style: s.card },
+          React.createElement('div', { className: 'dshc-taskgrid-head' },
+            React.createElement('span', { style: s.label }, '待办扫描结果'),
+            React.createElement('span', { style: s.muted }, `${scanData.accounts.length} 个账号`),
+          ),
+          ...scanData.accounts.map((it) =>
+            React.createElement('div', { key: it.uid, className: 'dshc-row', style: { marginTop: 6 } },
+              React.createElement('span', { style: { ...s.label, minWidth: 0 } }, it.nickname || it.uid.slice(0, 8)),
+              it.growth?.length > 0
+                ? React.createElement(Tag, { text: `成长待办 ${it.growth.length}`, tone: 'warn', title: it.growth.join(' · ') })
+                : React.createElement(Tag, { text: '成长无待办', tone: 'ok' }),
+              it.chances > 0 ? React.createElement(Tag, { text: `抽奖 ${it.chances}`, tone: 'info' }) : null,
+              it.growthErr ? React.createElement(Tag, { text: '成长查询失败', tone: 'err', title: it.growthErr }) : null,
+              it.schoolErr ? React.createElement(Tag, { text: '开学季查询失败', tone: 'err', title: it.schoolErr }) : null,
+            ),
+          ),
+        )
+      : null,
+    queueData?.items?.length > 0
+      ? React.createElement('div', { style: s.card },
+          React.createElement('div', { className: 'dshc-taskgrid-head' },
+            React.createElement('span', { style: s.label }, '执行队列明细'),
+            React.createElement('span', { style: s.muted }, `${doneCount}/${queueData.total}`),
+          ),
+          React.createElement('div', { className: 'dshc-tblwrap', style: { marginTop: 8 } },
+            React.createElement('table', null,
+              React.createElement('thead', null,
+                React.createElement('tr', null,
+                  ...['账号', '任务', '状态', '说明'].map((h2) => React.createElement('th', { key: h2 }, h2)),
+                ),
+              ),
+              React.createElement('tbody', null,
+                ...queueData.items.map((it, i) =>
+                  React.createElement('tr', { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
+                    React.createElement('td', null, it.nickname || it.uid.slice(0, 8)),
+                    React.createElement('td', { style: { ...s.code }, title: it.kind === 'school' ? '开学季' : '成长' }, it.code),
+                    React.createElement('td', null,
+                      React.createElement(Tag, {
+                        text: { pending: '待执行', running: '执行中', done: '完成', skipped: '跳过', error: '失败' }[it.status] ?? it.status,
+                        tone: { done: 'ok', error: 'err', running: 'info', skipped: 'idle', pending: 'idle' }[it.status] ?? 'idle',
+                      }),
+                    ),
+                    React.createElement('td', { style: { ...s.muted, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: it.message || '' }, it.message || '—'),
+                  ),
+                ),
               ),
             ),
           ),
-          React.createElement('tbody', null,
-            ...TASK_DEFS.map((task) => {
-              const state = byName.get(task.name);
-              return React.createElement('tr', { key: task.name },
-                React.createElement('td', null, `${task.icon} ${task.label}`),
-                React.createElement('td', null,
-                  React.createElement(Tag, {
-                    text: state?.running ? '运行中' : state?.run_count > 0 ? '已执行' : '未执行',
-                    tone: state?.running ? 'info' : state?.run_count > 0 ? 'ok' : 'idle',
-                  }),
-                ),
-                React.createElement('td', null, String(state?.run_count ?? 0)),
-                React.createElement('td', null, state?.last_start ? relativeTime(state.last_start) : '—'),
-                React.createElement('td', null,
-                  typeof state?.duration_sec === 'number' ? `${state.duration_sec.toFixed(1)}s` : '—',
-                ),
-                React.createElement('td', null,
-                  state?.last_error
-                    ? React.createElement('span', { style: { color: tone.err.fg } }, state.last_error.slice(0, 60))
-                    : '—',
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    ),
-
-    // 签到的逐账号结果（chanhub 比 panel 强的一点：结构化结果可查）
-    React.createElement(CheckinOutcomesCard, { task: byName.get('checkin') }),
+        )
+      : null,
 
     // 开学季（真实子任务状态：来自网关 GET /v1/accounts/{uid}/school-tasks）
     React.createElement(SchoolTasksCard, {
-      schoolData: schoolForAccount(schoolData, accounts),
-      accountCount: (accounts || []).length,
+      schoolData: schoolData?.[schoolUid],
+      accounts,
+      byUid: schoolData,
+      selectedUid: schoolUid,
+      onSelectUid: setSchoolUid,
       running: runningName === 'school',
       onRunTask,
       vouchersData,
@@ -1100,66 +1335,90 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
 
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
     React.createElement(GrowthTasksCard, {
-      growthData: growthForAccount(growthData, accounts),
-      accountCount: (accounts || []).length,
+      growthData: growthData?.[growthUid],
+      accounts,
+      byUid: growthData,
+      selectedUid: growthUid,
+      onSelectUid: setGrowthUid,
       onRefresh,
       onGrowthWrite,
       writeBusy: growthWriteBusy,
       adminAvailable,
     }),
-
-    // 按账号（保留主轴结构）
-    React.createElement('div', { style: s.card },
-      React.createElement('div', { style: { ...s.label, marginBottom: 10 } }, '按账号查看'),
-      accounts.length === 0
-        ? React.createElement('div', { style: s.muted }, '暂无账号。')
-        : React.createElement('div', null,
-            ...accounts.map((account) =>
-              React.createElement(AccountFold, {
-                key: account.uid,
-                account,
-                maxInFlight,
-                channel: channelOf(account),
-                onAction: () => {},
-                busy: false,
-                scheduleConfig,
-              }),
-            ),
-          ),
-    ),
   );
 }
 
 /**
- * schoolForAccount 取「账号池顺序里第一个有数据」的开学季状态。
- * 与 growthForAccount 同理由：进度逐账号，合并会造出假进度。
+ * 逐账号数据的默认选号：账号池顺序里第一个「有数据」的账号。
+ *
+ * 为什么不再用「第一个 available」的旧 selector：那让卡片固定显示第 1 个账号、
+ * 其余账号的进度看不到（而数据其实早就全量拉过了）。现在选号是显式状态，
+ * 这里只负责给出**初始值**。
+ *
+ * @param byUid - `{uid: {available, ...}}` 的逐账号结果表。
+ * @param accounts - 账号池顺序。
+ * @returns uid，或 undefined（无任何数据）。
  */
-/**
- * firstGrowthAccountUid 取「进度数据可用的第一个账号 uid」：
- * 成长码写操作与进度查看同源（同一账号），保证面板显示的进度就是操作的进度。
- * @param growthByUid - getGrowthTasks 的逐账号结果表。
- * @returns uid 或 undefined。
- */
-function firstGrowthAccountUid(growthByUid) {
-  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
-    if (entry?.available === true) return uid;
+function defaultAccountUid(byUid, accounts) {
+  for (const account of accounts ?? []) {
+    if (byUid?.[account.uid]?.available === true) return account.uid;
   }
-  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
-    if (entry) return uid;
+  for (const account of accounts ?? []) {
+    if (byUid?.[account.uid]) return account.uid;
   }
   return undefined;
 }
 
-function schoolForAccount(schoolByUid, accounts) {
-  for (const account of accounts ?? []) {
-    const entry = schoolByUid?.[account.uid];
-    if (entry && entry.available === true) return entry;
-  }
-  for (const account of accounts ?? []) {
-    const entry = schoolByUid?.[account.uid];
-    if (entry) return entry;
-  }
-  return undefined;
+/**
+ * 账号选择器（逐账号数据卡共用）。
+ *
+ * 只在多账号时渲染 —— 单账号下它只是一行噪音。
+ * 每个按钮带状态点：绿=有数据、灰=无数据、红=查询失败，
+ * 这样不必逐个点开就知道哪个账号值得看。
+ *
+ * @param props - `{accounts, byUid, value, onChange, label?}`。
+ * @returns React 元素或 null。
+ */
+function AccountPicker({ accounts, byUid, value, onChange, label = '账号' }) {
+  const list = accounts ?? [];
+  if (list.length <= 1) return null;
+  return React.createElement('div', { className: 'dshc-acctpick' },
+    React.createElement('span', { className: 'dshc-acctpick-label' }, label),
+    ...list.map((account) => {
+      const entry = byUid?.[account.uid];
+      const dot = !entry ? tone.idle.fg : entry.available === true ? tone.ok.fg : tone.err.fg;
+      const name = account.nickname || account.uid.slice(0, 8);
+      const active = account.uid === value;
+      return React.createElement('button', {
+        key: account.uid,
+        type: 'button',
+        className: `dshc-acctpick-btn${active ? ' on' : ''}`,
+        onClick: () => onChange(account.uid),
+        title: entry?.available === false
+          ? `${name}：${entry.reason ?? '该账号数据不可用'}`
+          : name,
+      },
+      React.createElement('span', { className: 'dshc-dot', style: { background: dot } }),
+      name);
+    }),
+  );
+}
+
+/**
+ * 逐账号数据卡的选中 uid（受控状态 + 兜底）。
+ *
+ * 为什么需要兜底：刷新后账号池可能变化（账号被移除），选中的 uid 会失效；
+ * 此时回落到默认 uid 而不是显示空白。
+ *
+ * @param selected - 当前选中的 uid。
+ * @param byUid - 逐账号结果表。
+ * @param accounts - 账号池顺序。
+ * @returns 有效 uid 或 undefined。
+ */
+function useSelectedUid(selected, byUid, accounts) {
+  const fallback = defaultAccountUid(byUid, accounts);
+  if (selected && byUid?.[selected]) return selected;
+  return fallback;
 }
 
 /** 开学季状态 → 视觉。 */
@@ -1179,7 +1438,7 @@ const SCHOOL_STATUS = {
  *     而不是让用户以为这个任务永远没了；
  *   - 人工项（学生认证）网关不可代做，如实标注。
  */
-function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
+function SchoolTasksCard({ schoolData, accounts, byUid, selectedUid, onSelectUid, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
   if (schoolData && schoolData.available === false) {
     return React.createElement(Unavailable, {
       title: '开学季子任务状态',
@@ -1189,7 +1448,7 @@ function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, voucher
   }
   if (!schoolData || schoolData.available !== true) {
     return React.createElement('div', { style: s.card },
-      React.createElement('div', { style: s.label }, '开学季子任务状态'),
+      React.createElement(CardHead, { title: '开学季' }),
       React.createElement('div', { style: { ...s.muted, marginTop: 8 } }, '加载中…'),
     );
   }
@@ -1197,138 +1456,139 @@ function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, voucher
   const data = schoolData.school;
   const tasks = Array.isArray(data.tasks) ? data.tasks : [];
   const counts = data.counts ?? {};
+  const claimed = counts.claimed ?? 0;
+  const total = counts.total ?? tasks.length;
+
+  // in_period=false 时才需要警示（过期快照），true 是常态、不占版面。
+  const stale = data.in_period === false;
 
   return React.createElement('div', { style: s.card },
-    React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-      React.createElement('div', { style: { ...s.label } }, '🎓 开学季'),
-      React.createElement('div', { className: 'dshc-row' },
-        React.createElement(Tag, {
-          text: data.in_period ? '活动进行中' : '活动未开始/已结束',
-          tone: data.in_period ? 'ok' : 'warn',
-          title: data.in_period ? undefined : 'in_period=false：以下状态为过期快照，不代表当前可操作',
-        }),
-        React.createElement(Tag, { text: `已领 ${counts.claimed ?? 0}/${counts.total ?? tasks.length}`, tone: 'ok' }),
-        accountCount > 1 ? React.createElement(Tag, { text: `当前显示第 1 个账号（共 ${accountCount} 个）`, tone: 'idle' }) : null,
-      ),
+    React.createElement(CardHead, {
+      title: '🎓 开学季',
+      actions: [
+        React.createElement('button', {
+          key: 'run',
+          type: 'button',
+          className: `dshc-taskbtn${running ? ' running' : ''}`,
+          style: { ...s.btnGhost, height: 26, padding: '0 10px', fontSize: 12 },
+          disabled: running,
+          onClick: () => onRunTask('school'),
+        }, running ? '执行中…' : '执行'),
+        adminAvailable
+          ? React.createElement('button', {
+              key: 'vouchers',
+              type: 'button',
+              style: { ...s.btnLink, fontSize: 12 },
+              disabled: vouchersLoading, onClick: onViewVouchers,
+              title: '查询各账号抽中的第三方券码（KFC/瑞幸/酷狗等，只读）',
+            }, vouchersLoading ? '查询中…' : '券码')
+          : null,
+      ],
+    }),
+
+    // 账号选择器：逐账号数据必须能切换（此前固定显示第 1 个账号）
+    React.createElement(AccountPicker, {
+      accounts,
+      byUid,
+      value: selectedUid,
+      onChange: onSelectUid,
+    }),
+
+    // 进度条 + 计数（比 "已领 4/5" 标签更直观，且一眼看出还剩多少）
+    React.createElement('div', { className: 'dshc-row', style: { marginTop: 12 } },
+      React.createElement('span', { className: 'dshc-progress' },
+        React.createElement('span', {
+          style: {
+            width: `${total > 0 ? Math.round((claimed / total) * 100) : 0}%`,
+            background: claimed >= total ? tone.ok.fg : 'var(--dsw-alias-button-info-fill,#4176e6)',
+          },
+        })),
+      React.createElement('span', { style: { ...s.muted, whiteSpace: 'nowrap' } }, `${claimed}/${total}`),
     ),
-    React.createElement('div', { style: { ...s.tip, marginTop: 8, marginBottom: 10 } }, INTUITION_FACTS.schoolSeason()),
+
+    stale
+      ? React.createElement('div', { style: { ...s.warn, marginTop: 10 } },
+          '活动未开始或已结束 —— 以下为过期快照，不代表当前可操作。')
+      : null,
 
     tasks.length === 0
-      ? React.createElement('div', { style: s.muted }, '网关未返回子任务。')
-      : React.createElement('div', { className: 'dshc-sub' },
+      ? React.createElement('div', { style: { ...s.muted, marginTop: 10 } }, '网关未返回子任务。')
+      : React.createElement('div', { className: 'dshc-sub', style: { marginTop: 12 } },
           ...tasks.map((task) => {
             const status = SCHOOL_STATUS[task.status] ?? { text: task.status ?? '—', tone: 'idle' };
             const done = ['claimed', 'completed'].includes(task.status);
             const recurring = task.task_type === 'recurring';
-            // 人工项：学生认证（网关脚本会跳过它）
             const manual = task.task_code === 'task_student_verify';
-            return React.createElement('div', { key: task.task_code, className: 'dshc-row', style: { marginBottom: 5 } },
+            // 网格行：五列固定（勾 / 标题 / 进度 / 来源 / 状态），列宽由 CSS 定死。
+            // 之前用 flex 自然排版，缺一个标签整行后续列就左移一格 —— 5 行里有 4 行
+            // 是 5 个子元素、1 行是 4 个（desktop_chat_1_time 无「每日」），于是错位。
+            return React.createElement('div', { key: task.task_code, className: 'dshc-srow' },
               React.createElement('span', {
                 className: done ? 'dshc-ck on' : manual ? 'dshc-ck na' : 'dshc-ck',
                 title: done ? '已领取' : manual ? '人工项（网关不可代做）' : status.text,
               }, done ? '✓' : manual ? '—' : '○'),
-              React.createElement('span', { style: { ...s.label, minWidth: 0, flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-                task.title || task.task_code,
+              React.createElement('span', { className: 'dshc-stitle', title: task.task_code },
+                task.title || task.task_code),
+              // 进度：claimed 但未满时（上游实测存在，如 desktop_chat_1_time 为
+              // claimed + 0/1）不隐藏也不改写 —— 如实显示，但加注说明这是上游口径，
+              // 避免与左侧「已领取」勾看起来自相矛盾。
+              React.createElement('span', {
+                className: `dshc-sprog${done && task.has_progress && task.current < task.target ? ' odd' : ''}`,
+                ...(done && task.has_progress && task.current < task.target
+                  ? { title: '上游口径：该任务已领取，但进度计数为 ' + `${task.current}/${task.target}` }
+                  : {}),
+              }, task.has_progress ? `${task.current}/${task.target}` : '—'),
+              React.createElement('span', { className: 'dshc-ssrc' },
+                recurring ? React.createElement(Tag, { text: '每日', tone: 'info' }) : null,
+                manual ? React.createElement(Tag, { text: '人工', tone: 'idle' }) : null,
               ),
-              React.createElement('span', { style: { ...s.code, minWidth: 160 } }, task.task_code),
-              task.has_progress
-                ? React.createElement('span', { style: { ...s.code, minWidth: 44, textAlign: 'right' } }, `${task.current}/${task.target}`)
-                : React.createElement('span', { style: { ...s.code, minWidth: 44, textAlign: 'right' } }, '—'),
               React.createElement(Tag, { text: status.text, tone: status.tone }),
-              manual ? React.createElement(Tag, { text: '人工项', tone: 'idle' }) : null,
-              recurring ? React.createElement(Tag, { text: '每日', tone: 'info' }) : null,
             );
           }),
         ),
 
-    // recurring 任务的重置提示（已领但每日可再做）
-    tasks.some((task) => task.task_type === 'recurring' && ['claimed', 'completed'].includes(task.status) && task.next_unlock_at)
-      ? React.createElement('div', { style: { ...s.tip, marginTop: 10, lineHeight: 1.7 } },
-          '标「每日」的任务每天可完成一次：上面显示的是**今日**状态，明日 00:00 重置后可再做',
-          '（脚本 /admin/tasks/school 会自动补做）。',
-        )
-      : null,
-
-    React.createElement('div', { style: s.block },
-      React.createElement(
-        'button',
-        { type: 'button', style: { ...s.btnGhost, opacity: running ? 0.5 : 1 },
-          disabled: running, onClick: () => onRunTask('school') },
-        running ? '🎓 执行中…' : '🎓 执行开学季',
-      ),
-      adminAvailable
-        ? React.createElement('button', {
-            type: 'button', style: { ...s.btnGhost, marginLeft: 8 },
-            disabled: vouchersLoading, onClick: onViewVouchers,
-            title: '查询各账号抽中的第三方券码（KFC/瑞幸/酷狗等，只读）',
-          }, vouchersLoading ? '查询中…' : '🎟 我的券码')
-        : null,
-      React.createElement('span', { style: { ...s.muted, marginLeft: 10 } },
-        '脚本整体执行（点亮 + 领奖 + 抽奖），执行后刷新可见逐项状态变化。',
-      ),
-    ),
-    // 券码视图（按需加载；panel 的「我的券码」对照能力，二维码不做 —— 弹窗形态
-    // 与宿主侧边栏不匹配，code 文本可复制即满足核销）。
+    // 券码（按需加载）：只读表格，折进结果区
     vouchersData
-      ? React.createElement('div', { className: 'dshc-tblwrap', style: { marginTop: 10 } },
-          React.createElement('table', null,
-            React.createElement('thead', null,
-              React.createElement('tr', null,
-                ...['账号', '奖品', '券码', '有效期'].map((h2) => React.createElement('th', { key: h2 }, h2)),
+      ? React.createElement(
+          'details',
+          { className: 'dshc-fold', style: { marginTop: 10 }, open: true },
+          React.createElement('summary', null, React.createElement('span', { style: s.label }, '券码')),
+          React.createElement('div', { className: 'dshc-body' },
+            React.createElement('div', { className: 'dshc-tblwrap' },
+              React.createElement('table', null,
+                React.createElement('thead', null,
+                  React.createElement('tr', null,
+                    ...['账号', '奖品', '券码', '有效期'].map((h2) => React.createElement('th', { key: h2 }, h2)),
+                  ),
+                ),
+                React.createElement('tbody', null,
+                  ...(function () {
+                    const rows = [];
+                    for (const r of vouchersData.rows ?? []) {
+                      if ((r.vouchers ?? []).length === 0) continue;
+                      for (const v of r.vouchers) {
+                        rows.push(React.createElement('tr', { key: `${r.uid}-${v.grant_id}` },
+                          React.createElement('td', null, r.nickname || r.uid.slice(0, 8)),
+                          React.createElement('td', null, v.prize_name || v.sku_code || '—'),
+                          React.createElement('td', { style: { ...s.code, userSelect: 'all' } }, v.code || '—'),
+                          React.createElement('td', null, v.valid_to || '—'),
+                        ));
+                      }
+                    }
+                    if (rows.length === 0) {
+                      rows.push(React.createElement('tr', { key: 'empty' },
+                        React.createElement('td', { colSpan: 4, style: { ...s.muted, textAlign: 'center' } }, '暂无券码。'),
+                      ));
+                    }
+                    return rows;
+                  })(),
+                ),
               ),
-            ),
-            React.createElement('tbody', null,
-              ...(function () {
-                const rows = [];
-                for (const r of vouchersData.rows ?? []) {
-                  if ((r.vouchers ?? []).length === 0) continue;
-                  for (const v of r.vouchers) {
-                    rows.push(React.createElement('tr', { key: `${r.uid}-${v.grant_id}` },
-                      React.createElement('td', null, r.nickname || r.uid.slice(0, 8)),
-                      React.createElement('td', null, v.prize_name || v.sku_code || '—'),
-                      React.createElement('td', { style: { ...s.code, userSelect: 'all' } }, v.code || '—'),
-                      React.createElement('td', null, v.valid_to || '—'),
-                    ));
-                  }
-                }
-                if (rows.length === 0) {
-                  rows.push(React.createElement('tr', { key: 'empty' },
-                    React.createElement('td', { colSpan: 4, style: { ...s.muted, textAlign: 'center' } },
-                      '暂无券码记录。'),
-                  ));
-                }
-                return rows;
-              })(),
             ),
           ),
         )
       : null,
-    React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, data.note ?? ''),
   );
-}
-
-/**
- * growthForAccount 取「账号池顺序里第一个有数据」的成长任务进度。
- *
- * 为什么不并集合并：进度是逐账号的（各账号的 current/target 不同），
- * 合并会制造出谁都没有的假进度。首版先展示第一个账号，
- * 并在多账号时如实标注「当前显示第 1 个」。
- *
- * @param growthByUid - `{uid: growthData}`。
- * @param accounts - 账号池顺序。
- * @returns 单个账号的 growthData，或 undefined。
- */
-function growthForAccount(growthByUid, accounts) {
-  for (const account of accounts ?? []) {
-    const entry = growthByUid?.[account.uid];
-    if (entry && entry.available === true) return entry;
-  }
-  // 全都失败也取第一份（让卡片区显示「网关未提供」的原因，而不是加载中）
-  for (const account of accounts ?? []) {
-    const entry = growthByUid?.[account.uid];
-    if (entry) return entry;
-  }
-  return undefined;
 }
 
 /**
@@ -1345,104 +1605,7 @@ function growthForAccount(growthByUid, accounts) {
  * @param props - `{growthData, accounts, onRefresh}`。
  * @returns React 元素。
  */
-/**
- * 任务中心卡（panel 对照补齐）：扫描待办 → 启动执行队列 → 进度轮询。
- * admin 未开启时整卡如实降级（端点在 admin.enabled 门槛内）。
- * @param props - `{adminAvailable, scanData, scanning, queueData, onScan, onQueueStart}`。
- */
-function TaskCenterCard({ adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }) {
-  if (!adminAvailable) {
-    return React.createElement(Unavailable, {
-      title: '任务中心',
-      needs: 'GET /admin/tasks/scan + POST /admin/tasks/queue/start（需网关开启 admin.enabled）',
-      hint: '任务中心支持跨账号扫描待办并排队执行（账号内串行、账号间并发）。',
-    });
-  }
-  const scanAccounts = scanData?.accounts ?? [];
-  const totalPending = scanAccounts.reduce(
-    (sum, it) => sum + (it.growth?.length ?? 0) + (it.school?.length > 0 ? 1 : 0), 0);
-  const doneCount = (queueData?.items ?? []).filter((it) => it.status === 'done' || it.status === 'error').length;
-
-  return React.createElement('div', { style: s.card },
-    React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-      React.createElement('div', { style: { ...s.label } }, '🗂 任务中心'),
-      React.createElement('div', { className: 'dshc-row' },
-        React.createElement('button', {
-          type: 'button', style: s.btnGhost, disabled: scanning, onClick: onScan,
-          title: '只读扫描：列出每个账号未完成且可自动化的任务',
-        }, scanning ? '扫描中…' : '扫描待办'),
-        React.createElement('button', {
-          type: 'button', style: s.btnGhost, onClick: onQueueStart,
-          title: '把扫描出的待办排队执行：账号内串行、账号间并发（自动领奖）',
-        }, '执行队列'),
-      ),
-    ),
-    React.createElement('div', { style: { ...s.muted, marginTop: 6, lineHeight: 1.7 } },
-      '扫描是只读的；「执行队列」按扫描结果排队（先 accept 再点亮动作再自动领奖）。' +
-      '对话类码会真实发起对话（消耗少量额度）。',
-    ),
-
-    // 队列进度（若已启动过）
-    queueData
-      ? React.createElement('div', { style: { marginTop: 10 } },
-          React.createElement('div', { className: 'dshc-row', style: { marginBottom: 6 } },
-            React.createElement(Tag, { text: queueData.running ? `执行中 ${doneCount}/${queueData.total}` : `已结束 ${doneCount}/${queueData.total}`, tone: queueData.running ? 'info' : 'ok' }),
-          ),
-          React.createElement('div', { className: 'dshc-tblwrap' },
-            React.createElement('table', null,
-              React.createElement('thead', null,
-                React.createElement('tr', null,
-                  ...['账号', '类型', '任务', '状态', '说明'].map((h2) => React.createElement('th', { key: h2 }, h2)),
-                ),
-              ),
-              React.createElement('tbody', null,
-                ...(queueData.items ?? []).map((it, i) =>
-                  React.createElement('tr', { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
-                    React.createElement('td', null, it.nickname || it.uid.slice(0, 8)),
-                    React.createElement('td', null, it.kind === 'school' ? '开学季' : '成长'),
-                    React.createElement('td', { style: { ...s.code } }, it.code),
-                    React.createElement('td', null,
-                      React.createElement(Tag, {
-                        text: { pending: '待执行', running: '执行中', done: '完成', skipped: '跳过', error: '失败' }[it.status] ?? it.status,
-                        tone: { done: 'ok', error: 'err', running: 'info', skipped: 'idle', pending: 'idle' }[it.status] ?? 'idle',
-                      }),
-                    ),
-                    React.createElement('td', { style: { ...s.muted, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, it.message || '—'),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        )
-      : null,
-
-    // 扫描结果
-    scanAccounts.length > 0
-      ? React.createElement('div', { style: { marginTop: 10 } },
-          ...scanAccounts.map((it) =>
-            React.createElement('div', { key: it.uid, style: { marginBottom: 8 } },
-              React.createElement('div', { className: 'dshc-row' },
-                React.createElement('span', { style: { ...s.label, minWidth: 0 } }, it.nickname || it.uid.slice(0, 8)),
-                it.growth?.length > 0
-                  ? React.createElement(Tag, { text: `成长待办 ${it.growth.length}`, tone: 'warn' })
-                  : React.createElement(Tag, { text: '成长无待办', tone: 'ok' }),
-                it.chances > 0 ? React.createElement(Tag, { text: `抽奖 ${it.chances} 次`, tone: 'info' }) : null,
-              ),
-              it.growth?.length > 0
-                ? React.createElement('div', { style: { ...s.code, marginLeft: 12, marginTop: 3 } }, it.growth.join(' · '))
-                : null,
-              it.growthErr ? React.createElement('div', { style: { ...s.muted, marginLeft: 12 } }, `成长查询失败：${it.growthErr}`) : null,
-              it.schoolErr ? React.createElement('div', { style: { ...s.muted, marginLeft: 12 } }, `开学季查询失败：${it.schoolErr}`) : null,
-            ),
-          ),
-        )
-      : scanning ? null : React.createElement('div', { style: { ...s.muted, marginTop: 8 } },
-          `待办合计 ${totalPending} 项（未扫描时显示 0，不代表没有）。点「扫描待办」查看。`,
-        ),
-  );
-}
-
-function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
+function GrowthTasksCard({ growthData, accounts, byUid, selectedUid, onSelectUid, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
   if (growthData && growthData.available === false) {
     return React.createElement(Unavailable, {
       title: '成长任务进度（逐码）',
@@ -1452,7 +1615,7 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, w
   }
   if (!growthData || growthData.available !== true) {
     return React.createElement('div', { style: s.card },
-      React.createElement('div', { style: s.label }, '成长任务进度'),
+      React.createElement(CardHead, { title: '成长任务' }),
       React.createElement('div', { style: { ...s.muted, marginTop: 8 } }, '加载中…'),
     );
   }
@@ -1461,22 +1624,21 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, w
   const tasks = Array.isArray(data.tasks) ? data.tasks : [];
   if (tasks.length === 0) {
     return React.createElement('div', { style: s.card },
-      React.createElement('div', { style: s.label }, '成长任务进度'),
-      React.createElement('div', { style: { ...s.muted, marginTop: 8 } },
-        '网关未返回任何任务（账号可能无成长任务资格）。',
-      ),
+      React.createElement(CardHead, { title: '成长任务' }),
+      React.createElement('div', { style: { ...s.muted, marginTop: 8 } }, '账号可能无成长任务资格。'),
     );
   }
 
-  // 分类：进行中未满 → 已完成 → 无进度对象
-  const active = tasks.filter((t) =>
+  // 分类：需要动手的 → 可领奖的 → 上游无进度对象的。已完成不再单列一类，
+  // 它与「可领奖」在动作上是同一件事（claim），合并后少一个分组。
+  const actionable = tasks.filter((t) =>
     t.has_progress && !['completed', 'claimed'].includes(t.accept_status) &&
     t.current < (t.target || 1));
-  const done = tasks.filter((t) => ['completed', 'claimed'].includes(t.accept_status));
-  const noProgress = tasks.filter((t) => !t.has_progress);
-  const others = tasks.filter((t) =>
-    t.has_progress && !['completed', 'claimed'].includes(t.accept_status) &&
-    t.current >= (t.target || 1));
+  const claimable = tasks.filter((t) =>
+    ['completed', 'claimed'].includes(t.accept_status) ||
+    (t.has_progress && t.target > 0 && t.current >= t.target && t.accept_status !== 'claimed'));
+  const pending = tasks.filter((t) => !t.has_progress);
+  const claimableUnclaimed = claimable.filter((t) => t.accept_status !== 'claimed');
 
   const statusTone = { claimed: 'ok', completed: 'ok', accepted: 'info', in_progress: 'info', not_accepted: 'idle' };
   const statusLabel = {
@@ -1485,170 +1647,224 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, w
   };
 
   const renderRow = (t) => {
-    const progress = t.has_progress ? `${t.current}/${t.target}` : '—';
+    const progress = t.has_progress ? `${t.current}/${t.target}` : null;
     const full = t.has_progress && t.target > 0 && t.current >= t.target;
     const claimed = t.accept_status === 'claimed';
     const completed = t.accept_status === 'completed';
     const busyThis = writeBusy === `${t.task_code}`;
-    // 单码动作（admin.enabled 门槛内；写操作真实推进状态）：
-    //   - accepted（未满）→ 可 accept 重新推进（幂等：上游按码判重）
-    //   - completed / 进度已满 → claim 领奖（幂等：重复领返回已领态不算失败）
-    //   - claimed → 无动作（已完结）
-    const showAccept = adminAvailable && !claimed && !completed && !t.locked;
-    const showClaim = adminAvailable && (completed || full);
-    return React.createElement('div', { key: t.task_code, className: 'dshc-row', style: { marginBottom: 5 } },
-      // 左侧色条：进行中未满 = 橙（提示还有活干），已满/已领 = 绿
+    const showAccept = adminAvailable && !claimed && !completed && !t.locked && !full;
+    const showClaim = adminAvailable && (completed || full) && !claimed;
+    // 来源与开放状态是**两件独立的事**，不能压成一个标签：
+    //   - 来源：小程序口径 / 有定时排程覆盖
+    //   - 开放状态：上游未解锁（locked）
+    // 此前把三者做成三选一，于是 locked 的行就看不到「它是小程序任务」——
+    // 信息被静默丢掉（真机踩到：Sequential_Tasks_2 只显示「已锁定」，
+    // 看不出它还是 mp 限定任务）。现在最多挂两个标签。
+    //
+    // 措辞用「未解锁」而非「已锁定」：locked 表示该任务上游尚未对你开放，
+    // 不是账号/面板出了问题 —— 后者会让人以为要排障。
+    const badges = [];
+    if (t.from_mp) badges.push({ text: '小程序', tone: 'info' });
+    if (t.scheduled) badges.push({ text: `定时 ${t.scheduled}`, tone: 'info' });
+    if (t.locked) {
+      badges.push({
+        text: '未解锁',
+        tone: 'warn',
+        title: '上游对该任务标记为未开放（locked）：当前不可做，面板也不会代做。'
+          + '这通常是上游的灰度/资格控制，与账号状态无关。',
+      });
+    }
+
+    // 网格行：六列固定（色条 / 标题 / 进度 / 来源 / 状态 / 动作）。
+    // 原先 flex 自然排版，22 行里出现 3、4、5 个子元素三种形态（无进度、无来源、
+    // 无动作各不相同）→ 进度与标签列逐行参差。列宽定死后无论有无内容都对齐。
+    return React.createElement('div', { key: t.task_code, className: 'dshc-growrow' },
       React.createElement('span', {
         className: 'dshc-codebar',
-        style: { background: full || ['completed', 'claimed'].includes(t.accept_status) ? tone.ok.fg : t.has_progress ? tone.warn.fg : 'transparent' },
+        style: { background: full || claimed || completed ? tone.ok.fg : t.has_progress ? tone.warn.fg : 'transparent' },
       }),
-      React.createElement('span', { style: { ...s.label, minWidth: 0, flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-        t.title || t.task_code,
+      React.createElement('span', { className: 'dshc-stitle', title: t.task_code }, t.title || t.task_code),
+      React.createElement('span', { className: 'dshc-sprog' }, progress ?? '—'),
+      React.createElement('span', { className: 'dshc-ssrc' },
+        ...badges.map((b) => React.createElement(Tag, { key: b.text, text: b.text, tone: b.tone, title: b.title })),
       ),
-      React.createElement('span', { style: { ...s.code, minWidth: 84 } }, t.task_code),
-      React.createElement('span', { style: { ...s.code, minWidth: 46, textAlign: 'right' } }, progress),
-      React.createElement(Tag, {
-        text: statusLabel[t.accept_status] ?? t.accept_status ?? '—',
-        tone: statusTone[t.accept_status] ?? 'idle',
-      }),
-      t.from_mp ? React.createElement(Tag, { text: '小程序', tone: 'info' }) : null,
-      t.scheduled ? React.createElement(Tag, { text: `定时→${t.scheduled}`, tone: 'info' }) : null,
-      t.locked ? React.createElement(Tag, { text: '已锁定', tone: 'warn' }) : null,
-      showAccept
-        ? React.createElement('button', {
-            type: 'button', style: { ...s.btnGhost, height: 22, padding: '0 8px', fontSize: 11 },
-            disabled: busyThis, onClick: () => onGrowthWrite('accept', t.task_code),
-            title: '对上游 accept 该码（开始做；对话类码会真实发起对话）',
-          }, busyThis ? '…' : '点亮')
-        : null,
-      showClaim
-        ? React.createElement('button', {
-            type: 'button', style: { ...s.btnGhost, height: 22, padding: '0 8px', fontSize: 11 },
-            disabled: busyThis, onClick: () => onGrowthWrite('claim', t.task_code),
-            title: '领取该码奖励（幂等：重复领取返回已领态，不算失败）',
-          }, busyThis ? '…' : '领取')
-        : null,
+      React.createElement(Tag, { text: statusLabel[t.accept_status] ?? t.accept_status ?? '—', tone: statusTone[t.accept_status] ?? 'idle' }),
+      React.createElement('span', { className: 'dshc-sact' },
+        showAccept
+          ? React.createElement('button', {
+              type: 'button', style: { ...s.btnLink, fontSize: 12 },
+              disabled: busyThis, onClick: () => onGrowthWrite('accept', t.task_code),
+              title: '对上游 accept 该码（开始做；对话类码会真实发起对话）',
+            }, busyThis ? '…' : '点亮')
+          : null,
+        showClaim
+          ? React.createElement('button', {
+              type: 'button', style: { ...s.btnLink, fontSize: 12 },
+              disabled: busyThis, onClick: () => onGrowthWrite('claim', t.task_code),
+              title: '领取该码奖励（幂等：重复领取返回已领态，不算失败）',
+            }, busyThis ? '…' : '领取')
+          : null,
+      ),
     );
   };
 
+  const doneCount = claimable.length;
+  const coverage = codeCoverage();
+
   return React.createElement('div', { style: s.card },
-    React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-      React.createElement('div', { style: { ...s.label } }, '成长任务进度'),
-      accountCount > 1 ? React.createElement(Tag, {
-        text: `当前显示第 1 个账号（共 ${accountCount} 个）`,
-        tone: 'idle',
-        title: '成长任务进度是逐账号的；切换账号需在账号池展开对应账号。多账号的进度可能不同。',
-      }) : null,
-      React.createElement('div', { className: 'dshc-row' },
-        React.createElement(Tag, { text: `已完成 ${done.length}/${tasks.length}`, tone: 'ok' }),
-        active.length > 0 ? React.createElement(Tag, { text: `进行中 ${active.length}`, tone: 'warn' }) : null,
-        // 「全部领取」：对当前 completed 未领的码逐个 claim（不自动 accept ——
-        // accept 会引发真实对话副作用链，是否点亮由用户逐码决定）。
+    React.createElement(CardHead, {
+      title: '成长任务',
+      actions: [
         adminAvailable
           ? React.createElement('button', {
-              type: 'button', style: s.btnGhost,
-              disabled: writeBusy === 'claim-claimable' || done.every((t) => t.accept_status === 'claimed'),
+              key: 'claim-all',
+              type: 'button',
+              style: { ...s.btnGhost, height: 26, padding: '0 10px', fontSize: 12 },
+              disabled: writeBusy === 'claim-claimable' || claimableUnclaimed.length === 0,
               onClick: () => onGrowthWrite('claim-claimable'),
               title: '领取当前全部已完成未领的奖励（幂等）',
             }, writeBusy === 'claim-claimable' ? '领取中…' : '全部领取')
           : null,
-        React.createElement('button', { type: 'button', style: s.btnLink, onClick: onRefresh }, '刷新'),
-      ),
+        React.createElement('button', {
+          key: 'refresh', type: 'button', style: { ...s.btnLink, fontSize: 12 }, onClick: onRefresh,
+        }, '刷新'),
+      ],
+    }),
+
+    // 账号选择器：逐账号数据必须能切换（此前固定显示第 1 个账号）
+    React.createElement(AccountPicker, {
+      accounts,
+      byUid,
+      value: selectedUid,
+      onChange: onSelectUid,
+    }),
+
+    React.createElement('div', { className: 'dshc-row', style: { marginTop: 12 } },
+      React.createElement('span', { className: 'dshc-progress' },
+        React.createElement('span', {
+          style: {
+            width: `${tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0}%`,
+            background: doneCount >= tasks.length ? tone.ok.fg : 'var(--dsw-alias-button-info-fill,#4176e6)',
+          },
+        })),
+      React.createElement('span', { style: { ...s.muted, whiteSpace: 'nowrap' } }, `${doneCount}/${tasks.length}`),
+      actionable.length > 0
+        ? React.createElement(Tag, {
+            text: `待做 ${actionable.length}`,
+            tone: 'warn',
+            title: '有进度未满、可继续推动的码',
+          })
+        : null,
+      // 事实②（定时覆盖只有 2/24）压成一个 chip：它的内容是「别的码没有定时入口」，
+      // 逐行看不到（缺席不可见），故必须有一处汇总 —— 但一句话即可，不写整段散文。
+      React.createElement(Tag, {
+        text: `定时覆盖 ${coverage.scheduled}/${coverage.total}`,
+        tone: 'idle',
+        title: `只有 ${coverage.scheduled} 个码有定时排程（chat_5 走活跃地图、black_cat 走夜猫子）；`
+          + `其余 ${coverage.unscheduled} 个没有任何定时入口，只能手动点「点亮」。`,
+      }),
     ),
-    React.createElement('div', { style: { ...s.muted, marginTop: 6 } },
-      `来源：上游成长任务列表（网关已合并默认与小程序两个下发口径${data.mp_error ? '；小程序口径查询失败：' + data.mp_error : ''}）。`,
-      INTUITION_FACTS.scheduledCoverage(),
-    ),
 
-    // 进行中未满（最值得看的）
-    active.length > 0
-      ? React.createElement('div', { style: s.block },
-          React.createElement('div', { style: { ...s.label, marginBottom: 6 } }, `进行中未满（${active.length}）`),
-          ...active.map(renderRow),
+    // 只有一类常驻展开：需要动手的。其余折叠。
+    actionable.length > 0
+      ? React.createElement('div', { className: 'dshc-rows', style: { marginTop: 12 } },
+          ...actionable.map(renderRow),
         )
-      : null,
+      : React.createElement('div', { style: { ...s.muted, marginTop: 12 } }, '没有待做的码。'),
 
-    // 已满但状态未推进（accepted 且进度已满 —— 通常点一次执行即可领）
-    others.length > 0
-      ? React.createElement('div', { style: s.block },
-          React.createElement('div', { style: { ...s.label, marginBottom: 6 } }, `进度已满（${others.length}）`),
-          ...others.map(renderRow),
-        )
-      : null,
-
-    // 无进度对象（公益提问等，无法代做）
-    noProgress.length > 0
-      ? React.createElement('div', { style: s.block },
-          React.createElement('div', { style: { ...s.label, marginBottom: 6 } }, `无进度数据（${noProgress.length}）`),
-          ...noProgress.map(renderRow),
-          React.createElement('div', { style: { ...s.muted, marginTop: 6 } },
-            '这些任务上游不下发进度对象（通常是不可代做的真实行为，如公益捐款）。',
-          ),
-        )
-      : null,
-
-    // 已完成折叠
-    done.length > 0
+    claimable.length > 0
       ? React.createElement(
           'details',
           { className: 'dshc-fold', style: { marginTop: 8 } },
           React.createElement('summary', null,
-            React.createElement('span', { style: s.label }, `已完成 / 已领取（${done.length}）`),
-            React.createElement('span', { style: { ...s.muted, marginLeft: 'auto' } }, '点开查看'),
+            React.createElement('span', { style: s.label }, '已完成 / 已领取'),
+            React.createElement('span', { style: { ...s.muted, marginLeft: 'auto' } }, `${claimable.length} 个`),
           ),
-          React.createElement('div', { className: 'dshc-body' }, ...done.map(renderRow)),
+          React.createElement('div', { className: 'dshc-body' }, ...claimable.map(renderRow)),
         )
       : null,
 
-    React.createElement('div', { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } }, data.note ?? ''),
+    pending.length > 0
+      ? React.createElement(
+          'details',
+          { className: 'dshc-fold' },
+          React.createElement('summary', null,
+            React.createElement('span', { style: s.label }, '无进度数据'),
+            React.createElement('span', { style: { ...s.muted, marginLeft: 'auto' } }, `${pending.length} 个`),
+          ),
+          React.createElement('div', { className: 'dshc-body' },
+            ...pending.map(renderRow),
+            React.createElement('div', { style: { ...s.muted, marginTop: 6 } },
+              '上游不下发进度对象，通常是不可代做的真实行为（如公益捐款）。'),
+          ),
+        )
+      : null,
   );
 }
 
-/**
- * 签到的逐账号结果卡（chanhub 的能力：CheckinOutcome 结构化可查）。
- * @param props - `{task}`。
- * @returns React 元素或 null。
- */
 function CheckinOutcomesCard({ task }) {
   const outcomes = task?.outcomes;
   if (!Array.isArray(outcomes) || outcomes.length === 0) return null;
   const summary = task.outcome_summary ?? {};
 
+  // 摘要常驻、明细折起：签到「多数号都成功」是常态，逐号表格常驻会挤掉下面
+  // 更值得看的开学季/成长进度。失败与跳过的号才是要看的，故默认只展开它们。
+  const attention = outcomes.filter((oc) => oc.status === 'fail' || oc.status === 'skipped');
+
   return React.createElement('div', { style: s.card },
-    React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-      React.createElement('div', { style: s.label }, '签到逐账号结果'),
-      React.createElement('span', { style: s.muted },
-        `${task.last_end ? relativeTime(task.last_end) : ''} · 耗时 ${typeof task.duration_sec === 'number' ? task.duration_sec.toFixed(1) : '—'}s`,
-      ),
-    ),
+    React.createElement(CardHead, {
+      title: '签到',
+      extra: task.last_end
+        ? `${relativeTime(task.last_end)}${typeof task.duration_sec === 'number' ? ' · ' + formatDuration(task.duration_sec) : ''}`
+        : undefined,
+    }),
     React.createElement('div', { className: 'dshc-row', style: { marginTop: 10 } },
-      React.createElement(Tag, { text: `共 ${summary.total ?? outcomes.length}`, tone: 'idle' }),
       React.createElement(Tag, { text: `成功 ${summary.ok ?? 0}`, tone: 'ok' }),
       React.createElement(Tag, { text: `已签过 ${summary.already ?? 0}`, tone: 'info' }),
-      React.createElement(Tag, { text: `失败 ${summary.fail ?? 0}`, tone: (summary.fail ?? 0) > 0 ? 'err' : 'idle' }),
-      React.createElement(Tag, { text: `跳过 ${summary.skipped ?? 0}`, tone: 'idle' }),
+      (summary.fail ?? 0) > 0 ? React.createElement(Tag, { text: `失败 ${summary.fail}`, tone: 'err' }) : null,
+      (summary.skipped ?? 0) > 0 ? React.createElement(Tag, { text: `跳过 ${summary.skipped}`, tone: 'idle' }) : null,
+      React.createElement('span', { style: { ...s.muted, marginLeft: 'auto' } }, `共 ${summary.total ?? outcomes.length} 个`),
+    ),
+    // 需关注的号（失败/跳过）直接列出；全部正常时只留上面的摘要。
+    ...attention.map((oc) =>
+      React.createElement('div', { key: oc.uid, className: 'dshc-row', style: { marginTop: 6 } },
+        React.createElement('span', { className: 'dshc-dot', style: { background: oc.status === 'fail' ? tone.err.fg : tone.idle.fg } }),
+        React.createElement('span', { style: { ...s.label, minWidth: 0 } }, oc.nickname || oc.uid.slice(0, 8)),
+        React.createElement('span', {
+          style: { ...s.muted, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+          title: oc.detail || '',
+        }, oc.detail || TASK_STATUS_LABEL[oc.status] || oc.status),
+      ),
     ),
     React.createElement(
-      'div',
-      { className: 'dshc-tblwrap', style: { marginTop: 10 } },
-      React.createElement('table', null,
-        React.createElement('thead', null,
-          React.createElement('tr', null,
-            ...['账号', '结果', '签到后余额', '说明'].map((h) => React.createElement('th', { key: h }, h)),
-          ),
-        ),
-        React.createElement('tbody', null,
-          ...outcomes.map((oc) =>
-            React.createElement('tr', { key: oc.uid },
-              React.createElement('td', null, oc.nickname || oc.uid.slice(0, 8)),
-              React.createElement('td', null,
-                React.createElement(Tag, {
-                  text: TASK_STATUS_LABEL[oc.status] ?? oc.status,
-                  tone: TASK_STATUS_TONE[oc.status] ?? 'idle',
-                }),
+      'details',
+      { className: 'dshc-fold', style: { marginTop: 10 } },
+      React.createElement('summary', null,
+        React.createElement('span', { style: s.label }, '逐账号明细'),
+        React.createElement('span', { style: { ...s.muted, marginLeft: 'auto' } }, `${outcomes.length} 个账号`),
+      ),
+      React.createElement('div', { className: 'dshc-body' },
+        React.createElement('div', { className: 'dshc-tblwrap' },
+          React.createElement('table', null,
+            React.createElement('thead', null,
+              React.createElement('tr', null,
+                ...['账号', '结果', '余额', '说明'].map((h) => React.createElement('th', { key: h }, h)),
               ),
-              React.createElement('td', null, typeof oc.credits === 'number' ? formatNumber(oc.credits) : '—'),
-              React.createElement('td', null, oc.detail || '—'),
+            ),
+            React.createElement('tbody', null,
+              ...outcomes.map((oc) =>
+                React.createElement('tr', { key: oc.uid },
+                  React.createElement('td', null, oc.nickname || oc.uid.slice(0, 8)),
+                  React.createElement('td', null,
+                    React.createElement(Tag, {
+                      text: TASK_STATUS_LABEL[oc.status] ?? oc.status,
+                      tone: TASK_STATUS_TONE[oc.status] ?? 'idle',
+                    }),
+                  ),
+                  React.createElement('td', null, typeof oc.credits === 'number' ? formatNumber(oc.credits) : '—'),
+                  React.createElement('td', { style: { ...s.muted } }, oc.detail || '—'),
+                ),
+              ),
             ),
           ),
         ),
@@ -1676,7 +1892,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
     null,
     React.createElement('div', { style: s.card },
       React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-        React.createElement('div', { style: s.label }, '时序分桶'),
+        React.createElement('div', { style: s.label }, '用量'),
         React.createElement(
           'div',
           { className: 'dshc-row' },
@@ -1699,7 +1915,8 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
               option.label,
             ),
           ),
-          React.createElement('button', { type: 'button', style: s.btnLink, onClick: onRefresh }, '刷新'),
+          React.createElement('button', { type: 'button', style: { ...s.btnLink, padding: '0 4px' }, onClick: onRefresh, title: '刷新' },
+            React.createElement(Icons.refresh, null)),
         ),
       ),
       !bucketsAvailable
@@ -1708,8 +1925,6 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
           )
         : React.createElement(UsageBucketBody, { usage: usageData }),
     ),
-
-    React.createElement(ModelStatsCard, { stats }),
   );
 }
 
@@ -1724,6 +1939,13 @@ function UsageBucketBody({ usage }) {
   }
   const buckets = usage.buckets ?? [];
   const maxRequests = Math.max(1, ...buckets.map((bucket) => bucket.requests));
+  const [dim, setDim] = React.useState('uid');
+  const dimRows = usage[`by_${dim}`] ?? [];
+  const dimMeta = {
+    uid: { label: '按账号', columns: ['账号', '请求', '失败', 'Tokens', '扣费', '平均延迟'] },
+    realm: { label: '按域', columns: ['域', '请求', '失败', 'Tokens', '扣费', '平均延迟'] },
+    model: { label: '按模型', columns: ['模型', '请求', '失败', 'Tokens', '扣费', '平均延迟'] },
+  };
 
   return React.createElement(
     'div',
@@ -1735,164 +1957,63 @@ function UsageBucketBody({ usage }) {
         )
       : null,
 
-    // 合计
-    React.createElement('div', { className: 'dshc-five', style: { marginBottom: 12 } },
-      ...usageStat('总请求', usage.total?.requests ?? 0),
-      ...usageStat('成功', usage.total?.success ?? 0),
-      ...usageStat('失败', usage.total?.failed ?? 0),
-      ...usageStat('Prompt tokens', usage.total?.prompt_tokens ?? 0),
-      ...usageStat('Completion tokens', usage.total?.completion_tokens ?? 0),
-    ),
-
-    // 时序柱
+    // 时序柱（渐变柱）
     buckets.length === 0
       ? React.createElement('div', { style: { ...s.muted, marginBottom: 12 } },
           '该窗口内没有请求记录。发起一次对话后即可看到分桶。',
         )
       : React.createElement('div', { style: { marginBottom: 14 } },
-          React.createElement('div', { style: { ...s.muted, marginBottom: 6 } },
-            `共 ${buckets.length} 个桶（窗口 ${usage.window}）`,
-          ),
-          React.createElement('div', { className: 'dshc-row', style: { alignItems: 'flex-end', gap: 3, overflowX: 'auto' } },
+          React.createElement('div', { className: 'dshc-bars' },
             ...buckets.slice(-48).map((bucket, index) =>
               React.createElement('span', {
                 key: `${bucket.slot}-${bucket.uid}-${bucket.model}-${index}`,
+                className: bucket.failed > 0 ? 'bad' : '',
                 title: `${bucket.slot} · ${bucket.uid ? bucket.uid.slice(0, 8) : '全部账号'} · ${bucket.model || '全部模型'}\n请求 ${bucket.requests} · 失败 ${bucket.failed} · tokens ${bucket.total_tokens}`,
-                style: {
-                  width: 12,
-                  flexShrink: 0,
-                  height: Math.max(3, Math.round((bucket.requests / maxRequests) * 60)),
-                  background: bucket.failed > 0 ? tone.warn.fg : tone.ok.fg,
-                  borderRadius: 2,
-                },
+                style: { height: Math.max(3, Math.round((bucket.requests / maxRequests) * 72)) },
               }),
             ),
           ),
+          React.createElement('div', { className: 'dshc-row', style: { marginTop: 6, justifyContent: 'space-between' } },
+            React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
+              `请求 ${formatNumber(usage.total?.requests ?? 0)} · 失败 ${formatNumber(usage.total?.failed ?? 0)} · tokens ${formatNumber(usage.total?.completion_tokens ?? 0)}`),
+          ),
         ),
 
-    // 三维表格
-    ...['ByUID', 'ByRealm', 'ByModel'].map((key) => {
-      const label = { ByUID: '按账号', ByRealm: '按域', ByModel: '按模型' }[key];
-      const rows = usage[`by_${key.slice(2).toLowerCase()}`] ?? usage[key.toLowerCase()] ?? [];
-      return React.createElement(
-        'div',
-        { key, style: { marginBottom: 12 } },
-        React.createElement('div', { style: { ...s.label, marginBottom: 6 } }, label),
-        rows.length === 0
-          ? React.createElement('div', { style: s.muted }, '无数据')
-          : React.createElement(
-              'div',
-              { className: 'dshc-tblwrap' },
-              React.createElement('table', null,
-                React.createElement('thead', null,
-                  React.createElement('tr', null,
-                    ...['键', '请求', '成功', '失败', 'Prompt', 'Completion', '合计', '扣费', '平均延迟'].map((h) =>
-                      React.createElement('th', { key: h }, h),
-                    ),
-                  ),
-                ),
-                React.createElement('tbody', null,
-                  ...rows.map((row) =>
-                    React.createElement('tr', { key: row.key },
-                      React.createElement('td', null, row.key),
-                      React.createElement('td', null, formatNumber(row.requests ?? 0)),
-                      React.createElement('td', null, formatNumber(row.success ?? 0)),
-                      React.createElement('td', null, formatNumber(row.failed ?? 0)),
-                      React.createElement('td', null, formatNumber(row.prompt_tokens ?? 0)),
-                      React.createElement('td', null, formatNumber(row.completion_tokens ?? 0)),
-                      React.createElement('td', null, formatNumber(row.total_tokens ?? 0)),
-                      React.createElement('td', null, typeof row.credit === 'number' ? row.credit.toFixed(4) : '—'),
-                      React.createElement('td', null, `${(row.avg_latency_ms ?? 0).toFixed(0)} ms`),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-      );
-    }),
-
-    React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, usage.note ?? ''),
-  );
-}
-
-/**
- * 全局按模型统计（/v1/stats，既有端点）。
- * @param props - `{stats}`。
- * @returns React 元素。
- */
-function ModelStatsCard({ stats }) {
-  if (!stats) {
-    return React.createElement(Unavailable, {
-      title: '全局按模型统计',
-      needs: 'GET /v1/stats（本网关未提供）',
-      hint: '该端点在 chanhub 中已实现（仅按模型聚合、仅内存）。',
-    });
-  }
-  const models = Array.isArray(stats.models) ? stats.models : [];
-  return React.createElement('div', { style: s.card },
-    React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-      React.createElement('div', { style: s.label }, '全局按模型统计'),
-      React.createElement(Tag, { text: `运行 ${formatDuration(stats.uptime_sec)}`, tone: 'idle' }),
+    // 维度切换（单表）
+    React.createElement('div', { className: 'dshc-row', style: { marginBottom: 6 } },
+      ...Object.entries(dimMeta).map(([key, meta]) =>
+        segmentButton(key, meta.label, dim, setDim)),
     ),
-    models.length === 0
-      ? React.createElement('div', { style: { ...s.muted, marginTop: 10 } }, '暂无请求记录。')
+    dimRows.length === 0
+      ? React.createElement('div', { style: s.muted }, '无数据')
       : React.createElement(
           'div',
-          { className: 'dshc-tblwrap', style: { marginTop: 10 } },
+          { className: 'dshc-tblwrap' },
           React.createElement('table', null,
             React.createElement('thead', null,
               React.createElement('tr', null,
-                ...['模型', '请求', '成功', '失败', 'TTFB', '延迟', '吞吐', 'Prompt', 'Completion', '缓存命中', '扣费', '最近'].map((h) =>
-                  React.createElement('th', { key: h }, h),
-                ),
+                ...dimMeta[dim].columns.map((h) => React.createElement('th', { key: h }, h)),
               ),
             ),
             React.createElement('tbody', null,
-              ...models.map((model) =>
-                React.createElement('tr', { key: model.model },
-                  React.createElement('td', null, model.model),
-                  React.createElement('td', null, formatNumber(model.requests ?? 0)),
-                  React.createElement('td', null, formatNumber(model.success ?? 0)),
-                  React.createElement('td', null, formatNumber(model.failed ?? 0)),
-                  React.createElement('td', null, `${(model.avg_ttfb_ms ?? 0).toFixed(0)} ms`),
-                  React.createElement('td', null, `${(model.avg_latency_ms ?? 0).toFixed(0)} ms`),
-                  React.createElement('td', null, (model.tokens_per_sec ?? 0).toFixed(1)),
-                  React.createElement('td', null, formatNumber(model.prompt_tokens ?? 0)),
-                  React.createElement('td', null, formatNumber(model.completion_tokens ?? 0)),
-                  React.createElement('td', null, `${((model.cache_hit_rate ?? 0) * 100).toFixed(1)}%`),
-                  React.createElement('td', null, typeof model.credit === 'number' ? model.credit.toFixed(4) : '—'),
-                  React.createElement('td', null, relativeTime(model.last_seen)),
+              ...dimRows.map((row) =>
+                React.createElement('tr', { key: row.key },
+                  React.createElement('td', null, row.key),
+                  React.createElement('td', null, formatNumber(row.requests ?? 0)),
+                  React.createElement('td', null, formatNumber(row.failed ?? 0)),
+                  React.createElement('td', {
+                    title: `Prompt ${formatNumber(row.prompt_tokens ?? 0)} · Completion ${formatNumber(row.completion_tokens ?? 0)}`,
+                  }, formatNumber(row.total_tokens ?? 0)),
+                  React.createElement('td', null, typeof row.credit === 'number' ? row.credit.toFixed(4) : '—'),
+                  React.createElement('td', null, `${(row.avg_latency_ms ?? 0).toFixed(0)} ms`),
                 ),
               ),
             ),
           ),
         ),
-    React.createElement('div', { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } },
-      '⚠️ 该表的两个局限：**仅内存**（进程重启清零）、**只有模型一维**（无法回答「哪个账号用了多少」）。',
-      '上面的分桶视图补上了账号 / 域 / 时序三个维度。',
-    ),
-  );
-}
 
-/** 用量统计小格。 */
-function usageStat(label, value) {
-  return [
-    React.createElement(
-      'div',
-      {
-        key: label,
-        style: {
-          background: 'var(--dsw-alias-bg-layer-1,#fff)',
-          border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
-          borderRadius: 8,
-          padding: '8px 10px',
-          minWidth: 0,
-        },
-      },
-      React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, label),
-      React.createElement('div', { style: { fontSize: 16, fontWeight: 600 } }, formatNumber(value)),
-    ),
-  ];
+    React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, usage.note ?? ''),
+  );
 }
 
 /**
@@ -2083,28 +2204,47 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
   return React.createElement(
     'div',
     null,
+    // 服务操作（置顶：重启网关 + 可写状态）
     React.createElement('div', { style: s.card },
       React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-        React.createElement('div', { style: s.label }, '网关配置（config.json 全量 53 项）'),
-        React.createElement(Tag, {
-          text: editable ? '可写' : '只读',
-          tone: editable ? 'ok' : 'warn',
-        }),
+        React.createElement('div', { className: 'dshc-row' },
+          React.createElement('span', { style: { ...s.label, display: 'flex', alignItems: 'center', gap: 6 } },
+            React.createElement(Icons.bolt, { style: { width: 15, height: 15, color: 'var(--dsw-alias-state-warn-primary,#b45309)' } }),
+            '服务操作'),
+          React.createElement(Tag, {
+            text: editable ? '配置可写' : '配置只读',
+            tone: editable ? 'ok' : 'warn',
+          }),
+        ),
+        React.createElement(
+          'button',
+          {
+            type: 'button',
+            style: { ...s.btnGhost, borderColor: tone.warn.fg, color: tone.warn.fg },
+            disabled: serviceBusy,
+            onClick: onServiceControl,
+          },
+          serviceBusy ? '重启中…' : '↻ 重启网关',
+        ),
       ),
-      React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
-        `配置文件：${configInfo?.path ?? '—'}`,
-      ),
-      configInfo?.reason
-        ? React.createElement('div', { style: { ...s.warn, marginTop: 10 } }, configInfo.reason)
-        : null,
-      !editable
-        ? React.createElement('div', { style: { ...s.tip, marginTop: 10 } },
-            '当前为只读：改动不会被保存。容器部署常见 `./config.json:/app/config.json:ro`，需去掉 `:ro` 后重启容器。',
+      serviceControlResult
+        ? React.createElement(
+            'div',
+            { style: { ...(serviceControlResult.ok ? s.tip : s.err), marginTop: 10, lineHeight: 1.7 } },
+            serviceControlResult.ok
+              ? `命令已执行：${serviceControlResult.command}`
+              : `${serviceControlResult.message ?? '执行失败'}`,
+            serviceControlResult.stdout
+              ? React.createElement('div', { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stdout)
+              : null,
+            serviceControlResult.stderr
+              ? React.createElement('div', { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stderr)
+              : null,
           )
         : null,
     ),
 
-    // 分组折叠
+    // 分组折叠（两列网格布局，每项一行双列）
     ...groups.map((group) =>
       React.createElement(
         Fold,
@@ -2124,7 +2264,7 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
               : null,
           ),
         },
-        React.createElement('div', null,
+        React.createElement('div', { className: 'dshc-cfggrid' },
           ...group.fields.map((field) =>
             React.createElement(ConfigField, {
               key: field.path,
@@ -2180,46 +2320,7 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
         : null,
       validation.restart.size > 0
         ? React.createElement('div', { style: { ...s.warn, marginTop: 10 } },
-            `其中 ${validation.restart.size} 项属于「需重启」字段 —— chanhub 没有配置热加载，保存后需重启网关才生效。`,
-          )
-        : null,
-    ),
-
-    // 服务控制（放本 Tab 底部，与「需重启」说明同处）
-    React.createElement('div', { style: s.card },
-      React.createElement('div', { style: { ...s.label, marginBottom: 8 } }, '🔄 服务控制'),
-      React.createElement('div', { style: { ...s.tip, marginBottom: 10, lineHeight: 1.7 } },
-        'chanhub 自身没有重启能力（无热加载、无 SIGHUP 处理）。重启必须由**插件宿主**执行本机命令，',
-        '因此默认关闭：需在插件设置里打开 allowServiceControl 并填写重启命令。',
-      ),
-      React.createElement('div', { style: { ...s.code, background: 'var(--dsw-alias-bg-layer-1,#fff)', padding: '8px 10px', borderRadius: 6 } },
-        'docker compose restart <服务名>   # 白名单前缀之一',
-      ),
-      React.createElement('div', { className: 'dshc-row', style: { marginTop: 10 } },
-        React.createElement(
-          'button',
-          {
-            type: 'button',
-            style: s.btnGhost,
-            disabled: serviceBusy,
-            onClick: onServiceControl,
-          },
-          serviceBusy ? '执行中…' : '一键重启服务',
-        ),
-      ),
-      serviceControlResult
-        ? React.createElement(
-            'div',
-            { style: { ...(serviceControlResult.ok ? s.tip : s.err), marginTop: 10, lineHeight: 1.7 } },
-            serviceControlResult.ok
-              ? `命令已执行：${serviceControlResult.command}`
-              : `${serviceControlResult.message ?? '执行失败'}`,
-            serviceControlResult.stdout
-              ? React.createElement('div', { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stdout)
-              : null,
-            serviceControlResult.stderr
-              ? React.createElement('div', { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stderr)
-              : null,
+            `其中 ${validation.restart.size} 项需重启网关生效。`,
           )
         : null,
     ),
@@ -2263,53 +2364,119 @@ function ConfigField({ field, value, error, dirty, disabled, onChange, onReset }
     control = React.createElement('input', { ...inputProps, type: 'text', placeholder: field.default ?? '' });
   }
 
+  // 紧凑单行：label + 控件 + （需重启/危险/还原）标记；path 与默认值进 tooltip。
+  const rowTitle = [field.path, field.default ? `默认 ${field.default}` : '', field.note ?? '']
+    .filter(Boolean).join(' · ');
+
   return React.createElement(
     'div',
-    { style: { marginBottom: 10, minWidth: 0 } },
-    React.createElement(
-      'div',
-      { className: 'dshc-row', style: { marginBottom: 4 } },
-      React.createElement('span', { style: { ...s.label, minWidth: 150 } }, field.label),
-      React.createElement('span', { style: { ...s.code, color: 'var(--dsw-alias-label-tertiary,#8b93a1)' } }, field.path),
+    { className: `dshc-cfgrow${field.danger ? ' danger' : ''}`, style: { flexWrap: field.note && field.danger ? 'wrap' : 'nowrap' } },
+    React.createElement('label', { title: rowTitle },
+      field.label,
+      field.restart !== false ? ' ↻' : '',
+    ),
+    React.createElement('span', { className: 'dshc-cfgctl' },
+      control,
       dirty
         ? React.createElement(
             'span',
-            { style: { ...s.btnLink, cursor: 'pointer' }, onClick: onReset, title: '还原为当前文件值' },
+            { style: { ...s.btnLink, cursor: 'pointer', flexShrink: 0 }, onClick: onReset, title: '还原为当前文件值' },
             '还原',
           )
         : null,
-      field.danger ? React.createElement(Tag, { text: '危险语义', tone: 'warn' }) : null,
-      field.restart !== false ? React.createElement(Tag, { text: '需重启', tone: 'idle' }) : null,
-      field.type ? React.createElement(Tag, { text: field.type, tone: 'idle' }) : null,
-      field.default ? React.createElement('span', { style: s.muted }, `默认 ${field.default}`) : null,
     ),
-    control,
-    field.note
-      ? React.createElement(
-          'div',
-          {
-            style: {
-              ...s.muted,
-              marginTop: 4,
-              ...(field.danger ? { color: tone.warn.fg } : {}),
-            },
-          },
-          field.note,
-        )
+    field.danger
+      ? React.createElement(Tag, { text: '危险', tone: 'warn' })
       : null,
     error
-      ? React.createElement('div', { style: { ...s.muted, marginTop: 4, color: tone.err.fg } }, error)
+      ? React.createElement('span', { style: { ...s.muted, color: tone.err.fg, flexBasis: '100%' } }, error)
       : null,
+  );
+}
+
+/**
+ * 密钥脱敏显示：保留首尾各 4 位，中间圆点。
+ * @param value - 原始或占位字符串。
+ * @returns 脱敏后的字符串。
+ */
+function maskKey(value) {
+  if (!value) return '';
+  if (value.length <= 8) return '••••••••';
+  return `${value.slice(0, 4)}••••${value.slice(-4)}`;
+}
+
+/**
+ * API_KEY 药丸（顶栏右段）。
+ *
+ * 默认脱敏（首尾各 4 位），👁 切换明文 / 再隐藏；药丸本体点击 = 复制。
+ * 明文经 revealApiKey RPC 从宿主取（与网关同机文件/凭证缓存同源），
+ * 浏览器端不落 localStorage，仅存组件内存。
+ *
+ * @param props - `{onReveal: () => Promise<string>}`。
+ * @returns React 元素。
+ */
+function ApiKeyPill({ onReveal }) {
+  const [plain, setPlain] = React.useState('');
+  const [revealed, setRevealed] = React.useState(false);
+  const display = revealed && plain ? plain : maskKey(plain || 'sk-••••••••');
+
+  const toggleEye = async () => {
+    if (revealed) {
+      setRevealed(false);
+      return;
+    }
+    let value = plain;
+    if (!value) {
+      value = await onReveal();
+      if (!value) return; // onReveal 已 toast 错误
+      setPlain(value);
+    }
+    setRevealed(true);
+  };
+
+  const copyAll = async () => {
+    let value = plain;
+    if (!value) value = await onReveal();
+    if (!value) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch { /* 剪贴板不可用：静默（宿主 iframe 限制时常见） */ }
+  };
+
+  return React.createElement(
+    'span',
+    { className: 'dshc-keypill', style: { marginLeft: 'auto' }, onClick: copyAll, title: '点击复制完整 API Key' },
+    React.createElement('span', { style: { fontFamily: 'ui-monospace,Menlo,monospace' } }, display),
+    React.createElement('button', {
+      type: 'button',
+      className: 'dshc-keypill-ico',
+      title: revealed ? '隐藏' : '显示',
+      onClick: (e) => { e.stopPropagation(); void toggleEye(); },
+    }, revealed ? React.createElement(Icons.eyeOff, null) : React.createElement(Icons.eye, null)),
+    React.createElement('span', { className: 'dshc-keypill-ico', title: '复制' }, React.createElement(Icons.copy, null)),
   );
 }
 
 /**
  * Tab 栏（复刻 dsh-bridge-gateway 的 TabBar：纯前端状态，非 DSH slot 机制）。
  *
- * @param props - `{active, onChange, statusText}`。
+ * @param props - `{active, onChange, statusText, onAdd}`。
+ *   onAdd 为空 = 网关不支持交互登录，此时不渲染「添加账号」按钮
+ *   （不给出必然失败的入口）。
  * @returns React 元素。
  */
-function TabBar({ active, onChange, statusText }) {
+function TabBar({ active, onChange, statusText, onAdd }) {
   return React.createElement(
     'div',
     { className: 'dshc-tabs' },
@@ -2348,9 +2515,22 @@ function TabBar({ active, onChange, statusText }) {
         label,
       );
     }),
-    React.createElement('span', { style: { ...s.muted, marginLeft: 'auto', paddingLeft: 12, whiteSpace: 'nowrap' } },
-      statusText,
-    ),
+    // statusText 目前恒为空串（v2 把连接状态移到顶栏了），故条件渲染 ——
+    // 否则这个空 span 的 paddingLeft 会在「添加账号」左侧留下 12px 死空隙。
+    statusText
+      ? React.createElement('span', { style: { ...s.muted, marginLeft: 'auto', paddingLeft: 12, whiteSpace: 'nowrap' } },
+          statusText,
+        )
+      : null,
+    // 添加账号：与「账号池 … 配置」同一行、贴最右。是否渲染由 onAdd 是否存在决定。
+    onAdd
+      ? React.createElement('button', {
+          type: 'button',
+          className: 'dshc-tabadd',
+          onClick: onAdd,
+          title: 'OAuth 设备授权登录：浏览器完成授权后自动落盘并热加载进池，无需重启网关',
+        }, '＋ 添加账号')
+      : null,
   );
 }
 
@@ -2369,6 +2549,10 @@ function ChanhubPanel({ rpcCall }) {
   const [creditsByUid, setCreditsByUid] = React.useState({});
   const [growthByUid, setGrowthByUid] = React.useState({});
   const [schoolByUid, setSchoolByUid] = React.useState({});
+  // 逐账号卡各自记住选中的账号（两张卡独立 —— 开学季与成长任务的进度本就无关）。
+  // 空串 = 未显式选择 → 由 useSelectedUid 给出默认（账号池顺序里第一个有数据的）。
+  const [growthUid, setGrowthUid] = React.useState('');
+  const [schoolUid, setSchoolUid] = React.useState('');
   const [usage, setUsage] = React.useState(null);
   const [logs, setLogs] = React.useState(null);
   const [usageWindow, setUsageWindow] = React.useState('72h');
@@ -2376,6 +2560,8 @@ function ChanhubPanel({ rpcCall }) {
   const [runningTask, setRunningTask] = React.useState('');
   const [err, setErr] = React.useState('');
   const [refreshing, setRefreshing] = React.useState(false);
+  // 刷新降级原因（非空 = 本次没刷到新余额，显示的是缓存值）。
+  const [refreshDegraded, setRefreshDegraded] = React.useState('');
   const [busyAccount, setBusyAccount] = React.useState({});
   const [saving, setSaving] = React.useState(false);
   const [serviceBusy, setServiceBusy] = React.useState(false);
@@ -2415,9 +2601,12 @@ function ChanhubPanel({ rpcCall }) {
   const refresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
+      // 刷新首选 refreshStatus（网关侧先重取余额写回池，再返回 status）——
+      // 这样积分就是新鲜的，不需要「实时值 vs 缓存值」两套显示。
+      // 网关未开 admin.enabled 时它内部降级为只读 status，并带 refreshError。
       const [statusResult, configResult, accountsResult, statsResult, tasksResult, usageResult, logsResult] =
         await Promise.all([
-          rpcCall(ENDPOINTS.getStatus, {}),
+          rpcCall(ENDPOINTS.refreshStatus, {}),
           rpcCall(ENDPOINTS.getConfig, {}),
           rpcCall(ENDPOINTS.getAccounts, {}),
           rpcCall(ENDPOINTS.getStats, {}),
@@ -2433,6 +2622,10 @@ function ChanhubPanel({ rpcCall }) {
       }
       setErr('');
       setData(statusResult?.value ?? null);
+      // 刷新降级（网关未开 admin.enabled）：积分是缓存值，不是最新的 —— 如实提示。
+      setRefreshDegraded(statusResult?.value?.refreshed === false
+        ? (statusResult.value.refreshError?.message ?? '刷新未生效')
+        : '');
       setConfigInfo(configResult?.ok === false ? { ok: false, message: configResult?.error?.message } : configResult?.value ?? null);
       setAuthInfo(accountsResult?.value ?? null);
       setStats(statsResult?.value?.available ? statsResult.value.stats : null);
@@ -2502,22 +2695,8 @@ function ChanhubPanel({ rpcCall }) {
     void refresh();
   }, [refresh]);
 
-  // 页面隐藏时暂停轮询（省网关开销），可见时恢复并立即刷一次。
-  const [visible, setVisible] = React.useState(true);
-  React.useEffect(() => {
-    if (typeof document === 'undefined') return undefined;
-    const handler = () => setVisible(!document.hidden);
-    document.addEventListener('visibilitychange', handler);
-    return () => document.removeEventListener('visibilitychange', handler);
-  }, []);
-
-  React.useEffect(() => {
-    if (!visible) return undefined;
-    const timer = setInterval(() => {
-      void refresh();
-    }, 8000);
-    return () => clearInterval(timer);
-  }, [visible, refresh]);
+  // 自动刷新已移除（默认不轮询）：进面板时上方 refresh() 触发一次，
+  // 之后由顶栏 ↻ 手动刷新。
 
   /** 账号动作（带二次确认）。 */
   const onAccountAction = React.useCallback(
@@ -2609,6 +2788,27 @@ function ChanhubPanel({ rpcCall }) {
   // 开学季券码（任务 Tab 按需查看）。
   const [vouchersData, setVouchersData] = React.useState(null);
   const [vouchersLoading, setVouchersLoading] = React.useState(false);
+  // 添加账号：弹窗开关 + 网关能力（loginChannels 为空 = 不渲染入口）。
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [loginChannels, setLoginChannels] = React.useState(null);
+  const [loginRealms, setLoginRealms] = React.useState([]);
+
+  // 网关可登录渠道只在挂载时探一次：这是网关**版本能力**，不会在会话中变化，
+  // 没必要跟着 8s 轮询反复打 /panel/api/channels。
+  React.useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const result = await rpcCall(ENDPOINTS.getChannels, {});
+        if (!alive) return;
+        setLoginChannels(result?.value?.loginChannels ?? []);
+        setLoginRealms(result?.value?.realms ?? []);
+      } catch {
+        if (alive) setLoginChannels([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, [rpcCall]);
 
   /** 全账号任务扫描（只读）。 */
   const onTaskScan = React.useCallback(
@@ -2689,6 +2889,48 @@ function ChanhubPanel({ rpcCall }) {
     [rpcCall, refresh, showToast],
   );
 
+  /**
+   * 添加账号：发起 OAuth 登录，返回授权 URL。
+   *
+   * 返回原始 RPC 信封（`{ok, value|error}`）而不是抛异常：弹窗要按失败原因渲染
+   * 就地提示。旧的网关对 workbuddy 回 400 unknown channel（`upstream-error`），
+   * 这里把它翻译成可读的一句话——面板必须能区分「渠道不支持」与「网络故障」。
+   */
+  const onLoginStart = React.useCallback(
+    async (channel, realm) => {
+      try {
+        const result = await rpcCall(ENDPOINTS.loginStart, { channel, realm });
+        if (result?.ok === false && channel === 'workbuddy') {
+          const message = result.error?.message ?? '';
+          if (/unknown channel/i.test(message)) {
+            return { ok: false, error: { message: '该网关版本不支持在面板里添加 workbuddy 账号 —— 请升级 chanhub 网关后重试。' } };
+          }
+        }
+        return result;
+      } catch (error) {
+        return { ok: false, error: { message: String(error?.message ?? error) } };
+      }
+    },
+    [rpcCall],
+  );
+
+  /** 添加账号：轮询登录态（弹窗负责节奏，这里只做转发）。 */
+  const onLoginPoll = React.useCallback(
+    async (channel) => rpcCall(ENDPOINTS.loginPoll, { channel }),
+    [rpcCall],
+  );
+
+  /**
+   * 添加账号：提交用户粘贴的回调。
+   *
+   * traework 的必经路径：Trae 授权页硬性要求回调是 127.0.0.1（远端打不开），
+   * 登录凭证只能靠用户从地址栏复制回来。
+   */
+  const onLoginCallback = React.useCallback(
+    async (channel, callback) => rpcCall(ENDPOINTS.loginCallback, { channel, callback }),
+    [rpcCall],
+  );
+
   /** 查看开学季券码（全部账号，只读）。 */
   const onViewVouchers = React.useCallback(
     async () => {
@@ -2709,10 +2951,18 @@ function ChanhubPanel({ rpcCall }) {
     [rpcCall, showToast],
   );
 
+  // 逐账号卡的有效选中 uid：用户显式选择优先；刷新后账号池变化导致选中失效时，
+  // 回落到「账号池顺序里第一个有数据的账号」（而不是显示空白）。
+  const taskAccounts = data?.status?.accounts ?? [];
+  const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, taskAccounts);
+  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, taskAccounts);
+
   /** 单码/批量成长码写操作（点亮 accept / 领取 claim / 全部领取）。 */
   const onGrowthWrite = React.useCallback(
     async (action, code) => {
-      const uid = firstGrowthAccountUid(growthByUid);
+      // 必须用**当前卡片选中的账号**：此前这里取「第一个有数据的账号」，
+      // 于是切到第 3 个账号后点「点亮」，改的却是第 1 个账号的进度（真机踩到）。
+      const uid = effectiveGrowthUid;
       if (!uid) {
         showToast('成长任务进度是逐账号的：当前没有可操作的账号数据。');
         return;
@@ -2742,7 +2992,7 @@ function ChanhubPanel({ rpcCall }) {
         setGrowthWriteBusy('');
       }
     },
-    [rpcCall, refresh, showToast, growthByUid],
+    [rpcCall, refresh, showToast, effectiveGrowthUid],
   );
 
   /** 触发一类任务（异步：网关立即回执，结果经刷新查看）。 */
@@ -2810,6 +3060,21 @@ function ChanhubPanel({ rpcCall }) {
   // 成长码写操作（点亮/领取）与批量任务按钮才出现；false = 如实隐藏并说明。
   const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
 
+  /** API_KEY 明文获取（顶栏小眼睛用；走已认证 RPC 通道，明文不落盘）。 */
+  const onReveal = React.useCallback(async () => {
+    try {
+      const result = await rpcCall(ENDPOINTS.revealApiKey, {});
+      if (result?.ok === false) {
+        showToast(`获取失败：${result?.error?.message ?? '未知错误'}`);
+        return '';
+      }
+      return String(result?.value?.apiKey ?? '');
+    } catch (error) {
+      showToast(`获取失败：${error?.message ?? error}`);
+      return '';
+    }
+  }, [rpcCall, showToast]);
+
   /** 顶部连接状态文案。 */
   const statusText = (() => {
     if (data?.reachable === false) return '● 未连接';
@@ -2826,47 +3091,73 @@ function ChanhubPanel({ rpcCall }) {
     { style: { display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 } },
     React.createElement('style', null, FOLD_CSS),
 
-    // 顶部品牌行
+    // 顶栏（单行药丸条）：标题 + 连接状态 + API_KEY 药丸 + 刷新
     React.createElement(
       'div',
-      { style: { ...s.card, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
-      React.createElement(Icons.gateway, { style: { color: 'var(--dsw-alias-brand-primary,#4f6ef7)', width: 22, height: 22 } }),
+      { className: 'dshc-topbar' },
+      React.createElement(Icons.hub, { style: { color: 'var(--dsw-alias-brand-primary,#4f6ef7)', width: 20, height: 20, flexShrink: 0 } }),
+      React.createElement('span', { className: 'dshc-topbar-title' }, '渠道中心'),
       React.createElement(
-        'div',
-        { style: { minWidth: 0, flexGrow: 1 } },
-        React.createElement('div', { style: { ...s.label, fontSize: 15 } }, 'chanhub 网关面板'),
-        React.createElement('div', { style: s.muted },
-          '账号池 · 积分 · 熔断冷却 · 配置 —— 数据直连 lament-z/chanhub（WorkBuddy2API）网关',
+        'span',
+        { className: 'dshc-row', style: { gap: 6, marginLeft: 4 } },
+        React.createElement('span', {
+          className: 'dshc-statusdot',
+          style: { background: data?.reachable === false || data?.error ? tone.err.fg : data?.reachable ? tone.ok.fg : tone.idle.fg },
+        }),
+        React.createElement('span', { style: { ...s.muted, whiteSpace: 'nowrap' } },
+          data?.reachable === true
+            ? `已连接 ${(data.baseURL ?? '').replace(/^https?:\/\//, '')}`
+            : data?.reachable === false ? '未连接' : data?.error ? '异常' : '加载中…',
         ),
       ),
-      React.createElement(Tag, {
-        text: statusText,
-        tone: data?.reachable === false || data?.error ? 'err' : data?.reachable ? 'ok' : 'idle',
-      }),
+      React.createElement(ApiKeyPill, { onReveal }),
+      React.createElement(
+        'button',
+        {
+          type: 'button',
+          // 刷新反馈：图标旋转 + 文案切换 + 禁用态。此前只有 disabled（无任何视觉
+          // 差异），点下去看不出有没有生效 —— 与「刷新没反应」的报告一致。
+          style: { ...s.btnGhost, height: 26, padding: '0 10px', marginLeft: 'auto', flexShrink: 0, gap: 5, opacity: refreshing ? 0.65 : 1 },
+          onClick: refresh,
+          disabled: refreshing,
+          title: refreshing ? '正在刷新…' : '刷新数据（重新拉取账号、任务、用量、日志）',
+        },
+        React.createElement('span', { className: refreshing ? 'dshc-spin' : '' },
+          React.createElement(Icons.refresh, null)),
+        refreshing ? React.createElement('span', { style: { fontSize: 12 } }, '刷新中…') : null,
+      ),
     ),
 
-    // 不可达时的说明（区分「网关没起来」与「key 不对」——处置完全不同）
+    // 出错时的细警示条（仅出错时出现，替代原整卡说明）
     data?.reachable === false
-      ? React.createElement('div', { style: { ...s.err, marginBottom: 14, lineHeight: 1.7 } },
-          `无法连接网关：${data.error?.message ?? '未知原因'}`,
-          React.createElement('div', { style: { marginTop: 6 } },
-            '请确认网关已启动、地址正确，并在插件设置里配置 apiKeyEnv（默认 WB2API_API_KEY）。',
-          ),
-        )
+      ? React.createElement('div', { style: { ...s.err, marginBottom: 12, lineHeight: 1.7 } },
+          `无法连接网关：${data.error?.message ?? '未知原因'} —— 请确认网关已启动、地址正确。`)
       : null,
     data?.reachable === true && data?.error
-      ? React.createElement('div', { style: { ...s.err, marginBottom: 14, lineHeight: 1.7 } },
+      ? React.createElement('div', { style: { ...s.err, marginBottom: 12, lineHeight: 1.7 } },
           `网关可达，但取状态失败：${data.error.message}`,
-          data.error.code === 'auth-failed'
-            ? React.createElement('div', { style: { marginTop: 6 } },
-                '网关确认在线，是 API key 不匹配。请在插件设置里核对 apiKeyEnv 指向的凭证，或网关 config.json 的 api_key。',
-              )
-            : null,
-        )
+          data.error.code === 'auth-failed' ? '（API key 不匹配，请核对插件设置里的凭证）' : '')
       : null,
-    err ? React.createElement('div', { style: { ...s.err, marginBottom: 14 } }, err) : null,
+    err ? React.createElement('div', { style: { ...s.err, marginBottom: 12 } }, err) : null,
 
-    React.createElement(TabBar, { active: activeTab, onChange: setActiveTab, statusText }),
+    // 刷新降级提示：网关没开 admin.enabled（或版本较旧）时刷新拿不到新余额，
+    // 显示的是缓存值。必须说出来 —— 否则用户会以为积分卡住了。
+    refreshDegraded
+      ? React.createElement('div', { style: { ...s.warn, marginBottom: 12, lineHeight: 1.7 } },
+          `积分可能不是最新的：${refreshDegraded}`,
+          React.createElement('div', { style: { marginTop: 4 } },
+            '在网关 config.json 里设置 ',
+            React.createElement('code', { style: s.code }, 'admin.enabled: true'),
+            ' 后重启网关，刷新即可同步最新余额。'))
+      : null,
+
+    // onAdd 为空（loginChannels 空数组 = 旧网关，或 null = 尚未探完）时不渲染按钮。
+    React.createElement(TabBar, {
+      active: activeTab,
+      onChange: setActiveTab,
+      statusText: '',
+      onAdd: loginChannels && loginChannels.length > 0 ? () => setAddOpen(true) : undefined,
+    }),
 
     // Tab 内容
     activeTab === 'accounts'
@@ -2877,13 +3168,9 @@ function ChanhubPanel({ rpcCall }) {
           onAction: onAccountAction,
           busy: busyAccount,
           onRefresh: refresh,
-          refreshing,
           error: '',
           creditsByUid,
           scheduleConfig: configInfo?.config?.schedule,
-          onRunTask,
-          runningName: runningTask,
-          taskData: tasks,
           onRemove: onRemoveAccount,
         })
       : null,
@@ -2895,6 +3182,10 @@ function ChanhubPanel({ rpcCall }) {
           taskData: tasks,
           growthData: growthByUid,
           schoolData: schoolByUid,
+          growthUid: effectiveGrowthUid,
+          setGrowthUid,
+          schoolUid: effectiveSchoolUid,
+          setSchoolUid,
           onRunTask,
           runningName: runningTask,
           onRefresh: refresh,
@@ -2941,6 +3232,20 @@ function ChanhubPanel({ rpcCall }) {
         })
       : null,
 
+    // 添加账号弹窗（OAuth 设备授权）。会话态在网关侧，故关掉弹窗不丢失在途登录；
+    // 重开只是重新发起——这是有意的：避免面板里藏一个不可见的后台轮询。
+    addOpen
+      ? React.createElement(AddAccountDialog, {
+          channels: loginChannels ?? [],
+          realms: loginRealms,
+          onStart: onLoginStart,
+          onPoll: onLoginPoll,
+          onCallback: onLoginCallback,
+          onClose: () => setAddOpen(false),
+          onDone: refresh,
+        })
+      : null,
+
     // 轻量提示条
     toast
       ? React.createElement(
@@ -2980,7 +3285,7 @@ function apply(ctx) {
         name: 'settings.section',
         id: 'dsh-chanhub',
         order: 11,
-        label: () => 'chanhub',
+        label: () => '渠道中心',
         inject: () => ({ rpcCall }),
       },
       ChanhubPanel,
@@ -2988,4 +3293,6 @@ function apply(ctx) {
   );
 }
 
-export { name, inject, apply };
+// AddAccountDialog 与 apply 一并导出：前者是测试入口——渲染测试走打包产物
+// （client/client.js）而非源码，与 client-render.test.mjs 的既有纪律一致。
+export { name, inject, apply, AddAccountDialog };

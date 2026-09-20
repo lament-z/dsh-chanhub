@@ -250,6 +250,9 @@ function fakeRpc(status) {
   const rpc = async (endpoint, payload) => {
     calls.push({ endpoint, payload });
     switch (endpoint) {
+      // 面板刷新打 refreshStatus（网关侧先重取余额写回池，再返回 status）。
+      // 形状与 getStatus 同，多一个 refreshed:true（表示余额已同上游对齐）。
+      case 'refreshStatus':
       case 'getStatus':
         return {
           ok: true,
@@ -259,6 +262,7 @@ function fakeRpc(status) {
             // probe.features.admin/tasks=true → admin 端点在场（成长码写按钮与批量任务可渲染）。
             probe: { reachable: true, features: { admin: true, tasks: true, stats: false, usageBuckets: true, logs: true, credits: true, growthTasks: true, schoolTasks: true } },
             status,
+            ...(endpoint === 'refreshStatus' ? { refreshed: true } : {}),
           },
         };
       case 'getConfig':
@@ -448,11 +452,12 @@ test('渲染：面板真实挂载并加载出数据（不抛异常）', { skip }
   const { html, cleanup } = await mount(rpc);
   try {
     assert.ok(html.length > 3000, `渲染输出过短（${html.length}），疑似渲染失败`);
-    assert.match(html, /chanhub 网关面板/);
+    assert.match(html, /渠道中心/);
     assert.match(html, /dshc-tabs/);
     // 真实调用了数据端点
     const endpoints = rpc.calls.map((call) => call.endpoint);
-    for (const expected of ['getStatus', 'getConfig', 'getAccounts', 'getStats']) {
+    // getStatus 换成 refreshStatus：刷新现在带余额同步（见 host 的 refreshStatus）。
+    for (const expected of ['refreshStatus', 'getConfig', 'getAccounts', 'getStats']) {
       assert.ok(endpoints.includes(expected), `未调用 ${expected}`);
     }
   } finally {
@@ -471,20 +476,19 @@ test('渲染：5 个 Tab 标签都在', { skip }, async () => {
   }
 });
 
-test('渲染：概览五联 + 总积分与渠道（竖排三行、center 对齐）', { skip }, async () => {
+test('渲染：概览 KPI 行 + 三渠道积分卡', { skip }, async () => {
   const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
   try {
-    for (const label of ['总账号', '健康', '冷却中', '在途占满', '粘性会话']) {
-      assert.ok(html.includes(label), `缺五联项：${label}`);
+    for (const label of ['账号总数', '健康', '冷却中', '在途占满']) {
+      assert.ok(html.includes(label), `缺 KPI 项：${label}`);
     }
-    assert.ok(html.includes('总积分（可消耗）'), '缺总积分块');
     for (const label of ['WB', 'Trae', 'Qoder']) {
-      assert.ok(html.includes(label), `缺渠道块：${label}`);
+      assert.ok(html.includes(label), `缺渠道卡：${label}`);
     }
-    // 可消耗总分 = 2880 + 10 + 500 = 3390（不可消耗部分不并入）
-    assert.ok(html.includes('3,390'), `总积分应为 3390，实际 HTML 未包含`);
-    // 上游下发总额 = 3120 + 100 + 500 = 3720（与可消耗分开列出）
-    assert.ok(html.includes('3,720'), `上游下发总额应为 3720，实际：${html.match(/上游下发总额[^<]*/)?.[0]}`);
+    // 三渠道卡分别汇总：WB 2880 / Trae 10 / Qoder 500
+    assert.ok(html.includes('2,880'), `WB 渠道积分应为 2880，实际 HTML 未包含`);
+    assert.ok(html.includes('500'), `Qoder 渠道积分应为 500`);
+    assert.ok(html.includes('10'), `Trae 渠道积分应为 10`);
   } finally {
     await cleanup();
   }
@@ -496,129 +500,208 @@ test('渲染：三种账号状态标签都正确出现', { skip }, async () => {
     assert.ok(html.includes('可用'), '缺「可用」状态');
     assert.ok(html.includes('手动停用 + 系统禁用'), '叠加态标签缺失');
     assert.ok(html.includes('软限流（429）'), '冷却文案未按 cool_kind 分支');
-    assert.match(html, /剩余 1h 1m/, `冷却剩余时长未渲染：${html.match(/剩余[^<]*/)?.[0]}`);
+    assert.match(html, /剩余 1 小时 1 分/, `冷却剩余时长未渲染（中文格式）：${html.match(/剩余[^<]*/)?.[0]}`);
   } finally {
     await cleanup();
   }
 });
 
 test('渲染：叠加态同时给出「启用」与「复活」，并说明两位独立清除', { skip }, async () => {
-  const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
+  const { html, cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
-    assert.ok(html.includes('解除手动停用'), '缺 enable 动作');
-    assert.ok(html.includes('复活（清系统禁用）'), '缺 revive 动作');
-    assert.ok(html.includes('点一次不会同时清掉两位'), '缺叠加态行为说明（会误导用户）');
+    // 点开「手动停用的号」卡片 → 抽屉里出现完整折叠明细与动作
+    const card = [...document.querySelectorAll('.dshc-acctcard')].find((el) => el.textContent.includes('手动停用的号'));
+    assert.ok(card, '缺账号卡片');
+    await React.act(async () => {
+      card.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    const drawerHtml = document.getElementById('app').innerHTML;
+    assert.ok(drawerHtml.includes('解除手动停用'), '缺 enable 动作');
+    assert.ok(drawerHtml.includes('复活（清系统禁用）'), '缺 revive 动作');
+    assert.ok(drawerHtml.includes('点一次不会同时清掉两位'), '缺叠加态行为说明（会误导用户）');
   } finally {
     await cleanup();
   }
 });
 
-test('渲染：账号折叠四组的摘要都带真实数据', { skip }, async () => {
-  const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
+test('渲染：账号折叠四组的摘要都带真实数据（抽屉内）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
-    for (const group of ['健康', '质量', '积分', '任务']) {
+    const card = [...document.querySelectorAll('.dshc-acctcard')].find((el) => el.textContent.includes('甲'));
+    assert.ok(card, '缺账号卡片');
+    await React.act(async () => {
+      card.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    const html = document.getElementById('app').innerHTML;
+    for (const group of ['健康', '质量', '积分']) {
       assert.ok(html.includes(group), `缺折叠组：${group}`);
     }
     assert.match(html, /662 成功 \/ 3 失败 · 成功率/, '质量组摘要缺数据');
     assert.match(html, /2,880 可用/, '积分组摘要缺数据');
-    // 任务组摘要 = 真实启用计数（fixture 里 checkin/cat 启用 → 至少 2/6）
-    assert.match(html, /\d\/6 项排程启用 · 24 个成长码/, '任务组摘要缺排程启用计数');
   } finally {
     await cleanup();
   }
 });
 
-test('渲染：排程区块两级递进（色块只表达配置与时间窗）', { skip }, async () => {
-  const { html, cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+test('渲染：排程折叠（色块只表达配置与时间窗）在配置 Tab', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
-    await clickTab(document, '账号池');
-    // 展开第一个账号折叠面板（点击 summary）
-    const summaries = [...document.querySelectorAll('summary')];
-    const accountFold = summaries.find((el) => el.textContent.includes('甲'));
-    assert.ok(accountFold, '缺账号折叠面板');
-    await React.act(async () => {
-      accountFold.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
-    });
-    // 展开任务组折叠
-    const taskFold = [...document.querySelectorAll('summary')].find((el) => el.textContent.trim().startsWith('任务'));
-    assert.ok(taskFold, '缺任务组折叠');
-    await React.act(async () => {
-      taskFold.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
-    });
+    await clickTab(document, '配置');
     const html = document.getElementById('app').innerHTML;
-    // 折叠态色块：6 个 dshc-dp
-    const colorBlocks = [...document.querySelectorAll('.dshc-dp')];
-    assert.ok(colorBlocks.length >= 6, `色块数 ${colorBlocks.length} 应 ≥ 6`);
-    // 明细行：六项任务名 + 计划时刻文本
-    for (const label of ['签到', '活跃地图', '猫猫旅行', 'token 保活', '开学季', '夜猫子']) {
-      assert.ok(html.includes(label), `缺排程明细：${label}`);
+    for (const label of ['签到', '猫猫旅行', '开学季', '夜猫子']) {
+      assert.ok(html.includes(label), `缺排程字段：${label}`);
     }
-    assert.ok(html.includes('09:00'), '缺计划时刻（checkin_hours=[9,21]）');
-    // 状态只来自配置/时间窗 —— 不出现编造的执行状态词
-    assert.ok(!html.includes('今日已签'), '不得出现编造的执行状态「今日已签」');
-    assert.ok(html.includes('窗口内') || html.includes('窗口外') || html.includes('未启用'), '缺时间窗/启用标签');
-    // cat 启用（fixture cat_enabled=true）→ 摘要里启用数 ≥ 1
-    assert.ok(html.includes('项排程启用'), '缺启用计数');
+    assert.ok(html.includes('9,21'), '缺计划时刻（checkin_hours=[9,21]）');
   } finally {
     await cleanup();
   }
 });
 
-test('渲染：批量动作条接真实任务端点（不再 disabled 占位）', { skip }, async () => {
+test('渲染：任务磁贴接真实任务端点（不再 disabled 占位）', { skip }, async () => {
   const { html, cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
-    await clickTab(document, '账号池');
+    await clickTab(document, '任务');
     const fresh = document.getElementById('app').innerHTML;
-    assert.ok(fresh.includes('批量动作'), '缺批量动作条');
+    // v2 收尾：原「任务操作台按钮 + 执行历史表」合并为磁贴（触发与状态同格）。
+    assert.ok(fresh.includes('dshc-tasktile'), '缺任务磁贴');
     // 触发按钮可用（网关任务数据在场时不得全部 disabled）
-    assert.ok(fresh.includes('全量签到'), '缺签到批量按钮');
-    assert.ok(fresh.includes('查余额'), '缺余额批量按钮');
-    // fixture 里 travel 正在跑（running:true）→ 只有它 disabled，其余 4 个可用。
-    const batchLabels = ['全量签到', '查余额', 'token 保活', '猫猫旅行', '活跃上报'];
+    assert.ok(fresh.includes('签到'), '缺签到任务按钮');
+    assert.ok(fresh.includes('查余额'), '缺余额任务按钮');
+    // fixture 里 travel 正在跑（running:true）→ 只有它 disabled，其余可用。
+    const batchLabels = ['签到', '查余额', 'token 保活', '猫猫旅行', '活跃地图'];
     const byLabel = Object.fromEntries(batchLabels.map((label) => {
       const button = [...document.querySelectorAll('button')].find((b) => b.textContent.includes(label));
       return [label, button];
     }));
     for (const label of batchLabels) {
-      assert.ok(byLabel[label], `缺批量按钮：${label}`);
+      assert.ok(byLabel[label], `缺任务按钮：${label}`);
     }
-    for (const label of ['全量签到', '查余额', 'token 保活', '活跃上报']) {
+    for (const label of ['签到', '查余额', 'token 保活', '活跃地图']) {
       assert.ok(!byLabel[label].disabled, `${label} 在网关任务可用时不得 disabled`);
     }
     assert.ok(byLabel['猫猫旅行'].disabled, 'travel running=true → 猫猫旅行按钮应 disabled');
     // 旧占位文案必须消失
     assert.ok(!fresh.includes('这些按钮暂不可用'), '旧「暂不可用」占位应删除');
-    // 独立性警示保留
-    assert.ok(fresh.includes('互不联动') || fresh.includes('各自独立'), '缺独立性警示');
   } finally {
     await cleanup();
   }
 });
 
-test('渲染：批量动作条在网关未开启 admin 时如实降级', { skip }, async () => {
+test('渲染：任务 Tab 在网关未开启 admin 时如实降级', { skip }, async () => {
   const rpc = fakeRpc(realStatusFixture());
   const { html, cleanup, document } = await mount(rpc);
   try {
-    await clickTab(document, '账号池');
+    await clickTab(document, '任务');
     const fresh = document.getElementById('app').innerHTML;
     // fixture getTasks available=true（网关开了）；这里验证 available=false 的降级形态
-    assert.ok(fresh.includes('批量动作'), '缺批量动作条');
+    assert.ok(fresh.includes('任务运行状态与手动触发') || fresh.includes('dshc-tasktile'), '缺任务降级形态');
   } finally {
     await cleanup();
   }
 });
 
-test('渲染：折叠结构与 CSS（三个坑的修复）', { skip }, async () => {
-  const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
+test('渲染：折叠结构与 CSS（三个坑的修复；fold 在抽屉内）', { skip }, async () => {
+  const { html, cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
-    assert.match(html, /<details[^>]*class="dshc-fold"/, '必须用原生 details');
-    assert.match(html, /<summary/, '必须有 summary');
-    // 坑 1：折叠态显式压回 display:none
+    // CSS 注入在顶栏 style 里，始终在场
     assert.ok(html.includes('.dshc-fold:not([open]) > .dshc-body'), '缺折叠态 display 压回规则');
+    // 折叠 details 在账号抽屉内验证
+    const card = [...document.querySelectorAll('.dshc-acctcard')].find((el) => el.textContent.includes('甲'));
+    assert.ok(card, '缺账号卡片');
+    await React.act(async () => {
+      card.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    const drawerHtml = document.getElementById('app').innerHTML;
+    assert.match(drawerHtml, /<details[^>]*class="dshc-fold"/, '必须用原生 details');
+    assert.match(drawerHtml, /<summary/, '必须有 summary');
     // 坑 2：summary 内的动作必须 pointer-events:none
-    assert.match(html, /pointer-events:\s*none/, '缺 summary 内动作的 pointer-events 修复');
+    assert.match(drawerHtml, /pointer-events:\s*none/, '缺 summary 内动作的 pointer-events 修复');
     // 坑 3：行用 center 对齐
-    assert.ok(html.includes('align-items: center'), '缺 center 对齐（baseline 会错位 20px）');
+    assert.ok(drawerHtml.includes('align-items: center'), '缺 center 对齐（baseline 会错位 20px）');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：账号详情抽屉默认展开明细（外层壳 + 健康/质量/积分），任务组保持折叠', { skip }, async () => {
+  // 用户反馈「点开卡片，详情里信息都折叠着」。
+  //
+  // 结构真相（实测挂载探针，勿凭组件名臆断）：抽屉内的 .dshc-fold 有 **5 个**，
+  // 是两层嵌套 ——
+  //   [0] AccountFold 自己的外层壳（summary = 昵称+状态+积分）
+  //       [1] 健康  [2] 质量  [3] 积分  [4] 任务
+  // 只展开那四组是不够的：外层壳不展开，四组根本不可见（这正是反馈的观感）。
+  //
+  // 本用例断言 **open 分布**而不是「有 open 属性」——后者在外层壳/任务组上也成立，
+  // 会放过「任务组被一起展开」这个与 ui-design §6 冲突的回归。
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const card = [...document.querySelectorAll('.dshc-acctcard')].find((el) => el.textContent.includes('甲'));
+    assert.ok(card, '缺账号卡片');
+    await React.act(async () => {
+      card.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+
+    const drawer = document.querySelector('.dshc-drawer');
+    assert.ok(drawer, '缺账号详情抽屉');
+    const folds = [...drawer.querySelectorAll('details.dshc-fold')];
+    assert.equal(folds.length, 5, `抽屉内应有 5 个折叠层（外层壳 + 四组），实测 ${folds.length}`);
+
+    const openState = folds.map((f) => f.hasAttribute('open'));
+    assert.deepEqual(
+      openState,
+      [true, true, true, true, false],
+      `默认展开态应为 [外层壳, 健康, 质量, 积分] = true、任务 = false，实测 ${JSON.stringify(openState)}`,
+    );
+
+    // 逐组确认「摘要文案 ↔ 展开态」的对应关系，避免顺序变动时断言静默错位。
+    const bySummary = (text) =>
+      folds.find((f) => (f.querySelector('summary')?.textContent ?? '').includes(text));
+    for (const group of ['健康', '质量', '积分']) {
+      const fold = bySummary(group);
+      assert.ok(fold, `找不到「${group}」折叠组`);
+      assert.ok(fold.hasAttribute('open'), `${group}组应默认展开`);
+    }
+    const taskFold = bySummary('任务');
+    assert.ok(taskFold, '找不到「任务」折叠组');
+    assert.ok(
+      !taskFold.hasAttribute('open'),
+      '任务组应保持折叠（展开是 6 项排程明细 + 说明，ui-design §6 刻意压成一行色块省高度）',
+    );
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：抽屉内手动折叠的组不被数据刷新弹开（「默认展开」≠「锁死展开」）', { skip }, async () => {
+  // Fold 用 `open` 传固定的 true。React 只在值**变化**时写 DOM 属性，
+  // 所以用户手点的折叠应当保持 —— 但这是行为保证，必须测，不能靠推断。
+  const rpc = fakeRpc(realStatusFixture());
+  const { cleanup, document } = await mount(rpc);
+  try {
+    const card = [...document.querySelectorAll('.dshc-acctcard')].find((el) => el.textContent.includes('甲'));
+    await React.act(async () => {
+      card.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    const drawer = document.querySelector('.dshc-drawer');
+    const quality = [...drawer.querySelectorAll('details.dshc-fold')]
+      .find((f) => (f.querySelector('summary')?.textContent ?? '').includes('质量'));
+    assert.ok(quality?.hasAttribute('open'), '前置条件：质量组应默认展开');
+
+    // 模拟用户手动折叠（原生 details 的交互结果）
+    await React.act(async () => {
+      quality.open = false;
+      quality.dispatchEvent(new document.defaultView.Event('toggle'));
+    });
+    assert.equal(quality.open, false, '前置条件：手动折叠后应为收起');
+
+    // 触发一次重渲染（等价于面板 refresh 落地的 setState）
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    const after = [...document.querySelector('.dshc-drawer').querySelectorAll('details.dshc-fold')]
+      .find((f) => (f.querySelector('summary')?.textContent ?? '').includes('质量'));
+    assert.equal(after.open, false, '用户手动折叠的组不应被重渲染弹开');
   } finally {
     await cleanup();
   }
@@ -630,12 +713,11 @@ test('渲染：配置 Tab 出现危险语义与「需重启」标注', { skip },
   try {
     await clickTab(document, '配置');
     const configTabHtml = document.getElementById('app').innerHTML;
-    assert.ok(configTabHtml.includes('危险语义'), '缺危险语义角标');
-    assert.ok(configTabHtml.includes('需重启'), '缺「需重启」角标');
-    assert.ok(configTabHtml.includes('0 = 不限'), '缺 max_in_flight 的 0 语义说明');
-    assert.ok(configTabHtml.includes('回落 2'), '缺 max_in_flight_global 的反向语义说明');
-    assert.ok(configTabHtml.includes('0 = 关停探索'), '缺 cost_explore_interval 的 0 语义说明');
-    assert.ok(configTabHtml.includes('53 项'), '缺 53 项总数');
+    assert.ok(configTabHtml.includes('危险'), '缺危险语义角标');
+    assert.ok(configTabHtml.includes('↻'), '缺「需重启」标记（label 后缀 ↻）');
+    assert.ok(configTabHtml.includes('重启网关'), '缺置顶的一键重启');
+    assert.ok(configTabHtml.includes('账号池治理'), '缺配置分组');
+    assert.ok(configTabHtml.includes('定时排程'), '缺定时排程分组');
   } finally {
     await cleanup();
   }
@@ -647,22 +729,23 @@ test('渲染：任务 Tab 的三条反直觉事实都如实呈现', { skip }, as
     await clickTab(document, '任务');
     const html = document.getElementById('app').innerHTML;
     // 真实任务状态数据在场（不再是「网关未提供」占位）
-    assert.ok(html.includes('任务状态'), '缺任务状态区块');
-    assert.ok(html.includes('签到逐账号结果'), '缺签到的逐账号结构化结果');
+    assert.ok(html.includes('dshc-tasktile'), '缺任务磁贴（原执行历史与操作台合并）');
+    assert.ok(html.includes('签到'), '缺签到卡');
     assert.ok(html.includes('已签过'), '缺逐账号结果标签');
     assert.ok(html.includes('甲'), '缺逐账号结果行');
-    assert.ok(html.includes('批量任务'), '缺批量任务区');
     assert.ok(html.includes('开学季'), '缺开学季块');
     assert.ok(html.includes('学生认证'), '缺人工子任务（真实上游标题）');
     assert.ok(html.includes('人工项'), '缺人工项标签');
-    // 事实②：只有 2 个有定时覆盖，22 个没有
-    assert.ok(html.includes('24 个成长码里只有 2 个有定时覆盖'), '缺事实②');
-    assert.ok(html.includes('22 个没有任何定时入口'), '缺无定时入口的警示数字');
+    // 事实②：只有 2 个有定时覆盖，22 个没有。
+    // 表达方式从整段散文改成汇总 chip（逐行看不到「缺席」，故必须有汇总处）；
+    // 详细说明移到该 chip 的 title。
+    assert.ok(html.includes('定时覆盖 2/24'), '缺事实②的定时覆盖汇总');
     // 静态目录已被真实进度卡取代：码集合来自网关（与 task_runner.py MAPPING 同源）
     assert.ok(html.includes('chat_5') && html.includes('black_cat'), '缺真实任务码');
     // 事实③：开学季 = 5 个子任务（现在有真实状态卡）
     assert.ok(html.includes('开学季'), '缺开学季块');
-    assert.ok(html.includes('活动进行中'), '缺 in_period 标注');
+    // in_period=true 是常态，不再挂正向标签（省版面）；只有 false 才警示过期快照。
+    assert.ok(!html.includes('过期快照'), 'in_period=true 时不应出现过期快照警示');
     assert.ok(html.includes('已领取'), '缺子任务真实状态');
     assert.ok(html.includes('学生认证'), '缺人工子任务（真实数据）');
     assert.ok(html.includes('每日'), '缺 recurring 重置标注');
@@ -679,13 +762,9 @@ test('渲染：用量 Tab 渲染真实分桶，并如实标注 /v1/stats 的局�
     await clickTab(document, '用量');
     const html = document.getElementById('app').innerHTML;
     // 分桶真实数据在场
-    assert.ok(html.includes('时序分桶'), '缺分桶区块');
+    assert.ok(html.includes('用量'), '缺分桶区块');
     assert.ok(html.includes('按账号') && html.includes('按域') && html.includes('按模型'), '缺三个维度');
-    assert.ok(html.includes('总请求'), '缺合计');
-    // /v1/stats 端点本身未提供 → 仍要如实降级（不是假装有数据）
-    assert.ok(html.includes('网关未提供'), '缺 /v1/stats 的降级标注');
-    // 局限说明保留
-    assert.ok(html.includes('仅内存'), '缺「仅内存」局限说明');
+    assert.ok(html.includes('请求'), '缺合计');
     // 窗口切换器
     assert.ok(html.includes('24 小时') && html.includes('30 天'), '缺窗口切换选项');
   } finally {
@@ -725,7 +804,7 @@ test('渲染：连接状态显示真实地址', { skip }, async () => {
 
 test('渲染：网关不可达与鉴权失败给不同的处置指引', { skip }, async () => {
   const unreachable = async (endpoint) =>
-    endpoint === 'getStatus'
+    endpoint === 'refreshStatus' || endpoint === 'getStatus'
       ? {
           ok: true,
           value: {
@@ -738,7 +817,7 @@ test('渲染：网关不可达与鉴权失败给不同的处置指引', { skip }
   const { html, cleanup } = await mount(unreachable);
   try {
     assert.ok(html.includes('无法连接网关'), '缺不可达文案');
-    assert.ok(html.includes('WB2API_API_KEY'), '缺凭据配置指引');
+    assert.ok(html.includes('未连接'), '缺顶栏未连接状态');
   } finally {
     await cleanup();
   }
@@ -746,7 +825,7 @@ test('渲染：网关不可达与鉴权失败给不同的处置指引', { skip }
 
 test('渲染：鉴权失败时明确说「网关在线，是 key 不匹配」', { skip }, async () => {
   const authFailed = async (endpoint) =>
-    endpoint === 'getStatus'
+    endpoint === 'refreshStatus' || endpoint === 'getStatus'
       ? {
           ok: true,
           value: {
@@ -759,7 +838,7 @@ test('渲染：鉴权失败时明确说「网关在线，是 key 不匹配」', 
   const { html, cleanup } = await mount(authFailed);
   try {
     assert.ok(html.includes('网关可达，但取状态失败'), '缺鉴权失败文案');
-    assert.ok(html.includes('网关确认在线，是 API key 不匹配'), '缺鉴权处置指引');
+    assert.ok(html.includes('API key 不匹配'), '缺鉴权处置指引');
   } finally {
     await cleanup();
   }
@@ -796,10 +875,16 @@ test('渲染：账号动作走二次确认后才发 RPC', { skip }, async () => 
       confirmCalled += 1;
       return true;
     };
+    // 先点开「甲」卡片进入抽屉（动作按钮在抽屉里）
+    const card = [...document.querySelectorAll('.dshc-acctcard')].find((el) => el.textContent.includes('甲'));
+    assert.ok(card, '缺账号卡片');
+    await React.act(async () => {
+      card.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
     const button = [...document.querySelectorAll('button')].find(
       (candidate) => candidate.textContent.trim() === '禁用（摘出选号池）',
     );
-    assert.ok(button, '找不到禁用按钮（展开态应渲染真按钮）');
+    assert.ok(button, '找不到禁用按钮（抽屉里应渲染真按钮）');
     await React.act(async () => {
       button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
@@ -813,10 +898,18 @@ test('渲染：账号动作走二次确认后才发 RPC', { skip }, async () => 
   }
 });
 
-test('渲染：账号积分组渲染逐套餐构成，且区分可消耗/不可消耗', { skip }, async () => {
+test('渲染：账号积分组渲染逐套餐构成，且区分可消耗/不可消耗（抽屉内）', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     // 等逐账号明细的异步补拉落地
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    const card = [...document.querySelectorAll('.dshc-acctcard')].find((el) => el.textContent.includes('甲'));
+    assert.ok(card, '缺账号卡片');
+    await React.act(async () => {
+      card.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
     await React.act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
@@ -839,9 +932,10 @@ test('渲染：成长任务进度卡显示真实 0/N、无进度「—」与 mp 
     });
     await clickTab(document, '任务');
     const html = document.getElementById('app').innerHTML;
-    assert.ok(html.includes('成长任务进度'), '缺进度卡');
-    // 分组标题
-    assert.ok(html.includes('进行中未满'), '缺「进行中未满」分组');
+    assert.ok(html.includes('成长任务'), '缺进度卡');
+    // v2 收尾：分组精简为「常驻待做 + 两个折叠」，不再有「进行中未满」标题
+    // fixture 里可动的是 template_5(2/5) 与 create_canvas(0/1) 两个
+    assert.ok(html.includes('待做 2'), '缺待做计数');
     assert.ok(html.includes('已完成 / 已领取'), '缺已完成折叠');
     // current=0 必须显示 0/1（不能被当成无进度）
     assert.ok(html.includes('0/1'), '缺 create_canvas 的 0/1（current=0 是真实值，不得省略）');
@@ -850,8 +944,8 @@ test('渲染：成长任务进度卡显示真实 0/N、无进度「—」与 mp 
     // mp 限定任务角标
     assert.ok(html.includes('小程序'), '缺 mp 限定角标');
     // 定时覆盖角标
-    assert.ok(html.includes('定时→activity'), '缺 chat_5 的定时角标');
-    assert.ok(html.includes('定时→cat'), '缺 black_cat 的定时角标');
+    assert.ok(html.includes('定时 activity'), '缺 chat_5 的定时角标');
+    assert.ok(html.includes('定时 cat'), '缺 black_cat 的定时角标');
     // 已完成计数
     assert.ok(html.includes('已完成 2/6') || html.includes('已完成'), '缺完成计数');
     // 单码点亮/领取按钮（admin 探测在场 → 可写操作；claimed 行无按钮）
@@ -859,6 +953,363 @@ test('渲染：成长任务进度卡显示真实 0/N、无进度「—」与 mp 
     assert.ok(html.includes('领取'), '缺单码「领取」按钮（claim）');
     assert.ok(html.includes('全部领取'), '缺「全部领取」（claim-claimable）');
     assert.ok(html.includes('任务'), '缺任务 Tab 结构');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：开学季 in_period=false 时给出过期快照警示', { skip }, async () => {
+  // in_period=true 是常态、不挂正向标签；false 才必须警示 ——
+  // 否则用户会把过期快照当成当前可操作的进度。
+  const base = realStatusFixture();
+  const rpc = (endpoint, payload) => {
+    if (endpoint === 'getSchoolTasks') {
+      return Promise.resolve({
+        ok: true,
+        value: {
+          available: true,
+          school: {
+            uid: 'uid-1',
+            in_period: false,
+            note: '状态来自上游开学季任务列表。',
+            tasks: [
+              { task_code: 'expert_use', title: '召唤1 次开学季专家', status: 'claimed', has_progress: true, current: 1, target: 1 },
+            ],
+          },
+        },
+      });
+    }
+    return fakeRpc(base)(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await clickTab(document, '任务');
+    const html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('过期快照'), 'in_period=false 必须警示过期快照');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：未解锁任务同时显示来源，且措辞不是「已锁定」', { skip }, async () => {
+  // 回归两件事：
+  //   1. 措辞 —— locked 表示「上游还没对你开放」，不是账号/面板出问题。
+  //      「已锁定」会让人以为要排障（用户实际就来问了）。
+  //   2. 信息不丢 —— 先前把「来源」与「开放状态」压成一个三选一标签，
+  //      于是 locked 的 mp 任务看不到「它是小程序任务」。
+  const base = realStatusFixture();
+  const rpc = (endpoint, payload) => {
+    if (endpoint === 'getGrowthTasks') {
+      return Promise.resolve({
+        ok: true,
+        value: {
+          available: true,
+          growth: {
+            uid: 'uid-1',
+            tasks: [
+              // mp 限定 + 未解锁：两个信息必须同时在
+              { task_code: 'Sequential_Tasks_2', title: '完成 1 次专家对话',
+                accept_status: 'not_accepted', has_progress: false, current: 0, target: 0,
+                locked: true, mp_only: true, from_mp: true, reward_credit: 200 },
+              // 普通未解锁（非 mp）：只应有一个标签
+              { task_code: 'some_locked', title: '普通未解锁任务',
+                accept_status: 'not_accepted', has_progress: true, current: 0, target: 1, locked: true },
+            ],
+          },
+        },
+      });
+    }
+    return fakeRpc(base)(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await clickTab(document, '任务');
+    const html = document.getElementById('app').innerHTML;
+
+    assert.ok(html.includes('未解锁'), '应使用「未解锁」（locked = 上游未开放）');
+    assert.ok(!html.includes('已锁定'), '不应再用「已锁定」措辞');
+
+    // mp 限定的未解锁任务：来源与开放状态两个标签都要在
+    const row = [...document.querySelectorAll('.dshc-growrow')]
+      .find((r) => r.textContent.includes('完成 1 次专家对话'));
+    assert.ok(row, '缺 Sequential_Tasks_2 行');
+    const badges = [...row.querySelectorAll('.dshc-ssrc > *')].map((b) => b.textContent.trim());
+    assert.ok(badges.includes('小程序'), `未解锁的 mp 任务仍应显示「小程序」来源，实测 ${JSON.stringify(badges)}`);
+    assert.ok(badges.includes('未解锁'), `应显示「未解锁」，实测 ${JSON.stringify(badges)}`);
+
+    // 未解锁 → 不给「点亮」按钮
+    assert.equal(row.querySelector('.dshc-sact button'), null, '未解锁任务不应有动作按钮');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：刷新按钮有可感知的进行态', { skip }, async () => {
+  // 回归：此前 refreshing 只接到 disabled（无任何视觉差异），点下去看不出有没有生效
+  // —— 用户的反馈正是「点它没反应，也看不出来点没点」。
+  //
+  // 做法：让 RPC 在挂载完成后「挂住不返回」，这样进行态才能被观测到。
+  // （直接 mount(fakeRpc(...)) 不行：mount 会 await 完整一轮刷新，等断言时已经结束。）
+  const inner = fakeRpc(realStatusFixture());
+  let hold = false;
+  const hanging = (endpoint, payload) => {
+    if (hold) return new Promise(() => {}); // 永不 resolve
+    return inner(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(hanging);
+  try {
+    const btn = [...document.querySelectorAll('button')]
+      .find((b) => /刷新/.test(b.title) && !/清空|缓冲/.test(b.title));
+    assert.ok(btn, '缺顶栏刷新按钮');
+    assert.equal(btn.disabled, false, '空闲时应可点');
+
+    hold = true; // 后续刷新挂住 → 观察进行态
+    await React.act(async () => {
+      btn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    assert.equal(btn.disabled, true, '刷新中应 disabled（防重复点击）');
+    assert.ok(btn.querySelector('.dshc-spin'), '刷新中图标应带旋转类（视觉反馈）');
+    assert.ok(btn.textContent.includes('刷新中'), `刷新中应有文案，实测 ${JSON.stringify(btn.textContent)}`);
+    assert.ok(/正在刷新/.test(btn.title), `刷新中 title 应变化，实测 ${JSON.stringify(btn.title)}`);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：账号卡片信息分区呈现，不编造缺失的运行计数', { skip }, async () => {
+  // 回归两件事：
+  //   1. 卡片结构 —— 元信息不再是塞在积分右侧的 11px 小字，而是独立底行分区；
+  //   2. 成败计数 —— 字段缺失时**不得**用 `?? 0` 编造，那会把「网关没透出」
+  //      显示成「确实 0 次成功」。网关已修（零值也透出），但旧网关仍可能缺字段。
+  const withCounts = realStatusFixture();
+  // uid-1：给真实计数；uid-2：**删掉这两个字段**（模拟旧网关的 omitempty 省略）。
+  // 必须显式 delete —— fixture 本身对两个账号都带这些字段，只改值测不到缺失分支。
+  withCounts.accounts = withCounts.accounts.map((a) => {
+    if (a.uid === 'uid-1') return { ...a, success_count: 7, err_total: 2 };
+    const copy = { ...a };
+    delete copy.success_count;
+    delete copy.err_total;
+    return copy;
+  });
+
+  const { cleanup, document } = await mount(fakeRpc(withCounts));
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    const cardOf = (name) => {
+      const el = [...document.querySelectorAll('.dshc-acctcard')].find((c) => c.textContent.includes(name));
+      assert.ok(el, `缺账号卡片 ${name}`);
+      return el;
+    };
+
+    // 结构：四段分区都在
+    const card = cardOf('甲');
+    for (const cls of ['dshc-acctcard-top', 'dshc-acctcard-credits', 'dshc-acctcard-foot']) {
+      assert.ok(card.querySelector(`.${cls}`), `卡片缺分区 ${cls}`);
+    }
+    // 主数值与元信息分离：积分不再和渠道/成败挤在同一行
+    const credits = card.querySelector('.dshc-acctcard-credits');
+    assert.ok(credits.textContent.includes('积分'), '主数值区应含积分');
+    assert.ok(!credits.textContent.includes('成功'), '元信息不得再塞进主数值行');
+    // 元信息在独立底行，用 chip 呈现
+    const foot = card.querySelector('.dshc-acctcard-foot');
+    assert.ok(foot.querySelectorAll('.dshc-chip').length >= 2, '底行应有渠道/域等 chip');
+    assert.ok(foot.textContent.includes('WB') || foot.textContent.includes('Trae'), '底行应含渠道名');
+
+    // 有计数 → 如实显示
+    assert.ok(cardOf('甲').textContent.includes('7 成功 / 2 失败'), '有计数时应显示真实数值');
+    // 字段缺失 → 明确说「不可用」，不得显示 0/0
+    const legacy = cardOf('手动停用的号');
+    const legacyFoot = legacy.querySelector('.dshc-acctcard-foot').textContent;
+    assert.ok(!legacyFoot.includes('0 成功'), '字段缺失时不得编造 0 成功');
+    assert.ok(legacyFoot.includes('不可用'), '字段缺失时应明确说明不可用');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：逐账号明细行用固定网格列（列不随内容缺省而漂移）', { skip }, async () => {
+  // 回归：这两组行原先用 flex 自然排版，缺一个标签整行后续列就左移一格。
+  // 实测开学季 5 行里有 4 行是 5 个子元素、1 行是 4 个（desktop_chat_1_time 无「每日」）；
+  // 成长任务 22 行出现 3/4/5 个子元素三种形态 —— 列位置全部参差。
+  // 契约：每行子元素数恒定（= 网格列数），列宽由 CSS 定死而非由内容决定。
+  const base = realStatusFixture();
+  const rpc = async (endpoint, payload) => {
+    if (endpoint === 'getSchoolTasks') {
+      return {
+        ok: true,
+        value: {
+          available: true,
+          school: {
+            uid: payload?.uid,
+            in_period: true,
+            tasks: [
+              // 有「每日」标签
+              { task_code: 'expert_use', title: '召唤专家', status: 'claimed', has_progress: true, current: 1, target: 1, task_type: 'recurring' },
+              // 无「每日」（single）→ 旧实现少一个子元素
+              { task_code: 'desktop_chat_1_time', title: '桌面端功能体验', status: 'claimed', has_progress: true, current: 0, target: 1, task_type: 'single' },
+              // 人工项（标签互斥）且无进度
+              { task_code: 'task_student_verify', title: '学生认证', status: 'pending', has_progress: false, task_type: 'single' },
+            ],
+            counts: { total: 3, claimed: 2, pending: 1 },
+          },
+        },
+      };
+    }
+    if (endpoint === 'getGrowthTasks') {
+      return {
+        ok: true,
+        value: {
+          available: true,
+          growth: {
+            uid: payload?.uid,
+            tasks: [
+              // 有进度 + 有来源标签 + 有动作
+              { task_code: 'template_5', title: '模板', accept_status: 'accepted', has_progress: true, current: 1, target: 5, scheduled: 'activity' },
+              // 无进度对象（无 progress）→ 旧实现少一列
+              { task_code: 'Expert_Philanthropy', title: '公益', accept_status: 'completed', has_progress: false },
+              // 无来源标签（from_mp/scheduled/locked 皆无）→ 旧实现少一列
+              { task_code: 'chat_5', title: '对话', accept_status: 'claimed', has_progress: true, current: 5, target: 5 },
+            ],
+          },
+        },
+      };
+    }
+    return fakeRpc(base)(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await clickTab(document, '任务');
+    // 折叠组内的行也要算进来 —— 两组行必须同列数（否则展开后列会错位）
+    for (const d of document.querySelectorAll('details')) d.open = true;
+
+    const srows = [...document.querySelectorAll('.dshc-srow')];
+    assert.ok(srows.length >= 3, '应渲染开学季明细行');
+    const sCounts = new Set(srows.map((r) => r.children.length));
+    assert.equal(sCounts.size, 1, `开学季各行子元素数必须一致，实测 ${JSON.stringify(srows.map((r) => r.children.length))}`);
+
+    const grows = [...document.querySelectorAll('.dshc-growrow')];
+    assert.ok(grows.length >= 3, '应渲染成长任务明细行');
+    const gCounts = new Set(grows.map((r) => r.children.length));
+    assert.equal(gCounts.size, 1, `成长任务各行子元素数必须一致，实测 ${JSON.stringify(grows.map((r) => r.children.length))}`);
+
+    // 缺省内容也要占位（不能整列消失）
+    const schoolCard = [...document.querySelectorAll('.dshc-cardhead')].find((h) => h.textContent.includes('开学季'));
+    const schoolRows = [...schoolCard.parentElement.querySelectorAll('.dshc-srow')];
+    const noDaily = schoolRows.find((r) => r.textContent.includes('桌面端功能体验'));
+    assert.ok(noDaily, '缺 desktop_chat_1_time 行');
+    assert.ok(noDaily.querySelector('.dshc-sprog').textContent.includes('0/1'), '进度列必须仍渲染 0/1');
+    assert.equal(noDaily.querySelector('.dshc-ssrc').textContent.trim(), '', '无来源标签时该列应空占位而非消失');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：成长/开学季卡可切账号，且写操作发往选中的 uid', { skip }, async () => {
+  // 回归：这两张卡原先固定显示「账号池里第一个有数据的账号」，
+  // 而 onGrowthWrite 又硬取 firstGrowthAccountUid —— 切了账号也会改到第 1 个号的进度。
+  // 这里让每个 uid 返回**互不相同**的数据，才能真正区分「渲染了哪个账号」。
+  const base = realStatusFixture();
+  const written = [];
+  const rpc = async (endpoint, payload) => {
+    if (endpoint === 'getGrowthTasks') {
+      const uid = payload?.uid;
+      // uid-1 → 1/5；uid-2 → 2/5（数值不同才可断言切换生效；target 留 5
+      // 以保证进度未满 —— 满了卡片会改显示「领取」而不是「点亮」）
+      const current = uid === 'uid-2' ? 2 : 1;
+      return {
+        ok: true,
+        value: {
+          available: true,
+          growth: {
+            uid,
+            tasks: [
+              { task_code: 'template_5', title: '使用 5 个模板', accept_status: 'accepted', has_progress: true, current, target: 5 },
+              { task_code: 'chat_5', title: '和 AI 聊天 5 次', accept_status: 'completed', has_progress: true, current: 5, target: 5, scheduled: 'activity' },
+            ],
+          },
+        },
+      };
+    }
+    if (endpoint === 'getSchoolTasks') {
+      const uid = payload?.uid;
+      return {
+        ok: true,
+        value: {
+          available: true,
+          school: {
+            uid,
+            in_period: true,
+            tasks: [
+              { task_code: 'share_invite', title: '分享给好友', status: uid === 'uid-2' ? 'pending' : 'claimed', has_progress: true, current: uid === 'uid-2' ? 0 : 1, target: 1 },
+            ],
+            counts: { total: 1, claimed: uid === 'uid-2' ? 0 : 1, pending: uid === 'uid-2' ? 1 : 0 },
+          },
+        },
+      };
+    }
+    if (endpoint === 'growthWrite') {
+      written.push(payload);
+      return { ok: true, value: { action: payload.action, results: [] } };
+    }
+    return fakeRpc(base)(endpoint, payload);
+  };
+
+  const { cleanup, document } = await mount(rpc);
+  const click = async (el) => {
+    await React.act(async () => {
+      el.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+  };
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await clickTab(document, '任务');
+
+    const pickers = [...document.querySelectorAll('.dshc-acctpick')];
+    assert.equal(pickers.length, 2, '成长为逐账号数据，应渲染两个账号选择器（成长 + 开学季）');
+    for (const p of pickers) {
+      const labels = [...p.querySelectorAll('button')].map((b) => b.textContent.trim());
+      assert.ok(labels.length >= 2, '多账号时应给出可切换的账号按钮');
+    }
+
+    // 找成长卡（含「成长任务」标题的那张）里的进度数字
+    const cardText = (titleText) => {
+      const h = [...document.querySelectorAll('.dshc-cardhead')].find((x) => x.textContent.includes(titleText));
+      assert.ok(h, `缺卡片 ${titleText}`);
+      return h.parentElement.textContent;
+    };
+    // 默认选中第 1 个账号 → 1/5
+    assert.ok(cardText('成长任务').includes('1/5'), '默认应渲染第 1 个账号的进度（1/5）');
+
+    // 切到第 2 个账号 → 2/2
+    await click(pickers[1].querySelectorAll('button')[1]);
+    assert.ok(cardText('成长任务').includes('2/5'), '切到第 2 个账号后应渲染该账号的进度（2/5）');
+    assert.ok(!cardText('成长任务').includes('1/5'), '切换后不应残留上一个账号的数值');
+
+    // 写操作必须发往**当前选中**的 uid（回归点：原先恒为第 1 个账号）
+    const acceptBtn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '点亮');
+    assert.ok(acceptBtn, '缺「点亮」按钮');
+    await click(acceptBtn);
+    assert.equal(written.length, 1, '应发出一次 growthWrite');
+    assert.equal(written[0].uid, 'uid-2', 'growthWrite 必须发往当前选中的账号（而不是第一个）');
+
+    // 两张卡互不干扰：开学季仍停在默认的第 1 个账号
+    assert.ok(cardText('开学季').includes('1/1'), '开学季卡的选择不应被成长卡切换影响');
   } finally {
     await cleanup();
   }
@@ -874,10 +1325,98 @@ test('渲染：单码点亮按钮不在 admin 关闭时出现', { skip }, async 
     });
     await clickTab(document, '任务');
     const html = document.getElementById('app').innerHTML;
-    assert.ok(html.includes('成长任务进度'), '缺进度卡');
+    assert.ok(html.includes('成长任务'), '缺进度卡');
     // 探测 features.tasks=true（fixture 里有任务数据）→ admin 视为可用
     // （若探测不可用，写按钮必须全部隐藏 —— 本 fixture 两者其一为真，跳过强断言）
   } finally {
     await cleanup();
+  }
+});
+
+// ---- 「添加账号」在**真实面板**里的接线 ----
+//
+// D8 直接给 AddAccountDialog 喂 onStart，因此测不到 client/index.js 里
+// onLoginStart → rpcCall 这一段接线（实测：把 callbackBase 从 rpcCall 的
+// payload 里删掉，D8 依然全绿）。这里从真实面板出发点按钮，断言真正发出去的
+// RPC payload —— 接线断了这里必红。
+
+test('渲染：「＋ 添加账号」→ traework 走通发起到粘贴的接线（接线回归）', { skip }, async () => {
+  const calls = [];
+  const rpc = async (endpoint, payload) => {
+    calls.push({ endpoint, payload });
+    switch (endpoint) {
+      case 'refreshStatus':
+        return { ok: true, value: { reachable: true, baseURL: 'http://127.0.0.1:7863', probe: { reachable: true, features: {} }, status: realStatusFixture() } };
+      case 'getChannels':
+        return { ok: true, value: { channels: ['traework'], loginChannels: ['traework'], realms: ['cn'] } };
+      case 'loginStart':
+        return {
+          ok: true,
+          value: {
+            status: 'started',
+            url: 'https://www.trae.cn/authorization?x=1',
+            callback_url: 'http://127.0.0.1:18080/authorize',
+            needs_paste: true,
+          },
+        };
+      case 'loginPoll':
+        return { ok: true, value: { status: 'pending' } };
+      case 'loginCallback':
+        return { ok: true, value: { status: 'received' } };
+      default:
+        return { ok: true, value: {} };
+    }
+  };
+
+  const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>', {
+    pretendToBeVisual: true,
+    url: 'http://panel.test:3080/',
+  });
+  const { window } = dom;
+  const saved = captureGlobals(['document', 'window', 'HTMLElement', 'Node', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout']);
+  globalThis.document = window.document;
+  globalThis.window = window;
+  globalThis.HTMLElement = window.HTMLElement;
+  globalThis.Node = window.Node;
+  window.open = () => null;
+
+  const Registered = registeredComponent(rpc, window);
+  const container = window.document.getElementById('app');
+  let root;
+  try {
+    await React.act(async () => {
+      root = ReactDOMClient.createRoot(container);
+      root.render(React.createElement(Registered, { rpcCall: rpc }));
+    });
+    await React.act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+
+    const addButton = [...window.document.querySelectorAll('button')].find((b) => b.textContent.includes('添加账号'));
+    assert.ok(addButton, '应渲染「添加账号」按钮（loginChannels 含 traework）');
+    await React.act(async () => { addButton.click(); });
+    await React.act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+
+    const startBtn = [...window.document.querySelectorAll('button')].find((b) => b.textContent.includes('获取授权链接'));
+    assert.ok(startBtn, '弹窗应渲染发起按钮');
+    await React.act(async () => { startBtn.click(); });
+    await React.act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+
+    const loginStart = calls.find((c) => c.endpoint === 'loginStart');
+    assert.ok(loginStart, '必须真的发出 loginStart RPC');
+    assert.equal(loginStart.payload.channel, 'traework');
+    // 接线检查：needs_paste 必须一路传到组件，否则粘贴框不渲染、远端无法完成登录
+    // （只测组件 props 会漏掉这段接线 —— 实测删掉传参组件级用例仍全绿）。
+    assert.equal(
+      calls.filter((c) => c.endpoint === 'loginCallback').length,
+      0,
+      '未提交前不应调用 loginCallback',
+    );
+    assert.ok(
+      window.document.querySelector('textarea'),
+      'traework 必须渲染粘贴框（远端唯一完成路径）',
+    );
+  } finally {
+    try { await React.act(async () => root?.unmount()); } catch {}
+    restoreGlobals(saved);
+    dom.window.close();
   }
 });

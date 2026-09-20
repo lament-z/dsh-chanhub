@@ -12,12 +12,76 @@ DeepSeek Harness 客户端插件：在「设置」侧边栏接入 **chanhub**（
 | Tab | 内容 |
 |---|---|
 | 账号池 | 概览五联、按域可用性、总积分与渠道分列、渠道筛选、**批量任务触发**（网关真实端点）、账号折叠面板（健康 / 质量 / 积分 / 排程区块） |
-| 任务 | 任务触发与运行状态（签到/余额逐号结果）、成长任务逐码进度、开学季子任务状态 |
+| 任务 | 任务磁贴（点即触发，状态就地显示）、签到结果（摘要常驻 + 明细折起）、开学季子任务、成长任务进度（后两者均可切换账号） |
 | 用量 | 四维用量分桶（窗口切换 24h–30d），`/v1/stats` 局限如实标注 |
 | 日志 | 实时日志环形缓冲 + 频道筛选（对话 / 任务 / 系统） |
 | 配置 | 53 项网关配置，分组折叠 + 校验 + 危险语义标注 + 服务控制 |
 
 API key 只在宿主持有：所有网关调用都在宿主侧完成，经 `/dsh-chanhub` RPC 通道代理给浏览器。
+
+### 添加账号（面板内闭环）
+
+Tab 栏最右端（与「账号池 … 配置」同一行）有「**＋ 添加账号**」按钮，走网关的 OAuth 设备授权：
+
+```
+选渠道（WorkBuddy / TraeWork / QoderWork）+ 选域（国内版 / 国际版）
+  → 「获取授权链接」（自动新开标签页，链接同时可见可复制）
+  → 浏览器完成登录
+  → 面板每 2.5 秒轮询，授权一完成就落盘并热加载进池
+```
+
+成功后弹窗显示 uid / 昵称 / 域 / 积分，账号**无需重启网关**即出现在池中（网关侧 `pool.Add` + 顺带签到）。
+弹窗关闭时在途轮询会被清掉；重新发起即新开一轮（面板不持有登录会话，会话态在网关侧的
+`data/login-state-<channel>.json`，15 分钟 TTL）。
+
+#### 三个渠道的登录模型不同（决定「远端能不能加账号」）
+
+| 渠道 | 凭证怎么回来 | 需要入站回调吗 | 远端可用 |
+|---|---|---|---|
+| WorkBuddy | 网关轮询上游设备流端点（`auth/token?state=`） | 不需要 | ✅ 只要网关能出网 |
+| QoderWork | 网关轮询 `deviceToken/poll`；`redirect_uri` 是自定义 scheme，只唤醒桌面端 | 不需要 | ✅ 同上 |
+| TraeWork | 授权页把凭证写进**回跳 URL**，服务端无设备流端点 | **需要**，且**只接受 127.0.0.1** | ✅ 但必须走粘贴（见下） |
+
+**TraeWork 为什么必须粘贴**：Trae 授权页对回调地址有硬性校验
+（`authorization/page.js`，同一正则出现两次）：
+
+```js
+var T = "网络错误，请刷新页面重试。";
+if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
+  O(!1), ew("invalidUrl"), ep(3);   // ep(3) 渲染的就是 T
+}
+```
+
+`Z` 即 `auth_callback_url`。任何非 loopback 的地址（面板 origin、公网域名、
+局域网 IP）都会被判 `invalidUrl`，用户只看到「**网络错误，请刷新页面重试。**」
+—— 面板侧原本设想的「回调打到面板路由」方案因此**不可能成立**（曾据此实现并
+真机验证失败，已回退）。
+
+所以面板对 TraeWork 的做法是：
+
+1. 发起登录（网关恒起本地一次性监听，回调必然是 `http://127.0.0.1:<端口>/authorize`）。
+2. 弹窗常驻**粘贴框**，并明确告知：登录成功后浏览器会跳到一个打不开的地址，
+   这是 Trae 的限制而非故障；那个页面的地址栏里带着登录凭证，整段复制回来即可。
+3. 提交后走 `POST /panel/api/login/callback` 交给网关，再由现有 `poll` 路径
+   完成换 token + 取 uid。
+
+轮询有上限（15 分钟，与网关 TTL 对齐），超时会给出可执行提示而不是一直转。
+
+入口按**网关实际能力**渲染，而不是按插件假设：
+
+| 网关情况 | 面板表现 |
+|---|---|
+| 有 `/panel/api/channels` 且 `login_channels` 含目标渠道 | 渲染「＋ 添加账号」 |
+| 有该端点但渠道不在 `login_channels`（旧网关没有 `workbuddy` 登录分支） | 隐藏入口；若已进入则明确提示「该网关版本不支持…请升级 chanhub 网关」 |
+| 完全没有 `/panel/api/*` | 隐藏入口 |
+| 网关不认识 `callback_base`（TraeWork 旧版） | 提示「该网关版本不支持面板回调…请升级」而不是让用户干等 |
+
+> 旧的 chanhub 网关只搬进了 `traework` / `qoder` 两个渠道的登录，对 `workbuddy` 直接回
+> 400 `unknown channel` —— 而绝大多数部署的账号正是 workbuddy。这就是「面板能移除账号却不能新增账号」的根因。
+> 对应网关侧改动见 chanhub 仓库 `internal/routeapi/login_workbuddy.go` 与
+> `internal/channel/login/trae/login.go`（外部回调 + TTL）。
+
+### 消费的网关端点
 
 ### 消费的网关端点
 
@@ -48,6 +112,10 @@ API key 只在宿主持有：所有网关调用都在宿主侧完成，经 `/dsh
 | `POST /admin/config` | 校验 + 原子写配置；可热改字段就地生效 | `admin.enabled=true` |
 | `POST /admin/accounts/{uid}/{disable,enable,revive}` | 账号动作 | `admin.enabled=true` |
 | `POST /admin/accounts/{uid}/{checkin,balance,remove}` | 单号签到 / 余额 / 移除 | `admin.enabled=true` |
+| `GET /panel/api/channels` | 渠道清单（`channels` 协议全集 / `login_channels` 可登录集 / `realms`） | `withAuth` |
+| `POST /panel/api/login/start?channel=…[&realm=…]` | 发起登录，返回授权 URL；traework 额外回 `callback_url`（恒为 `http://127.0.0.1:<端口>/authorize`）与 `needs_paste` | `withAuth` |
+| `GET /panel/api/login/poll?channel=…` | 轮询登录态（`pending` / `done` / `error`） | `withAuth` |
+| `POST /panel/api/login/callback?channel=traework` | 提交用户粘贴的回调（body `{callback}`）—— traework 在远端唯一的完成路径 | `withAuth` |
 
 能力探测依据 `ServeMux` 的真实行为：未注册路径返回**纯文本** 404，
 已注册路径返回 **JSON** 信封（方法不符则是 405）。面板按实际探测结果渲染各区块。
@@ -65,6 +133,9 @@ API key 只在宿主持有：所有网关调用都在宿主侧完成，经 `/dsh
   就地生效；需重启字段在响应里明确列出
 - **模型实测上限** —— `scripts/probe_max_tokens.py`（手动执行，耗额度）写
   `data/model_probes.json`；`GET /v1/models/probes` 只读透出。网关绝不自动探测
+- **新增账号** —— `POST /panel/api/login/start` + `GET /panel/api/login/poll?channel=workbuddy`，
+  面板内 OAuth 闭环，落盘后热加载进池（此前只有「移除」没有「新增」，是真实的功能缺口，
+  不是数据缺口。网关侧只支持 traework/qoder 的登录，workbuddy 分支由本次一并补上）
 
 当前没有已知数据缺口。若网关版本较旧缺少某个端点，面板按能力探测结果渲染
 「网关未提供」占位并列出所需端点，不使用推断值填充。
@@ -73,6 +144,8 @@ API key 只在宿主持有：所有网关调用都在宿主侧完成，经 `/dsh
 ## 前置条件
 
 - 插件宿主能连到网关（默认 `http://127.0.0.1:7863`）。
+- 「添加账号」要求网关带 `/panel/api/login/*` 且 `login_channels` 含目标渠道
+  （旧的 chanhub 网关只支持 traework/qoder）。不满足时面板隐藏入口，其余功能不受影响。
 - 读写网关 `config.json` 要求**插件宿主与网关同机**（账号渠道已由 `/status`
   原生透出，不再依赖同机读取凭证文件）。
   容器部署若挂载 `./config.json:/app/config.json:ro` 则为只读 —— 需去掉 `:ro` 才能编辑。
@@ -132,6 +205,7 @@ DSHC_REACT_DIR=/tmp/dshc-render npm test
 | `lib/config-spec.js` | 53 项配置规格表（宿主校验与前端表单共用） |
 | `lib/auths.js` | 凭证文件只读盘点（渠道判定的唯一来源） |
 | `client/index.js` | 浏览器侧面板：5 Tab 界面 |
+| `client/add-account.js` | 「添加账号」弹窗（设备授权三段状态机 + 轮询生命周期） |
 | `client/derive.js` | 纯派生逻辑（状态判定 / 分组 / 归纳），可在 node 下直接测 |
 | `client/theme.js` | DSH 视觉令牌与折叠 CSS |
 | `client/build.mjs` | esbuild 打包脚本（与 dsh-bridge-gateway 一致） |

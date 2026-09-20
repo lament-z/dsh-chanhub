@@ -28,21 +28,6 @@ export const SCHEDULE_ITEMS = [
 ];
 
 /**
- * 开学季的 5 个子任务。前 4 个与 task_runner.py 的成长码**是同一批**
- * （两套执行器共用，跑任一边推进同一进度），第 5 个是人工项。
- */
-export const SCHOOL_SUBTASKS = [
-  { code: 'share_invite', label: '分享活动给好友', manual: false },
-  { code: 'chat_3_times', label: '与 AI 对话 3 次', manual: false },
-  { code: 'desktop_chat_1_time', label: '桌面端对话 1 次', manual: false },
-  { code: 'expert_use', label: '召唤开学季专家并对话', manual: false },
-  { code: 'task_student_verify', label: '微信学生认证', manual: true },
-];
-
-/** 与开学季共用的成长码（用于给成长码打「开学季」角标）。 */
-export const SCHOOL_SHARED_CODES = SCHOOL_SUBTASKS.filter((task) => !task.manual).map((task) => task.code);
-
-/**
  * 24 个成长任务码。
  *
  * 全部来自 `plugins/chanhub/scripts/task_runner.py` 的 MAPPING 表（逐条核对），
@@ -162,9 +147,9 @@ export function dotTone(state) {
 }
 
 /**
- * 把秒数格式化成中文时长。
+ * 把秒数格式化成中文时长（完整单位，不用缩写）。
  * @param seconds - 秒数。
- * @returns 如 `2h 5m` / `45s`。
+ * @returns 如 `2 小时 5 分` / `45 秒` / `1 天 3 小时`。
  */
 export function formatDuration(seconds) {
   if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return '—';
@@ -174,10 +159,10 @@ export function formatDuration(seconds) {
   const minute = Math.floor((total % 3600) / 60);
   const second = total % 60;
   const parts = [];
-  if (day > 0) parts.push(`${day}d`);
-  if (hour > 0) parts.push(`${hour}h`);
-  if (minute > 0 && day === 0) parts.push(`${minute}m`);
-  if (parts.length === 0) parts.push(`${second}s`);
+  if (day > 0) parts.push(`${day} 天`);
+  if (hour > 0) parts.push(`${hour} 小时`);
+  if (minute > 0 && day === 0) parts.push(`${minute} 分`);
+  if (parts.length === 0) parts.push(`${second} 秒`);
   return parts.slice(0, 2).join(' ');
 }
 
@@ -287,11 +272,13 @@ export function realmAvailability(realmTotals) {
 export function summaryCounters(status) {
   const sticky = status?.sticky_sessions;
   return [
-    { label: '总账号', value: status?.total ?? 0, tone: 'idle' },
-    { label: '健康', value: status?.healthy ?? 0, tone: 'ok' },
-    { label: '冷却中', value: status?.cooling ?? 0, tone: 'warn' },
-    { label: '在途占满', value: status?.in_flight_full ?? 0, tone: 'warn' },
-    { label: '粘性会话', value: typeof sticky === 'number' ? sticky : '—', tone: 'info' },
+    { key: 'total', label: '账号总数', value: status?.total ?? 0, tone: 'idle' },
+    { key: 'healthy', label: '健康', value: status?.healthy ?? 0, tone: 'ok' },
+    { key: 'cooling', label: '冷却中', value: status?.cooling ?? 0, tone: 'warn' },
+    { key: 'in_flight_full', label: '在途占满', value: status?.in_flight_full ?? 0, tone: 'warn' },
+    ...(typeof sticky === 'number'
+      ? [{ key: 'sticky', label: '粘性会话', value: sticky, tone: 'info' }]
+      : []),
   ];
 }
 
@@ -400,21 +387,6 @@ export function scheduleHoursText(item, scheduleConfig) {
 }
 
 /**
- * 成长码归类（用于徽标与默认可见性）。
- * @param code - 成长码定义。
- * @returns `{scheduled, schoolShared, badge}`。
- */
-export function codeBadges(code) {
-  const scheduled = Object.keys(SCHEDULED_CODES).includes(code.code);
-  const schoolShared = SCHOOL_SHARED_CODES.includes(code.code);
-  const badges = [];
-  if (scheduled) badges.push('定时');
-  if (schoolShared) badges.push('开学季');
-  if (code.unforgeable) badges.push('人工');
-  return { scheduled, schoolShared, badges };
-}
-
-/**
  * 统计「有多少成长码没有任何定时入口」—— §5.6 事实② 的警示数字。
  * @returns `{total, scheduled, unscheduled}`。
  */
@@ -484,17 +456,3 @@ export function resolveChannel(explicit, domain) {
   }
   return 'workbuddy';
 }
-
-/**
- * 三个反直觉事实的文案（必须如实呈现，否则误导用户）。
- *
- * 见 ui-design.md §5.6。这些不是「可选的说明」，而是正确性要求。
- */
-export const INTUITION_FACTS = {
-  batchIndependent:
-    '这些按钮各自独立，互不联动 —— 点「全量签到」只跑签到，不会顺带触发其他任务。成长任务需单独点「全部点亮」。',
-  scheduledCoverage: () =>
-    `24 个成长码里只有 2 个有定时覆盖（chat_5 走活跃地图、black_cat 走夜猫子），其余 ${codeCoverage().unscheduled} 个没有任何定时入口，只能手动触发。`,
-  schoolSeason: () =>
-    `开学季 = 5 个子任务：前 4 个可自动执行，第 5 个（微信学生认证）是人工项。其中 4 个与 task_runner.py 的成长码是同一批 —— 两套执行器共用，跑任一边推进同一进度。`,
-};

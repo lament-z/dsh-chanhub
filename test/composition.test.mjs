@@ -363,7 +363,7 @@ test('组合：客户端 bundle 的 slots 注册元信息正确（Loader 消费�
   const { meta, component } = registered[0];
   assert.equal(meta.name, 'settings.section');
   assert.equal(meta.id, 'dsh-chanhub', 'slot id 必须与插件 id 一致');
-  assert.equal(meta.label(), 'chanhub', '侧边栏显示名必须是 chanhub');
+  assert.equal(meta.label(), '渠道中心', '侧边栏显示名必须是中文「渠道中心」');
   assert.equal(typeof component, 'function');
   const injected = meta.inject();
   assert.equal(typeof injected.rpcCall, 'function');

@@ -81,6 +81,40 @@ function mockConnection(rejection) {
   return { requestRejection: () => rejection };
 }
 
+/**
+ * 宿主的 `server-response` 解码契约，逐字复刻自
+ * `@deepseek-ai/dsh-client-connection` 的 `parseConnectionResponse`。
+ *
+ * 为什么在插件侧复刻：这个契约是本插件 wire 层的**外部依赖**，而宿主不在
+ * 本仓的测试范围内。早先的测试只断言 `{type, rpcId, result.ok}` 等字段存在，
+ * 于是「result.ok===false 但 error.details 缺失」的信封全绿通过，直到浏览器里
+ * 炸成 "connection: invalid server-response failure"。
+ *
+ * @param value - 反序列化后的 wire 信封。
+ * @returns `{rpcId, result}`；不符合契约时抛 TypeError（与宿主同文案）。
+ */
+function parseConnectionResponse(value) {
+  if (!isRecord(value) || value.type !== 'server-response' || typeof value.rpcId !== 'string') {
+    throw new TypeError('connection: invalid server-response envelope');
+  }
+  const result = value.result;
+  if (!isRecord(result)) throw new TypeError('connection: invalid server-response result');
+  if (result.ok === true) return { rpcId: value.rpcId, result: { ok: true, value: result.value } };
+  if (result.ok !== false || !isRecord(result.error)) {
+    throw new TypeError('connection: invalid server-response result');
+  }
+  const error = result.error;
+  if (typeof error.code !== 'string' || typeof error.message !== 'string' || !isRecord(error.details)) {
+    throw new TypeError('connection: invalid server-response failure');
+  }
+  return { rpcId: value.rpcId, result: { ok: false, error } };
+}
+
+/** 与宿主同语义的「纯对象」判定（数组与 null 都不算）。 */
+function isRecord(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /** 从 env 造一个直连网关的 runtime。 */
 function envRuntime() {
   const settings = {
@@ -157,6 +191,56 @@ test('A3 未知 endpoint → bad-request', async () => {
   const parsed = JSON.parse(captured.body);
   assert.equal(parsed.result.ok, false);
   assert.equal(parsed.result.error.code, 'bad-request');
+  // 失败信封必须能被**宿主的**解码器接受（见 A3b）：只断言 code 会让
+  // 缺 details 的信封在浏览器里炸成 "invalid server-response failure"。
+  assert.equal(typeof parsed.result.error.message, 'string');
+  assert.ok(isRecord(parsed.result.error.details), '失败信封必须带 details');
+});
+
+test('A3b 任何失败信封都必须通过 dsh-client-connection 的解码器（回归：invalid server-response failure）', async () => {
+  // 这是用户实际看到的报错的回归闸门。
+  //
+  // dsh-client-connection 的 parseConnectionResponse 对失败信封有硬性要求：
+  //   result.ok === false && isRecord(result.error)
+  //   && typeof error.code === 'string' && typeof error.message === 'string'
+  //   && isRecord(error.details)          <-- 缺 details 时抛
+  //   TypeError("connection: invalid server-response failure")
+  // 浏览器把该异常原样冒泡成面板顶部的报错文案，于是**任何一个**失败分支都会
+  // 让整块面板打不开 —— 即使网关、密钥、渲染都正常。
+  //
+  // 断言方式刻意不是「details 字段存在」而是「喂给真实解码器不抛」：
+  // 字段断言看不出 isRecord（数组/字符串都算「有 details」），而那正是宿主拒绝的。
+  const handler = createHandler(envRuntime());
+  const failingEndpoints = [
+    // 未知 endpoint（客户端 bundle 比宿主新时必然走到）
+    { method: 'nope', payload: {} },
+    // 各业务分支的真实失败路径（缺参 / 未知动作）
+    { method: ENDPOINTS.getCredits, payload: {} },
+    { method: ENDPOINTS.runTask, payload: {} },
+    { method: ENDPOINTS.growthWrite, payload: { action: 'bogus', uid: 'x' } },
+    { method: ENDPOINTS.accountMore, payload: { action: 'bogus', uid: 'x' } },
+    { method: ENDPOINTS.accountDisable, payload: {} },
+  ];
+
+  for (const { method, payload } of failingEndpoints) {
+    const { res, captured } = fakeRes();
+    await serveChannelRequest(
+      fakeReq({
+        body: JSON.stringify({ type: 'client-request', rpcId: 'r3b', method, payload }),
+        url: `${CHANNEL}/${method}`,
+      }),
+      res,
+      mockConnection(undefined),
+      CHANNEL,
+      handler,
+    );
+    assert.equal(captured.status, 200, `${method}: 失败信封应走 200 + 结构化 error`);
+    const parsed = JSON.parse(captured.body);
+    assert.doesNotThrow(
+      () => parseConnectionResponse(parsed),
+      `${method}: 失败信封被宿主解码器拒绝 —— 浏览器会显示 "connection: invalid server-response failure"`,
+    );
+  }
 });
 
 test('A4 认证失败 → 直写 401，不进入业务逻辑', async () => {
@@ -463,7 +547,10 @@ test('C2 apply 注册 prefix 路由并返回清理函数（零泄漏）', async 
   };
 
   const dispose = mod.apply(fakeCtx);
-  assert.equal(registered.length, 1, '必须注册恰好一条路由');
+  // 只有 RPC 通道一条路由。曾经为「面板回调」加过第二条（trae-callback），
+  // 但那套设计被证伪：Trae 授权页硬性要求回调是 127.0.0.1，非 loopback 一律
+  // 显示「网络错误，请刷新页面重试。」，故远端改走粘贴，不再需要浏览器落点。
+  assert.equal(registered.length, 1, '必须注册恰好一条路由（RPC 通道）');
   assert.equal(registered[0].kind, 'prefix');
   assert.equal(registered[0].path, CHANNEL);
   assert.equal(typeof registered[0].handler, 'function');

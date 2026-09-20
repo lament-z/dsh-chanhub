@@ -4,9 +4,11 @@ window.__ModuleLoader__.load({
     var module = { exports: {} };
     var exports = module.exports;
     var React = require("react");
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name2 in all)
@@ -20,11 +22,20 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // client/index.js
 var index_exports = {};
 __export(index_exports, {
+  AddAccountDialog: () => AddAccountDialog,
   apply: () => apply,
   inject: () => inject,
   name: () => name
@@ -183,6 +194,13 @@ var FOLD_CSS = `
 /* \u5751 1\uFF1A\u663E\u5F0F display \u4F1A\u8986\u76D6\u6298\u53E0\u9690\u85CF \u2014\u2014 \u663E\u5F0F\u538B\u56DE */
 .dshc-fold:not([open]) > .dshc-body { display: none; }
 .dshc-body { padding: 4px 12px 12px; min-width: 0; }
+/* \u7F51\u683C\u884C\u7684\u7EDF\u4E00\u5185\u8FB9\u8DDD\uFF1A\u6298\u53E0\u4F53\uFF08.dshc-body\uFF09\u5E26 12px \u5DE6\u53F3\u5185\u8FB9\u8DDD\uFF0C\u800C\u5E38\u9A7B\u7684
+   \u300C\u5F85\u505A\u300D\u7EC4\u5728\u5361\u7247\u76F4\u4E0B \u2014\u2014 \u4E0D\u8865\u540C\u6837\u5185\u8FB9\u8DDD\uFF0C\u4E24\u7EC4\u884C\u7684\u7F51\u683C\u8D77\u70B9\u5C31\u5DEE 12px\uFF08\u5B9E\u6D4B 13px\uFF09\uFF0C
+   \u770B\u8D77\u6765\u50CF\u5217\u6CA1\u5BF9\u9F50\u3002\u7ED9\u4E24\u7EC4\u540C\u4E00\u4E2A\u6C34\u5E73\u5185\u8FB9\u8DDD\uFF0C\u7F51\u683C\u5217\u624D\u5BF9\u5F97\u4E0A\u3002 */
+.dshc-rows { padding: 0 12px; min-width: 0; border-left: 1px solid transparent; border-right: 1px solid transparent; }
+/* \u8BF4\u660E\uFF1A\u6298\u53E0\u5361 .dshc-fold \u81EA\u5E26 1px \u8FB9\u6846\uFF0C\u5176\u5185\u5BB9\u56E0\u6B64\u6BD4\u5361\u7247\u76F4\u4E0B\u7684\u5144\u5F1F\u8282\u70B9\u53F3\u79FB 1px\u3002
+   \u4E0A\u9762\u7684 transparent \u8FB9\u6846\u628A\u5E38\u9A7B\u884C\u7EC4\u4E5F\u63A8\u540C\u6837\u7684 1px\uFF0C\u4E24\u7EC4\u7F51\u683C\u5217\u624D\u4E25\u683C\u540C\u4E00 x\u3002
+   \u7528 border \u800C\u4E0D\u662F margin\uFF1Amargin \u4F1A\u8BA9\u5BBD\u5EA6\u4E5F\u5DEE 2px\uFF08\u5B9E\u6D4B 674 vs 672\uFF09\u3002 */
 .dshc-body .dshc-body { background: var(--dsw-alias-bg-layer-1,#fff); }
 /* \u884C\uFF1A\u4E00\u5F8B center \u5BF9\u9F50 \u2014\u2014 \u7AD6\u6392\u5757\u4E0E\u5355\u884C\u6587\u5B57\u7528 baseline \u4F1A\u9519\u4F4D\uFF08\u5B9E\u6D4B 20px\uFF0C\u5751 3\uFF09 */
 .dshc-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
@@ -222,6 +240,130 @@ var FOLD_CSS = `
 .dshc-log { font-family: ui-monospace,Menlo,monospace; font-size: 11.5px; line-height: 1.7; word-break: break-all; }
 .dshc-tabs { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .dshc-tabs::-webkit-scrollbar { display: none; }
+/* ---- v2 \u91CD\u8BBE\u8BA1\u65B0\u589E ---- */
+/* \u9876\u680F\u4E00\u884C\u836F\u4E38\u6761 */
+.dshc-topbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-2,#f9fafb); margin-bottom: 12px; flex-wrap: wrap; min-width: 0; }
+.dshc-topbar-title { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); white-space: nowrap; }
+.dshc-statusdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dshc-keypill { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); background: var(--dsw-alias-bg-layer-1,#fff); font-family: ui-monospace,Menlo,monospace; font-size: 11.5px; color: var(--dsw-alias-label-secondary,#6b7280); cursor: pointer; max-width: 260px; overflow: hidden; white-space: nowrap; flex-shrink: 0; }
+.dshc-keypill > span { overflow: hidden; text-overflow: ellipsis; }
+.dshc-keypill-ico { border: none; background: none; cursor: pointer; padding: 2px; display: inline-flex; color: var(--dsw-alias-label-tertiary,#8b93a1); flex-shrink: 0; }
+.dshc-keypill-ico:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
+/* Tab \u680F\u6700\u53F3\u7684\u300C\u6DFB\u52A0\u8D26\u53F7\u300D\uFF1A\u4E0E 5 \u4E2A Tab \u540C\u884C\uFF0C\u8D34\u53F3\u7AEF\u3002
+   sticky \u7684\u539F\u56E0\uFF1A .dshc-tabs \u662F overflow-x:auto \u7684\u6EDA\u52A8\u5BB9\u5668\uFF0C\u7A84\u5C4F\u4E0B\u6309\u94AE\u4F1A\u88AB\u6EDA\u51FA\u89C6\u91CE
+   \u2014\u2014 \u5B83\u662F\u5E38\u9A7B\u5165\u53E3\uFF0C\u4E0D\u8BE5\u968F Tab \u6A2A\u5411\u6EDA\u52A8\u800C\u6D88\u5931\u3002 */
+.dshc-tabadd { position: sticky; right: 0; flex-shrink: 0; align-self: center; margin: 0 0 4px 8px; font: inherit; cursor: pointer; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dsw-alias-button-info-fill,#4176e6); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-button-info-fill,#4176e6); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+.dshc-tabadd:hover { background: var(--dsw-alias-bg-layer-2,#eef2ff); }
+/* KPI \u884C\uFF08\u53EF\u70B9\u51FB\u7684\u7EDF\u8BA1\u683C\uFF09 */
+.dshc-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .dshc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: '10px 12px'; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+/* \u6E20\u9053\u4E09\u5361 */
+.dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
+.dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
+.dshc-chancard.dim { opacity: 0.55; }
+/* \u89C6\u56FE\u5207\u6362\uFF08\u5361\u7247/\u5217\u8868\uFF09 */
+.dshc-viewtoggle { display: inline-flex; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.dshc-viewtoggle > button { font: inherit; border: none; background: var(--dsw-alias-bg-layer-2,#f9fafb); color: var(--dsw-alias-label-secondary,#6b7280); padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.dshc-viewtoggle > button.on { background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-brand-primary,#4f6ef7); font-weight: 600; }
+/* \u8D26\u53F7\u5361\u7247\uFF08\u7F51\u683C\uFF09 */
+.dshc-acctgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+/* \u8D26\u53F7\u5361\uFF1A\u56DB\u6BB5\u5F0F\u7EB5\u5411\u7ED3\u6784\uFF08\u5934 / \u4E3B\u6570\u503C / \u5728\u9014\u6761 / \u5E95\u884C\uFF09\uFF0C\u4FE1\u606F\u5404\u5F52\u5176\u4F4D\u3002
+   \u539F\u5148\u53EA\u6709\u4E24\u884C\u4E14\u53F3\u4FA7\u6324\u4E00\u884C 11px \u5C0F\u5B57\uFF0C\u4E3B\u4F53\u5927\u7247\u7559\u767D \u2014\u2014 \u6539\u4E3A\u4E00\u5217\u94FA\u6EE1\uFF0C
+   \u4E3B\u6570\u503C\u653E\u5927\u5360\u6574\u884C\uFF0C\u5143\u4FE1\u606F\u62C6\u5230\u72EC\u7ACB\u5E95\u884C\uFF08\u5B57\u53F7 11.5px \u4ECD\u53EF\u8BFB\uFF09\u3002 */
+.dshc-acctcard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); cursor: pointer; min-width: 0; text-align: left; font: inherit; transition: box-shadow .15s, border-color .15s; }
+.dshc-acctcard:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); border-color: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-acctcard-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.dshc-acctcard-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.dshc-acctcard-nametext { font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* \u4E3B\u6570\u503C\uFF1A\u79EF\u5206\u5927\u5B57\u72EC\u5360\u4E00\u884C\uFF0C\u4E0D\u518D\u4E0E\u5143\u4FE1\u606F\u4E89\u5BBD */
+.dshc-acctcard-credits { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.dshc-acctcard-credits-num { font-size: 22px; font-weight: 600; line-height: 1.15; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-acctcard-credits-unit { font-size: 11.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-acctcard-expiring { font-size: 11px; color: var(--dsw-alias-state-warn-primary,#b45309); background: var(--dsw-alias-state-warn-tertiary,#fffbeb); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+/* \u4F59\u989D\u65B0\u9C9C\u5EA6\uFF08\u76F8\u5BF9\u65F6\u95F4\uFF09\uFF1A\u544A\u8BC9\u7528\u6237\u8FD9\u4E2A\u79EF\u5206\u503C\u6709\u591A\u65E7 */
+.dshc-acctcard-updated { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
+/* \u5728\u9014\u5360\u7528\uFF1A\u8F68\u9053 + \u586B\u5145 + \u53F3\u6807\u6CE8 */
+.dshc-acctcard-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dshc-acctcard-track { flex: 1 1 auto; min-width: 40px; height: 4px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); overflow: hidden; }
+.dshc-acctcard-fill { display: block; height: 100%; border-radius: 999px; background: var(--dsw-alias-button-info-fill,#4176e6); transition: width .3s; }
+.dshc-acctcard-fill.full { background: var(--dsw-alias-state-warn-primary,#f59e0b); }
+.dshc-acctcard-bartext { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
+/* \u5E95\u884C\uFF1A\u6E20\u9053 / \u57DF / \u6210\u8D25 \u2014\u2014 \u5143\u4FE1\u606F\u4ECE\u300C\u53F3\u4E0B\u89D2\u5C0F\u5B57\u300D\u6539\u4E3A\u72EC\u7ACB\u4E00\u884C */
+.dshc-acctcard-foot { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; margin-top: auto; padding-top: 7px; border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
+.dshc-chip { font-size: 11px; line-height: 1.5; padding: 1px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); color: var(--dsw-alias-label-secondary,#6b7280); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.dshc-chip-dim { color: var(--dsw-alias-label-tertiary,#9ca3af); }
+/* \u9010\u8D26\u53F7\u660E\u7EC6\u884C\uFF1A**\u7F51\u683C\u56FA\u5B9A\u5217**\uFF0C\u4FDD\u8BC1\u540C\u4E00\u5217\u5728\u6BCF\u884C\u4F4D\u7F6E\u4E00\u81F4\u3002
+   \u80CC\u666F\uFF1A\u5F00\u5B66\u5B63\u6709 5 \u884C\u4F46\u300C\u6BCF\u65E5\u300D\u6807\u7B7E\u53EA 4 \u884C\u6709\u3001\u6210\u957F\u4EFB\u52A1 22 \u884C\u91CC\u51FA\u73B0 3/4/5 \u4E2A\u5B50\u5143\u7D20
+   \u4E09\u79CD\u5F62\u6001 \u2014\u2014 \u7528 flex \u81EA\u7136\u6392\u7248\u65F6\u7F3A\u4E00\u5217\u5C31\u4F1A\u8BA9\u540E\u7EED\u5217\u5DE6\u79FB\uFF0C\u89C6\u89C9\u4E0A\u300C\u9519\u4F4D\u300D\u3002 */
+.dshc-srow { display: grid; grid-template-columns: 20px minmax(0, 1fr) 54px 64px max-content; align-items: center; gap: 8px; padding: 3px 0; min-width: 0; }
+.dshc-growrow { display: grid; grid-template-columns: 3px minmax(0, 1fr) 54px minmax(74px, auto) max-content 74px; align-items: center; gap: 8px; padding: 3px 0; min-width: 0; }
+.dshc-stitle { font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dshc-sprog { font-family: ui-monospace,Menlo,monospace; font-size: 12px; text-align: right; color: var(--dsw-alias-label-secondary,#6b7280); white-space: nowrap; }
+/* \u53E3\u5F84\u5F02\u5E38\uFF08\u4E0A\u6E38\u7ED9\u300C\u5DF2\u9886\u53D6\u300D\u4F46\u8FDB\u5EA6\u672A\u6EE1\uFF09\uFF1A\u52A0\u865A\u7EBF\u5E95\u7EB9\uFF0C\u63D0\u793A\u4E0D\u662F\u9762\u677F\u7B97\u9519 */
+.dshc-sprog.odd { color: var(--dsw-alias-state-warn-primary,#b45309); border-bottom: 1px dotted var(--dsw-alias-state-warn-primary,#b45309); cursor: help; }
+.dshc-ssrc { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }
+.dshc-sact { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+@media (max-width: 560px) {
+  .dshc-srow { grid-template-columns: 20px minmax(0, 1fr) 48px max-content; }
+  .dshc-srow > .dshc-ssrc { display: none; }
+  .dshc-growrow { grid-template-columns: 3px minmax(0, 1fr) 48px minmax(62px, auto) max-content 70px; }
+  .dshc-growrow > .dshc-ssrc { display: none; }
+}
+/* \u8D26\u53F7\u9009\u62E9\u5668\uFF08\u9010\u8D26\u53F7\u6570\u636E\u5361\u5171\u7528\uFF09\uFF1A\u53EA\u5728\u591A\u8D26\u53F7\u65F6\u6E32\u67D3 */
+.dshc-acctpick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; min-width: 0; }
+.dshc-acctpick-label { font-size: 11.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-right: 2px; }
+.dshc-acctpick-btn { font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-label-secondary,#6b7280); font-size: 12px; max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dshc-acctpick-btn.on { border-color: var(--dsw-alias-button-info-fill,#4176e6); color: var(--dsw-alias-button-info-fill,#4176e6); font-weight: 600; background: var(--dsw-alias-bg-layer-2,#eef2ff); }
+.dshc-acctpick-btn:hover { border-color: var(--dsw-alias-brand-primary,#4f6ef7); }
+/* \u5361\u7247\u6807\u9898\u884C\uFF1A\u6807\u9898 + \u53F3\u6B21\u8981\u4FE1\u606F + \u53F3\u52A8\u4F5C */
+.dshc-cardhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+/* \u4EFB\u52A1\u78C1\u8D34\uFF1A\u4E00\u884C\u4E03\u4E2A\uFF08\u7A84\u5C4F\u81EA\u52A8\u6298\u884C\uFF09\uFF0C\u70B9\u5373\u89E6\u53D1 */
+.dshc-taskgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.dshc-taskgrid-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dshc-tasktile { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); font: inherit; cursor: pointer; text-align: left; min-width: 0; transition: border-color .15s, box-shadow .15s; }
+.dshc-tasktile:hover:not(:disabled) { border-color: var(--dsw-alias-brand-primary,#4f6ef7); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.dshc-tasktile:disabled { cursor: default; opacity: .8; }
+.dshc-tasktile.failed { border-color: var(--dsw-alias-border-l2,#fecaca); }
+.dshc-tasktile-ico { font-size: 15px; line-height: 1.2; }
+.dshc-tasktile-name { font-size: 12.5px; font-weight: 500; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.dshc-tasktile-meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* \u4EFB\u52A1\u6309\u94AE\u547C\u5438\u6001\uFF08\u8FD0\u884C\u4E2D\uFF09 */
+@keyframes dshc-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--dsw-alias-button-info-fill,#4176e6); opacity: 1; } 50% { box-shadow: 0 0 0 5px rgba(65,118,230,0); opacity: .75; } }
+.dshc-taskbtn.running { animation: dshc-pulse 1.6s ease-in-out infinite; border-color: var(--dsw-alias-button-info-fill,#4176e6); color: var(--dsw-alias-button-info-fill,#4176e6); }
+/* \u961F\u5217\u8FDB\u5EA6\u6761 */
+.dshc-progress { height: 6px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); overflow: hidden; min-width: 120px; flex-grow: 1; }
+.dshc-progress > span { display: block; height: 100%; border-radius: 999px; background: var(--dsw-alias-button-info-fill,#4176e6); transition: width .5s; }
+/* \u7528\u91CF\u65F6\u5E8F\u67F1\uFF08\u6E10\u53D8 + hover\uFF09 */
+.dshc-bars { display: flex; align-items: flex-end; gap: 3px; height: 72px; overflow-x: auto; padding-bottom: 2px; }
+.dshc-bars > span { width: 14px; flex-shrink: 0; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--dsw-alias-brand-primary,#4f6ef7), var(--dsw-alias-button-info-fill,#4176e6)); opacity: .85; transition: opacity .15s; cursor: default; }
+.dshc-bars > span:hover { opacity: 1; }
+.dshc-bars > span.bad { background: linear-gradient(180deg, var(--dsw-alias-state-warn-primary,#f59e0b), var(--dsw-alias-state-error-primary,#dc2626)); }
+/* \u914D\u7F6E\u4E24\u5217\u7F51\u683C */
+.dshc-cfggrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; }
+@media (max-width: 760px) { .dshc-cfggrid { grid-template-columns: 1fr; } }
+.dshc-cfgrow { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; }
+.dshc-cfgrow > label { flex: none; width: 132px; font-size: 12px; color: var(--dsw-alias-label-secondary,#6b7280); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dshc-cfgrow > .dshc-cfgctl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.dshc-cfgrow.danger > label { color: var(--dsw-alias-state-warn-primary,#b45309); }
+/* \u8BE6\u60C5\u6ED1\u51FA\u9762\u677F */
+.dshc-drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 9998; }
+.dshc-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 92vw); background: var(--dsw-alias-bg-layer-2,#fff); border-left: 1px solid var(--dsw-alias-border-l2,#e5e7eb); box-shadow: -8px 0 30px rgba(0,0,0,.12); z-index: 9999; padding: 18px 20px; overflow-y: auto; box-sizing: border-box; }
+.dshc-drawer-close { position: absolute; top: 12px; right: 14px; border: none; background: none; cursor: pointer; font: inherit; font-size: 16px; color: var(--dsw-alias-label-tertiary,#8b93a1); padding: 4px; }
+.dshc-drawer-close:hover { color: var(--dsw-alias-label-primary,currentColor); }
+/* \u5C45\u4E2D\u5F39\u7A97\uFF08\u6DFB\u52A0\u8D26\u53F7\uFF09\uFF1A\u4E0E\u62BD\u5C49\u540C\u5C42\u53E0\u987A\u5E8F\uFF1B\u9AD8\u5EA6\u53D7\u9650\u5185\u90E8\u6EDA\u52A8 */
+.dshc-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, 92vw); max-height: 88vh; overflow-y: auto; background: var(--dsw-alias-bg-layer-2,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.18); z-index: 9999; padding: 20px 22px; box-sizing: border-box; }
+/* \u5355\u9009\u836F\u4E38\uFF08\u6E20\u9053 / \u57DF\uFF09 */
+.dshc-choice { font: inherit; cursor: pointer; display: inline-flex; align-items: baseline; gap: 5px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-label-secondary,#6b7280); font-size: 12.5px; }
+.dshc-choice.on { border-color: var(--dsw-alias-button-info-fill,#4176e6); color: var(--dsw-alias-button-info-fill,#4176e6); font-weight: 600; background: var(--dsw-alias-bg-layer-2,#eef2ff); }
+.dshc-choice:disabled { cursor: default; opacity: .8; }
+.dshc-choice-note { font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#9ca3af); }
+/* \u901A\u7528\u65CB\u8F6C\uFF08\u5237\u65B0\u6309\u94AE\u56FE\u6807\u7B49\uFF09 */
+.dshc-spin { display: inline-flex; animation: dshc-spin .8s linear infinite; }
+/* \u7B49\u5F85\u6388\u6743\u7684\u5C0F\u8F6C\u5708 */
+@keyframes dshc-spin { to { transform: rotate(360deg); } }
+.dshc-spinner { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--dsw-alias-border-l2,#e5e7eb); border-top-color: var(--dsw-alias-button-info-fill,#4176e6); animation: dshc-spin .8s linear infinite; }
 `;
 
 // lib/config-spec.js
@@ -343,7 +485,7 @@ var CONFIG_FIELDS = (
     { path: "admin.enabled", label: "\u542F\u7528\u7BA1\u7406\u7AEF\u70B9", type: "bool", default: "false", restart: true, danger: true, note: "\u5F00\u542F\u4E14 api_key \u4E3A\u7A7A \u2192 \u7F51\u5173\u62D2\u7EDD\u542F\u52A8" },
     // ---- 顶层（4 项）----
     { path: "listen", label: "\u76D1\u542C\u5730\u5740", type: "string", default: ":7863", restart: true, note: "assembly \u671F\u6355\u83B7\uFF0C\u5FC5\u987B\u91CD\u542F" },
-    { path: "api_key", label: "API key", type: "string", default: "", restart: true, danger: true, note: "\u6539\u52A8\u540E\u672C\u9762\u677F\u81EA\u8EAB\u4F1A\u5931\u8054\uFF0C\u9700\u540C\u6B65\u66F4\u65B0\u63D2\u4EF6\u8BBE\u7F6E" },
+    { path: "api_key", label: "API key", type: "string", default: "", restart: false, danger: true, note: "\u70ED\u751F\u6548\uFF1B\u6539\u52A8\u540E\u9700\u540C\u6B65\u66F4\u65B0\u63D2\u4EF6\u8BBE\u7F6E\uFF0C\u5426\u5219\u9762\u677F\u5931\u8054" },
     { path: "auth_dir", label: "\u51ED\u8BC1\u76EE\u5F55", type: "string", default: "./auths", restart: true },
     { path: "state_file", label: "\u72B6\u6001\u843D\u76D8\u8DEF\u5F84", type: "string", default: "./data/state.json", restart: true }
   ]
@@ -440,14 +582,6 @@ var SCHEDULE_ITEMS = [
   { id: "school", icon: "\u{1F393}", label: "\u5F00\u5B66\u5B63", hoursKey: "school_hours", enabledKey: "school_enabled", subtasks: 5 },
   { id: "cat", icon: "\u{1F319}", label: "\u591C\u732B\u5B50", hoursKey: "cat_hours", enabledKey: "cat_enabled", note: "\u7A97\u53E3 23:00\u201308:00 CST" }
 ];
-var SCHOOL_SUBTASKS = [
-  { code: "share_invite", label: "\u5206\u4EAB\u6D3B\u52A8\u7ED9\u597D\u53CB", manual: false },
-  { code: "chat_3_times", label: "\u4E0E AI \u5BF9\u8BDD 3 \u6B21", manual: false },
-  { code: "desktop_chat_1_time", label: "\u684C\u9762\u7AEF\u5BF9\u8BDD 1 \u6B21", manual: false },
-  { code: "expert_use", label: "\u53EC\u5524\u5F00\u5B66\u5B63\u4E13\u5BB6\u5E76\u5BF9\u8BDD", manual: false },
-  { code: "task_student_verify", label: "\u5FAE\u4FE1\u5B66\u751F\u8BA4\u8BC1", manual: true }
-];
-var SCHOOL_SHARED_CODES = SCHOOL_SUBTASKS.filter((task) => !task.manual).map((task) => task.code);
 var GROWTH_CODES = [
   { code: "create_canvas", label: "\u81EA\u9020\u753B\u5E03", target: 1 },
   { code: "template_5", label: "\u4F7F\u7528\u6A21\u677F 5 \u6B21", target: 5 },
@@ -537,10 +671,10 @@ function formatDuration(seconds) {
   const minute = Math.floor(total % 3600 / 60);
   const second = total % 60;
   const parts = [];
-  if (day > 0) parts.push(`${day}d`);
-  if (hour > 0) parts.push(`${hour}h`);
-  if (minute > 0 && day === 0) parts.push(`${minute}m`);
-  if (parts.length === 0) parts.push(`${second}s`);
+  if (day > 0) parts.push(`${day} \u5929`);
+  if (hour > 0) parts.push(`${hour} \u5C0F\u65F6`);
+  if (minute > 0 && day === 0) parts.push(`${minute} \u5206`);
+  if (parts.length === 0) parts.push(`${second} \u79D2`);
   return parts.slice(0, 2).join(" ");
 }
 function relativeTime(iso, now = Date.now()) {
@@ -603,11 +737,11 @@ function realmAvailability(realmTotals) {
 function summaryCounters(status) {
   const sticky = status?.sticky_sessions;
   return [
-    { label: "\u603B\u8D26\u53F7", value: status?.total ?? 0, tone: "idle" },
-    { label: "\u5065\u5EB7", value: status?.healthy ?? 0, tone: "ok" },
-    { label: "\u51B7\u5374\u4E2D", value: status?.cooling ?? 0, tone: "warn" },
-    { label: "\u5728\u9014\u5360\u6EE1", value: status?.in_flight_full ?? 0, tone: "warn" },
-    { label: "\u7C98\u6027\u4F1A\u8BDD", value: typeof sticky === "number" ? sticky : "\u2014", tone: "info" }
+    { key: "total", label: "\u8D26\u53F7\u603B\u6570", value: status?.total ?? 0, tone: "idle" },
+    { key: "healthy", label: "\u5065\u5EB7", value: status?.healthy ?? 0, tone: "ok" },
+    { key: "cooling", label: "\u51B7\u5374\u4E2D", value: status?.cooling ?? 0, tone: "warn" },
+    { key: "in_flight_full", label: "\u5728\u9014\u5360\u6EE1", value: status?.in_flight_full ?? 0, tone: "warn" },
+    ...typeof sticky === "number" ? [{ key: "sticky", label: "\u7C98\u6027\u4F1A\u8BDD", value: sticky, tone: "info" }] : []
   ];
 }
 function qualitySummary(account) {
@@ -701,11 +835,380 @@ function resolveChannel(explicit, domain) {
   }
   return "workbuddy";
 }
-var INTUITION_FACTS = {
-  batchIndependent: "\u8FD9\u4E9B\u6309\u94AE\u5404\u81EA\u72EC\u7ACB\uFF0C\u4E92\u4E0D\u8054\u52A8 \u2014\u2014 \u70B9\u300C\u5168\u91CF\u7B7E\u5230\u300D\u53EA\u8DD1\u7B7E\u5230\uFF0C\u4E0D\u4F1A\u987A\u5E26\u89E6\u53D1\u5176\u4ED6\u4EFB\u52A1\u3002\u6210\u957F\u4EFB\u52A1\u9700\u5355\u72EC\u70B9\u300C\u5168\u90E8\u70B9\u4EAE\u300D\u3002",
-  scheduledCoverage: () => `24 \u4E2A\u6210\u957F\u7801\u91CC\u53EA\u6709 2 \u4E2A\u6709\u5B9A\u65F6\u8986\u76D6\uFF08chat_5 \u8D70\u6D3B\u8DC3\u5730\u56FE\u3001black_cat \u8D70\u591C\u732B\u5B50\uFF09\uFF0C\u5176\u4F59 ${codeCoverage().unscheduled} \u4E2A\u6CA1\u6709\u4EFB\u4F55\u5B9A\u65F6\u5165\u53E3\uFF0C\u53EA\u80FD\u624B\u52A8\u89E6\u53D1\u3002`,
-  schoolSeason: () => `\u5F00\u5B66\u5B63 = 5 \u4E2A\u5B50\u4EFB\u52A1\uFF1A\u524D 4 \u4E2A\u53EF\u81EA\u52A8\u6267\u884C\uFF0C\u7B2C 5 \u4E2A\uFF08\u5FAE\u4FE1\u5B66\u751F\u8BA4\u8BC1\uFF09\u662F\u4EBA\u5DE5\u9879\u3002\u5176\u4E2D 4 \u4E2A\u4E0E task_runner.py \u7684\u6210\u957F\u7801\u662F\u540C\u4E00\u6279 \u2014\u2014 \u4E24\u5957\u6267\u884C\u5668\u5171\u7528\uFF0C\u8DD1\u4EFB\u4E00\u8FB9\u63A8\u8FDB\u540C\u4E00\u8FDB\u5EA6\u3002`
+
+// client/add-account.js
+var import_react = __toESM(require("react"), 1);
+var CHANNEL_LABEL2 = { workbuddy: "WorkBuddy", traework: "TraeWork", qoder: "QoderWork" };
+var CHANNEL_REALMS = {
+  workbuddy: [
+    { id: "cn", label: "\u56FD\u5185\u7248", note: "copilot.tencent.com" },
+    { id: "global", label: "\u56FD\u9645\u7248", note: "www.workbuddy.ai" }
+  ],
+  traework: [{ id: "cn", label: "\u9ED8\u8BA4", note: "trae.cn" }],
+  qoder: [{ id: "cn", label: "\u9ED8\u8BA4", note: "qoder.com.cn" }]
 };
+var POLL_INTERVAL_MS = 2500;
+var MAX_POLL_ATTEMPTS = 360;
+function RadioRow({ label, options, value, onChange }) {
+  return import_react.default.createElement(
+    "div",
+    { className: "dshc-row", style: { marginBottom: 10 } },
+    import_react.default.createElement("span", { style: { ...s.muted, width: 52, flexShrink: 0 } }, label),
+    ...options.map(
+      (option) => import_react.default.createElement(
+        "button",
+        {
+          key: option.id,
+          type: "button",
+          className: `dshc-choice${option.id === value ? " on" : ""}`,
+          disabled: options.length === 1,
+          title: option.note,
+          onClick: () => onChange(option.id)
+        },
+        option.label,
+        option.note ? import_react.default.createElement("span", { className: "dshc-choice-note" }, option.note) : null
+      )
+    )
+  );
+}
+function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClose, onDone }) {
+  const available = Array.isArray(channels) && channels.length > 0 ? channels : [];
+  const [channel, setChannel] = import_react.default.useState(available[0] ?? "");
+  const [realm, setRealm] = import_react.default.useState("cn");
+  const [phase, setPhase] = import_react.default.useState("idle");
+  const [url, setUrl] = import_react.default.useState("");
+  const [message, setMessage] = import_react.default.useState("");
+  const [error, setError] = import_react.default.useState("");
+  const [result, setResult] = import_react.default.useState(null);
+  const [callbackUrl, setCallbackUrl] = import_react.default.useState("");
+  const [needsPaste, setNeedsPaste] = import_react.default.useState(false);
+  const [pasted, setPasted] = import_react.default.useState("");
+  const [pasting, setPasting] = import_react.default.useState(false);
+  const [pasteError, setPasteError] = import_react.default.useState("");
+  const timer = import_react.default.useRef(null);
+  const attempts = import_react.default.useRef(0);
+  const generation = import_react.default.useRef(0);
+  const stopPolling = import_react.default.useCallback(() => {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+  import_react.default.useEffect(() => stopPolling, [stopPolling]);
+  const pollOnce = import_react.default.useCallback(
+    (gen) => {
+      timer.current = setTimeout(async () => {
+        if (generation.current !== gen) return;
+        attempts.current += 1;
+        if (attempts.current > MAX_POLL_ATTEMPTS) {
+          setPhase("error");
+          setError(
+            `\u7B49\u5F85\u8D85\u65F6\uFF08\u7EA6 ${Math.round(MAX_POLL_ATTEMPTS * POLL_INTERVAL_MS / 6e4)} \u5206\u949F\u672A\u5B8C\u6210\uFF09\u3002\u82E5\u6D4F\u89C8\u5668\u5DF2\u63D0\u793A\u300C\u65E0\u6CD5\u8BBF\u95EE\u6B64\u7F51\u7AD9\u300D\uFF0C\u8BF4\u660E Trae \u672A\u80FD\u81EA\u52A8\u8DF3\u56DE\u9762\u677F \u2014\u2014 \u8BF7\u7528\u4E0A\u65B9\u7684\u300C\u7C98\u8D34\u56DE\u8C03\u94FE\u63A5\u300D\u5B8C\u6210\u767B\u5F55\uFF0C\u6216\u91CD\u65B0\u53D1\u8D77\u3002`
+          );
+          return;
+        }
+        try {
+          const res = await onPoll(channel);
+          if (generation.current !== gen) return;
+          if (res?.ok === false) {
+            setPhase("error");
+            setError(res.error?.message ?? "\u8F6E\u8BE2\u5931\u8D25");
+            return;
+          }
+          const value = res?.value ?? {};
+          if (value.status === "done") {
+            setPhase("done");
+            setResult(value);
+            setMessage(value.checkin_message || "");
+            void onDone?.();
+            return;
+          }
+          if (value.status === "error") {
+            setPhase("error");
+            setError(value.error ?? "\u767B\u5F55\u5931\u8D25");
+            return;
+          }
+          setPhase("awaiting");
+          pollOnce(gen);
+        } catch (err) {
+          if (generation.current !== gen) return;
+          setPhase("error");
+          setError(err?.message ?? String(err));
+        }
+      }, POLL_INTERVAL_MS);
+    },
+    [channel, onPoll, onDone]
+  );
+  const start = import_react.default.useCallback(async () => {
+    stopPolling();
+    generation.current += 1;
+    const gen = generation.current;
+    attempts.current = 0;
+    setPhase("idle");
+    setError("");
+    setResult(null);
+    setCallbackUrl("");
+    setPasted("");
+    setPasteError("");
+    setMessage("\u6B63\u5728\u83B7\u53D6\u6388\u6743\u94FE\u63A5\u2026");
+    try {
+      const res = await onStart(channel, realm);
+      if (res?.ok === false) {
+        setPhase("error");
+        setMessage("");
+        setError(res.error?.message ?? "\u53D1\u8D77\u767B\u5F55\u5931\u8D25");
+        return;
+      }
+      const value = res?.value ?? {};
+      if (typeof value.url !== "string" || value.url === "") {
+        setPhase("error");
+        setMessage("");
+        setError("\u7F51\u5173\u672A\u8FD4\u56DE\u6388\u6743\u94FE\u63A5");
+        return;
+      }
+      setUrl(value.url);
+      setMessage("");
+      setPhase("awaiting");
+      setNeedsPaste(value.needs_paste === true);
+      setCallbackUrl(typeof value.callback_url === "string" ? value.callback_url : "");
+      if (typeof window !== "undefined") window.open(value.url, "_blank", "noopener,noreferrer");
+      pollOnce(gen);
+    } catch (err) {
+      setPhase("error");
+      setMessage("");
+      setError(err?.message ?? String(err));
+    }
+  }, [channel, realm, onStart, pollOnce, stopPolling]);
+  const submitPasted = import_react.default.useCallback(async () => {
+    const raw = pasted.trim();
+    if (raw === "") {
+      setPasteError("\u8BF7\u5148\u7C98\u8D34\u56DE\u8C03\u94FE\u63A5\uFF08\u6D4F\u89C8\u5668\u5730\u5740\u680F\u91CC\u7684\u5B8C\u6574\u5730\u5740\uFF09");
+      return;
+    }
+    setPasting(true);
+    setPasteError("");
+    try {
+      const res = await onCallback?.(channel, raw);
+      if (res?.ok === false) {
+        setPasteError(res.error?.message ?? "\u63D0\u4EA4\u5931\u8D25");
+        return;
+      }
+      const value = res?.value ?? {};
+      if (value.status !== "received") {
+        setPasteError(value.error ?? "\u7F51\u5173\u672A\u63A5\u53D7\u8BE5\u56DE\u8C03");
+        return;
+      }
+      setPasted("");
+      setMessage("\u56DE\u8C03\u5DF2\u63D0\u4EA4\uFF0C\u6B63\u5728\u6362\u53D6\u51ED\u8BC1\u2026");
+    } catch (err) {
+      setPasteError(err?.message ?? String(err));
+    } finally {
+      setPasting(false);
+    }
+  }, [pasted, onCallback, channel]);
+  const close = import_react.default.useCallback(() => {
+    generation.current += 1;
+    stopPolling();
+    onClose();
+  }, [onClose, stopPolling]);
+  import_react.default.useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [close]);
+  if (available.length === 0) {
+    return import_react.default.createElement(
+      "div",
+      null,
+      import_react.default.createElement("div", { className: "dshc-drawer-mask", onClick: close }),
+      import_react.default.createElement(
+        "div",
+        { className: "dshc-dialog" },
+        import_react.default.createElement("button", { type: "button", className: "dshc-drawer-close", onClick: close, title: "\u5173\u95ED" }, "\u2715"),
+        import_react.default.createElement("div", { style: { ...s.label, marginBottom: 8 } }, "\u6DFB\u52A0\u8D26\u53F7"),
+        import_react.default.createElement(
+          "div",
+          { style: s.warn },
+          "\u7F51\u5173\u672A\u63D0\u4F9B\u53EF\u7528\u7684\u767B\u5F55\u6E20\u9053 \u2014\u2014 \u9700\u5728 chanhub \u4FA7\u542F\u7528 /panel/api/login/*\uFF08\u542B workbuddy \u5206\u652F\uFF09\u3002",
+          "\u5347\u7EA7\u7F51\u5173\u540E\u91CD\u65B0\u6253\u5F00\u672C\u5F39\u7A97\u3002"
+        )
+      )
+    );
+  }
+  const realmOptions = CHANNEL_REALMS[channel] ?? [{ id: "cn", label: "\u9ED8\u8BA4", note: "" }];
+  const allowedRealms = Array.isArray(realms) && realms.length > 0 ? realms : ["cn"];
+  const visibleRealmOptions = realmOptions.filter((o) => allowedRealms.includes(o.id));
+  return import_react.default.createElement(
+    "div",
+    null,
+    import_react.default.createElement("div", { className: "dshc-drawer-mask", onClick: close }),
+    import_react.default.createElement(
+      "div",
+      { className: "dshc-dialog", role: "dialog", "aria-label": "\u6DFB\u52A0\u8D26\u53F7" },
+      import_react.default.createElement("button", { type: "button", className: "dshc-drawer-close", onClick: close, title: "\u5173\u95ED" }, "\u2715"),
+      import_react.default.createElement("div", { style: { ...s.label, marginBottom: 12 } }, "\u6DFB\u52A0\u8D26\u53F7"),
+      // 表单（awaiting 之后锁住，避免中途换渠道导致 state 对不上）
+      import_react.default.createElement(RadioRow, {
+        label: "\u6E20\u9053",
+        options: available.map((id) => ({ id, label: CHANNEL_LABEL2[id] ?? id })),
+        value: channel,
+        onChange: (id) => {
+          setChannel(id);
+          generation.current += 1;
+          attempts.current = 0;
+          stopPolling();
+          setPhase("idle");
+          setUrl("");
+          setResult(null);
+          setError("");
+          setCallbackUrl("");
+          setPasted("");
+          setPasteError("");
+        }
+      }),
+      import_react.default.createElement(RadioRow, {
+        label: "\u57DF",
+        options: visibleRealmOptions,
+        value: realm,
+        onChange: (id) => {
+          setRealm(id);
+          generation.current += 1;
+          attempts.current = 0;
+          stopPolling();
+          setPhase("idle");
+          setUrl("");
+          setResult(null);
+          setError("");
+          setCallbackUrl("");
+          setPasted("");
+          setPasteError("");
+        }
+      }),
+      phase === "idle" ? import_react.default.createElement(
+        "button",
+        { type: "button", style: { ...s.btnPri, width: "100%", justifyContent: "center", marginTop: 4 }, onClick: start },
+        message || "\u83B7\u53D6\u6388\u6743\u94FE\u63A5"
+      ) : null,
+      // 授权链接：无论自动打开是否成功，链接始终可见可复制。
+      phase === "awaiting" || phase === "done" ? import_react.default.createElement(
+        "div",
+        { style: { ...s.tip, marginTop: 8 } },
+        import_react.default.createElement(
+          "div",
+          { style: { marginBottom: 6 } },
+          phase === "awaiting" ? needsPaste ? "\u2460 \u5728\u65B0\u6253\u5F00\u7684\u9875\u9762\u5B8C\u6210\u767B\u5F55\u3000\u2461 \u6309\u4E0B\u65B9\u8BF4\u660E\u628A\u5730\u5740\u680F\u5185\u5BB9\u7C98\u56DE\u6765" : "\u2460 \u5728\u65B0\u6253\u5F00\u7684\u9875\u9762\u5B8C\u6210\u767B\u5F55\u3000\u2461 \u56DE\u5230\u672C\u9762\u677F\uFF0C\u65E0\u9700\u5176\u4ED6\u64CD\u4F5C" : "\u767B\u5F55\u5DF2\u5B8C\u6210\uFF0C\u4EE5\u4E0B\u94FE\u63A5\u5DF2\u5931\u6548\u3002"
+        ),
+        import_react.default.createElement("a", {
+          href: url,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          style: { ...s.code, color: tone.info.fg, display: "block", wordBreak: "break-all" }
+        }, url)
+      ) : null,
+      phase === "awaiting" ? import_react.default.createElement(
+        "div",
+        { className: "dshc-row", style: { marginTop: 10, gap: 6 } },
+        import_react.default.createElement("span", { className: "dshc-spinner" }),
+        import_react.default.createElement("span", { style: s.muted }, "\u7B49\u5F85\u6388\u6743\u5B8C\u6210\u2026\uFF08\u6BCF 2.5 \u79D2\u81EA\u52A8\u68C0\u67E5\uFF09")
+      ) : null,
+      // 粘贴完成（traework）。Trae 授权页硬性要求回调地址为
+      // http://127.0.0.1:<端口>/authorize，远端浏览器**必然**打不开该地址，
+      // 但登录成功后地址栏里就带着凭证 —— 复制回这里即可完成。
+      //
+      // 常驻渲染（不只在超时后）：这个「打不开」是必然发生的，不是异常情况，
+      // 等超时才提示等于让用户先困惑一次。
+      (phase === "awaiting" || phase === "error") && needsPaste ? import_react.default.createElement(
+        "div",
+        { style: { ...s.tip, marginTop: 10 } },
+        import_react.default.createElement(
+          "div",
+          { style: { marginBottom: 6 } },
+          "\u628A\u6D4F\u89C8\u5668\u5730\u5740\u680F\u91CC\u7684\u5185\u5BB9\u590D\u5236\u5230\u4E0B\u9762\u5B8C\u6210\u767B\u5F55\uFF1A"
+        ),
+        import_react.default.createElement(
+          "div",
+          { style: { ...s.muted, marginBottom: 6 } },
+          "\u767B\u5F55\u6210\u529F\u540E\u6D4F\u89C8\u5668\u4F1A\u8DF3\u5230\u4E00\u4E2A\u6253\u4E0D\u5F00\u7684\u5730\u5740\uFF08\u8FD9\u662F Trae \u7684\u9650\u5236\uFF0C\u4E0D\u662F\u6545\u969C\uFF09\u3002",
+          "\u90A3\u4E2A\u9875\u9762\u7684**\u5730\u5740\u680F\u91CC\u5E26\u7740\u767B\u5F55\u51ED\u8BC1** \u2014\u2014 \u6574\u6BB5\u590D\u5236\u8FC7\u6765\u5373\u53EF\u3002"
+        ),
+        import_react.default.createElement(
+          "div",
+          { style: { ...s.muted, marginBottom: 8, wordBreak: "break-all" } },
+          `\u4F60\u4F1A\u770B\u5230\u7684\u5730\u5740\u5F62\u5982\uFF1A${callbackUrl || "http://127.0.0.1:<\u7AEF\u53E3>/authorize"}?refreshToken=\u2026`
+        ),
+        import_react.default.createElement("textarea", {
+          value: pasted,
+          onChange: (e) => {
+            setPasted(e.target.value);
+            if (pasteError) setPasteError("");
+          },
+          placeholder: "\u7C98\u8D34\u5730\u5740\u680F\u91CC\u7684\u5B8C\u6574\u5730\u5740",
+          rows: 2,
+          spellCheck: false,
+          style: {
+            width: "100%",
+            boxSizing: "border-box",
+            fontFamily: "monospace",
+            fontSize: 11,
+            padding: "6px 8px",
+            resize: "vertical",
+            marginBottom: 8
+          }
+        }),
+        import_react.default.createElement(
+          "button",
+          {
+            type: "button",
+            disabled: pasting || pasted.trim() === "",
+            style: { ...s.btnGhost, width: "100%", justifyContent: "center" },
+            onClick: submitPasted
+          },
+          pasting ? "\u63D0\u4EA4\u4E2D\u2026" : "\u63D0\u4EA4\u5E76\u5B8C\u6210\u767B\u5F55"
+        ),
+        pasteError ? import_react.default.createElement("div", { style: { ...s.err, marginTop: 6 } }, pasteError) : null,
+        import_react.default.createElement(
+          "div",
+          { style: { ...s.muted, marginTop: 6 } },
+          "\u63D0\u793A\uFF1A\u8BE5\u5730\u5740\u5305\u542B\u4E00\u6B21\u6027\u767B\u5F55\u51ED\u8BC1\uFF0C\u4EC5\u63D0\u4EA4\u7ED9\u672C\u7F51\u5173\uFF0C\u52FF\u8F6C\u53D1\u4ED6\u4EBA\u3002"
+        )
+      ) : null,
+      phase === "done" && result ? import_react.default.createElement(
+        "div",
+        { style: { ...s.card, marginTop: 12, marginBottom: 0, padding: "12px 14px" } },
+        import_react.default.createElement(
+          "div",
+          { className: "dshc-row", style: { gap: 8, marginBottom: 6 } },
+          import_react.default.createElement("span", { style: { ...s.label } }, "\u2713 \u5DF2\u6DFB\u52A0"),
+          result.nickname ? import_react.default.createElement("span", { style: s.muted }, result.nickname) : null,
+          result.realm ? import_react.default.createElement("span", { style: s.muted }, result.realm === "global" ? "\u56FD\u9645\u7248" : "\u56FD\u5185\u7248") : null
+        ),
+        import_react.default.createElement(
+          "div",
+          { style: s.muted },
+          import_react.default.createElement("div", null, `UID\u3000${result.uid}`),
+          typeof result.credits === "number" && result.credits >= 0 ? import_react.default.createElement("div", null, `\u79EF\u5206\u3000${result.credits}`) : null,
+          import_react.default.createElement("div", null, "\u51ED\u8BC1\u5DF2\u843D\u76D8\u5E76\u70ED\u52A0\u8F7D\u8FDB\u6C60\uFF0C\u65E0\u9700\u91CD\u542F\u7F51\u5173\u3002")
+        ),
+        message ? import_react.default.createElement("div", { style: { ...s.muted, marginTop: 6 } }, message) : null
+      ) : null,
+      phase === "error" ? import_react.default.createElement(
+        "div",
+        { style: { marginTop: 10 } },
+        import_react.default.createElement("div", { style: s.err }, error),
+        import_react.default.createElement("button", {
+          type: "button",
+          style: { ...s.btnGhost, marginTop: 8, width: "100%", justifyContent: "center" },
+          onClick: () => {
+            setPhase("idle");
+            setError("");
+          }
+        }, "\u91CD\u65B0\u5F00\u59CB")
+      ) : null
+    )
+  );
+}
 
 // client/index.js
 var CHANNEL = "/dsh-chanhub";
@@ -713,6 +1216,7 @@ var name = "dsh-chanhub";
 var inject = ["slots", "connection"];
 var ENDPOINTS = {
   getStatus: "getStatus",
+  refreshStatus: "refreshStatus",
   getModels: "getModels",
   getStats: "getStats",
   probe: "probe",
@@ -736,7 +1240,12 @@ var ENDPOINTS = {
   accountDisable: "accountDisable",
   accountEnable: "accountEnable",
   accountRevive: "accountRevive",
-  serviceControl: "serviceControl"
+  loginStart: "loginStart",
+  loginPoll: "loginPoll",
+  loginCallback: "loginCallback",
+  getChannels: "getChannels",
+  serviceControl: "serviceControl",
+  revealApiKey: "revealApiKey"
 };
 var TASK_DEFS = [
   { name: "checkin", label: "\u7B7E\u5230", icon: "\u{1F4C5}", key: "checkin" },
@@ -780,11 +1289,17 @@ var svg = (props, ...children) => React.createElement(
   ...children
 );
 var Icons = {
-  gateway: (props) => svg(
+  // 渠道中心主图标：三条汇入一个节点的线（渠道汇聚），与 bridge 的
+  // tunnel/ops/gear、宿主齿轮 fallback 均不重合。
+  hub: (props) => svg(
     { width: 18, height: 18, ...props },
-    React.createElement("circle", { key: "c", cx: 12, cy: 12, r: 9 }),
-    React.createElement("path", { key: "a", d: "M3 12h18" }),
-    React.createElement("path", { key: "b", d: "M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z" })
+    React.createElement("circle", { key: "c", cx: 12, cy: 12, r: 2.6 }),
+    React.createElement("path", { key: "a", d: "M12 9.4V3.5" }),
+    React.createElement("path", { key: "b", d: "M9.8 13.4l-5.1 3" }),
+    React.createElement("path", { key: "d", d: "M14.2 13.4l5.1 3" }),
+    React.createElement("circle", { key: "e", cx: 12, cy: 3, r: 1.6 }),
+    React.createElement("circle", { key: "f", cx: 4, cy: 17, r: 1.6 }),
+    React.createElement("circle", { key: "g", cx: 20, cy: 17, r: 1.6 })
   ),
   chart: (props) => svg(
     props,
@@ -812,7 +1327,37 @@ var Icons = {
     { width: 13, height: 13, ...props },
     React.createElement("path", { key: "a", d: "M21 12a9 9 0 1 1-3-6.7" }),
     React.createElement("path", { key: "b", d: "M21 3v6h-6" })
-  )
+  ),
+  // v2 新增
+  eye: (props) => svg(
+    { width: 14, height: 14, ...props },
+    React.createElement("path", { key: "a", d: "M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" }),
+    React.createElement("circle", { key: "b", cx: 12, cy: 12, r: 3 })
+  ),
+  eyeOff: (props) => svg(
+    { width: 14, height: 14, ...props },
+    React.createElement("path", { key: "a", d: "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" }),
+    React.createElement("line", { key: "b", x1: 1, y1: 1, x2: 23, y2: 23 })
+  ),
+  copy: (props) => svg(
+    { width: 13, height: 13, ...props },
+    React.createElement("rect", { key: "a", x: 9, y: 9, width: 13, height: 13, rx: 2 }),
+    React.createElement("path", { key: "b", d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
+  ),
+  cardView: (props) => svg(
+    { width: 13, height: 13, ...props },
+    React.createElement("rect", { key: "a", x: 3, y: 3, width: 7, height: 7, rx: 1.5 }),
+    React.createElement("rect", { key: "b", x: 14, y: 3, width: 7, height: 7, rx: 1.5 }),
+    React.createElement("rect", { key: "c", x: 3, y: 14, width: 7, height: 7, rx: 1.5 }),
+    React.createElement("rect", { key: "d", x: 14, y: 14, width: 7, height: 7, rx: 1.5 })
+  ),
+  listView: (props) => svg(
+    { width: 13, height: 13, ...props },
+    React.createElement("rect", { key: "a", x: 3, y: 4, width: 18, height: 4, rx: 1 }),
+    React.createElement("rect", { key: "b", x: 3, y: 10, width: 18, height: 4, rx: 1 }),
+    React.createElement("rect", { key: "c", x: 3, y: 16, width: 18, height: 4, rx: 1 })
+  ),
+  bolt: (props) => svg(props, React.createElement("path", { d: "M13 2L3 14h7l-1 8 10-12h-7l1-8z" }))
 };
 function Tag({ text, tone: toneName = "idle", title }) {
   const palette = tone[toneName] ?? tone.idle;
@@ -823,6 +1368,15 @@ function Tag({ text, tone: toneName = "idle", title }) {
       ...title === void 0 ? {} : { title }
     },
     text
+  );
+}
+function CardHead({ title, extra, actions }) {
+  return React.createElement(
+    "div",
+    { className: "dshc-cardhead" },
+    React.createElement("span", { style: s.label }, title),
+    extra ? React.createElement("span", { style: s.muted }, extra) : null,
+    actions ? React.createElement("span", { className: "dshc-row", style: { marginLeft: "auto", gap: 6 } }, actions) : null
   );
 }
 function Unavailable({ title, needs, hint }) {
@@ -864,7 +1418,7 @@ function Fold({ summary, children, open = false, id }) {
     React.createElement("div", { className: "dshc-body" }, children)
   );
 }
-function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
+function OverviewCard({ status, channelOf, showDistribution, onToggleDistribution }) {
   const counters = summaryCounters(status);
   const realms = realmAvailability(status?.realm_totals);
   const grouped = groupByChannel(status?.accounts ?? [], channelOf);
@@ -872,61 +1426,70 @@ function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
   return React.createElement(
     "div",
     { style: s.card },
+    // KPI 行：账号总数（点击展开渠道分布）+ 健康/冷却/在途满
     React.createElement(
       "div",
-      { className: "dshc-row", style: { justifyContent: "space-between" } },
-      React.createElement(
-        "div",
-        { style: { ...s.label, display: "flex", alignItems: "center", gap: 8 } },
-        React.createElement(Icons.chart, { style: { width: 16, height: 16 } }),
-        "\u6982\u89C8"
-      ),
-      React.createElement(
-        "div",
-        { className: "dshc-row" },
-        React.createElement(
-          "span",
-          { style: s.muted },
-          `${status?.healthy ?? 0} \u53EF\u7528 \xB7 ${formatNumber(grouped.total)} \u79EF\u5206`
-        ),
-        React.createElement(
+      { className: "dshc-kpis" },
+      ...counters.map((counter) => {
+        const clickable = counter.key === "total";
+        return React.createElement(
           "button",
-          { type: "button", style: s.btnLink, onClick: onRefresh, disabled: refreshing },
-          React.createElement(Icons.refresh, null),
-          refreshing ? "\u5237\u65B0\u4E2D" : "\u5237\u65B0"
-        )
-      )
-    ),
-    // 五联
-    React.createElement(
-      "div",
-      { className: "dshc-five", style: { marginTop: 12 } },
-      ...counters.map(
-        (counter) => React.createElement(
-          "div",
           {
             key: counter.label,
-            style: {
-              background: "var(--dsw-alias-bg-layer-1,#fff)",
-              border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
-              borderRadius: 8,
-              padding: "8px 10px",
-              minWidth: 0
-            }
+            type: "button",
+            className: "dshc-kpi",
+            onClick: clickable ? onToggleDistribution : void 0,
+            title: clickable ? "\u70B9\u51FB\u67E5\u770B\u6E20\u9053\u5206\u5E03" : void 0,
+            style: { ...s.kpi, cursor: clickable ? "pointer" : "default" }
           },
-          React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, counter.label),
           React.createElement(
             "div",
-            { style: { fontSize: 18, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg } },
+            { style: { ...s.muted, fontSize: 11 } },
+            counter.label,
+            clickable ? " \u25BE" : ""
+          ),
+          React.createElement(
+            "div",
+            { style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg } },
             String(counter.value)
           )
+        );
+      })
+    ),
+    // 渠道分布（点「账号总数」展开）
+    showDistribution ? React.createElement(
+      "div",
+      { className: "dshc-row", style: { marginTop: 10, paddingLeft: 4 } },
+      ...grouped.channels.map(
+        (channel) => React.createElement(Tag, {
+          key: channel.id,
+          text: `${channel.label} ${channel.count} \u53F7`,
+          tone: channel.count > 0 ? "info" : "idle"
+        })
+      )
+    ) : null,
+    // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）
+    React.createElement(
+      "div",
+      { className: "dshc-chancards", style: { marginTop: 10 } },
+      ...grouped.channels.map(
+        (channel) => React.createElement(
+          "div",
+          { key: channel.id, className: `dshc-chancard${channel.count === 0 ? " dim" : ""}` },
+          React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, channel.label),
+          React.createElement(
+            "div",
+            { style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg } },
+            channel.count > 0 ? formatNumber(channel.credits) : "\u2014"
+          ),
+          React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} \u53F7`)
         )
       )
     ),
-    // 域可用性条（realm_totals 是 chanhub 独有字段）
+    // 域可用性条（realm_totals 独有数据，保留）
     realms.length > 0 ? React.createElement(
       "div",
-      { style: { marginTop: 12 } },
+      { style: { marginTop: 10 } },
       ...realms.map(
         (realm) => React.createElement(
           "div",
@@ -951,52 +1514,10 @@ function OverviewCard({ status, channelOf, onRefresh, refreshing }) {
           realm.disabled > 0 ? React.createElement(Tag, { text: `\u7981\u7528 ${realm.disabled}`, tone: "err" }) : null
         )
       )
-    ) : null,
-    // 总积分 / 渠道（竖排三行并排，center 对齐）
-    React.createElement(
-      "div",
-      { style: s.block },
-      React.createElement(
-        "div",
-        { className: "dshc-totalrow" },
-        React.createElement(
-          "div",
-          null,
-          React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, "\u603B\u79EF\u5206\uFF08\u53EF\u6D88\u8017\uFF09"),
-          React.createElement(
-            "div",
-            { style: { fontSize: 24, fontWeight: 700, color: tone.ok.fg, lineHeight: 1.2 } },
-            formatNumber(grouped.total)
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "dshc-channels" },
-          ...grouped.channels.map(
-            (channel) => React.createElement(
-              "div",
-              { key: channel.id, className: "dshc-chan" },
-              React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, channel.label),
-              React.createElement(
-                "div",
-                { style: { fontSize: 15, fontWeight: 600, color: "var(--dsw-alias-label-primary,currentColor)" } },
-                formatNumber(channel.credits)
-              ),
-              React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} \u53F7`)
-            )
-          )
-        )
-      ),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, marginTop: 8 } },
-        `\u4E0A\u6E38\u4E0B\u53D1\u603B\u989D ${formatNumber(grouped.creditsTotal)}\uFF1B\u5176\u4E2D\u4E0D\u53EF\u6D88\u8017\u90E8\u5206\u4E0D\u8BA1\u5165\u4E0A\u65B9\u603B\u6570`,
-        "\uFF08Trae \u7684 ep=1 \u4E13\u7528\u6C60\u6DF7\u7B97\u4F1A\u5BFC\u81F4\u6309\u865A\u9AD8\u4F59\u989D\u9009\u53F7\uFF09\u3002"
-      )
-    )
+    ) : null
   );
 }
-function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove }) {
+function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, scheduleConfig, onRemove, defaultOpen = false }) {
   const state = accountState(account, maxInFlight);
   const dot = (tone[state.tone] ?? tone.idle).fg;
   const label = channelLabel(channel);
@@ -1050,7 +1571,7 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
   );
   return React.createElement(
     Fold,
-    { summary },
+    { summary, open: defaultOpen },
     // 四组折叠：健康 / 质量 / 积分 / 任务。收起时也要能判断状态（摘要带关键数据）。
     React.createElement(
       Fold,
@@ -1059,7 +1580,7 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
         { className: "dshc-row", style: { minWidth: 0 } },
         React.createElement("span", { style: s.label }, "\u5065\u5EB7"),
         React.createElement("span", { style: s.muted }, healthSummary(account, state))
-      ) },
+      ), open: defaultOpen },
       React.createElement(
         "div",
         { className: "dshc-grid" },
@@ -1117,7 +1638,7 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
         { className: "dshc-row", style: { minWidth: 0 } },
         React.createElement("span", { style: s.label }, "\u8D28\u91CF"),
         React.createElement("span", { style: s.muted }, qualitySummary(account))
-      ) },
+      ), open: defaultOpen },
       React.createElement(
         "div",
         { className: "dshc-grid" },
@@ -1137,11 +1658,12 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
         { className: "dshc-row", style: { minWidth: 0 } },
         React.createElement("span", { style: s.label }, "\u79EF\u5206"),
         React.createElement("span", { style: s.muted }, creditsSummary(account))
-      ) },
+      ), open: defaultOpen },
       React.createElement(
         "div",
         { className: "dshc-grid" },
         ...accountRow("\u53EF\u6D88\u8017\u79EF\u5206", formatNumber(account.credits ?? 0)),
+        ...isZeroTime(account.credits_at) ? [] : accountRow("\u4F59\u989D\u66F4\u65B0\u4E8E", relativeTime(account.credits_at)),
         ...account.credits_expiring !== void 0 ? accountRow("\u5FEB\u8FC7\u671F\u79EF\u5206", formatNumber(account.credits_expiring)) : [],
         ...accountRow("\u4E0A\u6E38\u603B\u989D", formatNumber(account.credits_total ?? 0)),
         ...accountRow("\u4E0D\u53EF\u6D88\u8017", formatNumber(Math.max(0, (account.credits_total ?? 0) - (account.credits ?? 0))))
@@ -1404,8 +1926,11 @@ function rateLimitedNotice(list) {
     )
   );
 }
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, refreshing, error, creditsByUid, scheduleConfig, onRunTask, runningName, taskData, onRemove }) {
+function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove }) {
   const [filter, setFilter] = React.useState("all");
+  const [view, setView] = React.useState("card");
+  const [showDistribution, setShowDistribution] = React.useState(false);
+  const [detailAccount, setDetailAccount] = React.useState(null);
   const accounts = status?.accounts ?? [];
   const counts = React.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
@@ -1419,98 +1944,237 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
     () => filter === "all" ? accounts : accounts.filter((account) => channelOf(account) === filter),
     [accounts, channelOf, filter]
   );
-  const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
-  const byName = new Map(taskList.map((task) => [task.task, task]));
-  const tasksUnavailable = taskData && taskData.available === false;
-  const batchActions = [
-    { id: "checkin", label: "\u{1F4C5} \u5168\u91CF\u7B7E\u5230" },
-    { id: "balance", label: "\u{1F4B0} \u67E5\u4F59\u989D" },
-    { id: "keepalive", label: "\u{1F511} token \u4FDD\u6D3B" },
-    { id: "travel", label: "\u{1F431} \u732B\u732B\u65C5\u884C" },
-    { id: "activity", label: "\u{1F5FA} \u6D3B\u8DC3\u4E0A\u62A5" }
-  ];
   return React.createElement(
     "div",
     null,
     error ? React.createElement("div", { style: { ...s.err, marginBottom: 14 } }, error) : null,
-    React.createElement(OverviewCard, { status, channelOf, onRefresh, refreshing }),
-    // 批量动作条（置顶，在筛选条上方；ui-design §2 排版要求）
+    React.createElement(OverviewCard, {
+      status,
+      channelOf,
+      showDistribution,
+      onToggleDistribution: () => setShowDistribution((v) => !v)
+    }),
+    // 渠道 / 域筛选 + 视图切换 + 账号列表
     React.createElement(
       "div",
       { style: s.card },
-      React.createElement("div", { style: { ...s.label, marginBottom: 10 } }, "\u6279\u91CF\u52A8\u4F5C"),
-      tasksUnavailable ? React.createElement(
+      React.createElement(
         "div",
-        { className: "dshc-row" },
-        React.createElement("span", { style: { ...s.tag, background: tone.warn.bg, color: tone.warn.fg } }, "\u7F51\u5173\u672A\u5F00\u542F"),
+        { className: "dshc-row", style: { justifyContent: "space-between" } },
         React.createElement(
-          "span",
-          { style: s.muted },
-          "\u4EFB\u52A1\u7AEF\u70B9\u5728\u7F51\u5173 admin.enabled \u95E8\u69DB\u5185\uFF1B\u5F00\u542F\u540E\u8FD9\u91CC\u53EF\u6279\u91CF\u89E6\u53D1\u3002"
-        )
-      ) : React.createElement(
-        "div",
-        { className: "dshc-row" },
-        React.createElement("span", { style: { ...s.tag, background: tone.ok.bg, color: tone.ok.fg } }, "\u7F51\u5173\u4EFB\u52A1\u7AEF\u70B9"),
-        React.createElement("span", { style: s.muted }, "\u89E6\u53D1\u540E\u5F02\u6B65\u6267\u884C\uFF1B\u9010\u53F7\u7ED3\u679C\u89C1\u300C\u4EFB\u52A1\u300DTab \u6216\u70B9\u300C\u5237\u65B0\u72B6\u6001\u300D\u3002")
+          "div",
+          { className: "dshc-row" },
+          React.createElement("span", { style: { ...s.muted, marginRight: 4 } }, "\u6E20\u9053"),
+          segmentButton("all", "\u5168\u90E8", filter, setFilter, accounts.length),
+          ...CHANNEL_ORDER.filter((id) => (counts.get(id) ?? 0) > 0).map(
+            (id) => segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0)
+          )
+        ),
+        React.createElement(ViewToggle, { view, setView })
       ),
-      React.createElement(
-        "div",
-        { className: "dshc-row", style: { marginTop: 10 } },
-        ...batchActions.map((action) => {
-          const state = byName.get(action.id);
-          const isRunning = runningName === action.id || state?.running === true;
-          return React.createElement(
-            "button",
-            {
-              key: action.id,
-              type: "button",
-              style: { ...s.btnGhost, opacity: isRunning ? 0.5 : 1 },
-              disabled: tasksUnavailable || isRunning,
-              onClick: () => onRunTask(action.id),
-              title: state?.last_end ? `\u4E0A\u6B21\u6267\u884C\uFF1A${relativeTime(state.last_end)}` : "\u5C1A\u672A\u6267\u884C\u8FC7"
-            },
-            `${action.label}${isRunning ? " \xB7 \u8FD0\u884C\u4E2D" : ""}`
-          );
-        })
-      ),
-      React.createElement("div", { style: { ...s.warn, marginTop: 12 } }, INTUITION_FACTS.batchIndependent)
-    ),
-    // 渠道 / 域筛选
-    React.createElement(
-      "div",
-      { style: s.card },
-      React.createElement(
-        "div",
-        { className: "dshc-row" },
-        React.createElement("span", { style: { ...s.muted, marginRight: 4 } }, "\u6E20\u9053"),
-        segmentButton("all", "\u5168\u90E8", filter, setFilter, accounts.length),
-        ...CHANNEL_ORDER.filter((id) => (counts.get(id) ?? 0) > 0).map(
-          (id) => segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0)
-        )
-      ),
-      // 账号折叠面板
+      // 账号区：卡片式（默认，点开抽屉详情）或列表式
       React.createElement(
         "div",
         { style: s.block },
-        filtered.length === 0 ? React.createElement("div", { style: s.muted }, "\u8BE5\u7B5B\u9009\u4E0B\u6CA1\u6709\u8D26\u53F7\u3002") : React.createElement(
+        filtered.length === 0 ? React.createElement("div", { style: s.muted }, "\u8BE5\u7B5B\u9009\u4E0B\u6CA1\u6709\u8D26\u53F7\u3002") : view === "card" ? React.createElement(
           "div",
-          null,
+          { className: "dshc-acctgrid" },
           ...filtered.map(
-            (account) => React.createElement(AccountFold, {
+            (account) => React.createElement(AccountCard, {
               key: account.uid,
               account,
               maxInFlight,
               channel: channelOf(account),
-              onAction,
-              busy: Boolean(busy?.[account.uid]),
-              credits: creditsByUid?.[account.uid],
-              scheduleConfig,
-              onRemove
+              liveCredits: creditsByUid?.[account.uid],
+              onOpen: () => setDetailAccount(account)
             })
+          )
+        ) : React.createElement(
+          "div",
+          { className: "dshc-tblwrap" },
+          React.createElement(
+            "table",
+            null,
+            React.createElement(
+              "thead",
+              null,
+              React.createElement(
+                "tr",
+                null,
+                ...["\u8D26\u53F7", "\u6E20\u9053", "\u72B6\u6001", "\u79EF\u5206", "\u5728\u9014", "\u6210\u529F/\u5931\u8D25"].map((h) => React.createElement("th", { key: h }, h))
+              )
+            ),
+            React.createElement(
+              "tbody",
+              null,
+              ...filtered.map((account) => {
+                const st = accountState(account, maxInFlight);
+                return React.createElement(
+                  "tr",
+                  { key: account.uid },
+                  React.createElement("td", null, account.nickname || account.uid.slice(0, 8)),
+                  React.createElement("td", null, channelLabel(channelOf(account)) || "\u2014"),
+                  React.createElement(
+                    "td",
+                    null,
+                    React.createElement(Tag, { text: st.label, tone: st.tone, title: st.detail || void 0 })
+                  ),
+                  React.createElement("td", null, formatNumber(account.credits ?? 0)),
+                  React.createElement("td", null, `${account.in_flight ?? 0}/${maxInFlight ?? "\u2014"}`),
+                  React.createElement("td", null, `${account.success_count ?? 0}/${account.err_total ?? 0}`)
+                );
+              })
+            )
           )
         )
       )
+    ),
+    // 账号详情抽屉（点卡片弹出；复用 AccountFold 的完整明细）
+    detailAccount ? React.createElement(AccountDrawer, {
+      account: detailAccount,
+      maxInFlight,
+      channel: channelOf(detailAccount),
+      credits: creditsByUid?.[detailAccount.uid],
+      scheduleConfig,
+      onAction,
+      busy,
+      onRemove,
+      onClose: () => setDetailAccount(null)
+    }) : null
+  );
+}
+function AccountDrawer({ account, maxInFlight, channel, credits, scheduleConfig, onAction, busy, onRemove, onClose }) {
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return React.createElement(
+    "div",
+    null,
+    React.createElement("div", { className: "dshc-drawer-mask", onClick: onClose }),
+    React.createElement(
+      "div",
+      { className: "dshc-drawer" },
+      React.createElement("button", { type: "button", className: "dshc-drawer-close", onClick: onClose, title: "\u5173\u95ED" }, "\u2715"),
+      React.createElement(
+        "div",
+        { className: "dshc-row", style: { marginBottom: 12 } },
+        React.createElement("span", { style: { ...s.label, fontSize: 15 } }, account.nickname || account.uid.slice(0, 8)),
+        channelLabel(channel) ? React.createElement(Tag, { text: channelLabel(channel), tone: "info" }) : null,
+        account.realm ? React.createElement(Tag, { text: account.realm, tone: "idle" }) : null
+      ),
+      // 完整明细：直接复用 AccountFold（四组折叠），保持数据面不丢；动作在抽屉里可用。
+      // `defaultOpen: true` 让「点开卡片即见明细」—— 默认展开外层壳与健康/质量/积分，
+      // 任务组仍折叠（见 AccountFold 的说明）。
+      React.createElement(AccountFold, {
+        account,
+        maxInFlight,
+        channel,
+        onAction,
+        busy: Boolean(busy?.[account.uid]),
+        credits,
+        scheduleConfig,
+        onRemove,
+        defaultOpen: true
+      })
+    )
+  );
+}
+function ViewToggle({ view, setView }) {
+  return React.createElement(
+    "span",
+    { className: "dshc-viewtoggle" },
+    React.createElement("button", {
+      type: "button",
+      className: view === "card" ? "on" : "",
+      onClick: () => setView("card"),
+      title: "\u5361\u7247\u89C6\u56FE"
+    }, React.createElement(Icons.cardView, null), "\u5361\u7247"),
+    React.createElement("button", {
+      type: "button",
+      className: view === "list" ? "on" : "",
+      onClick: () => setView("list"),
+      title: "\u5217\u8868\u89C6\u56FE"
+    }, React.createElement(Icons.listView, null), "\u5217\u8868")
+  );
+}
+function AccountCard({ account, maxInFlight, channel, onOpen }) {
+  const state = accountState(account, maxInFlight);
+  const credits = account.credits ?? 0;
+  const creditsAt = isZeroTime(account.credits_at) ? void 0 : account.credits_at;
+  const target = typeof maxInFlight === "number" && maxInFlight > 0 ? maxInFlight : void 0;
+  const inFlight = account.in_flight ?? 0;
+  const busyPct = target ? Math.min(100, Math.round(inFlight / target * 100)) : 0;
+  const hasOutcome = account.success_count !== void 0 || account.err_total !== void 0;
+  const lastSuccess = isZeroTime(account.last_success) ? void 0 : account.last_success;
+  return React.createElement(
+    "button",
+    { type: "button", className: "dshc-acctcard", onClick: onOpen, title: "\u70B9\u51FB\u67E5\u770B\u8BE6\u60C5" },
+    // 顶行：昵称 + 状态
+    React.createElement(
+      "div",
+      { className: "dshc-acctcard-top" },
+      React.createElement(
+        "span",
+        { className: "dshc-acctcard-name" },
+        React.createElement("span", { className: "dshc-dot", style: { background: (tone[state.tone] ?? tone.idle).fg } }),
+        React.createElement(
+          "span",
+          { className: "dshc-acctcard-nametext" },
+          account.nickname || account.uid.slice(0, 8)
+        )
+      ),
+      React.createElement(Tag, { text: state.label, tone: state.tone, title: state.detail || void 0 })
+    ),
+    // 主数值：积分占满宽度，不再被右侧小字挤成半栏
+    React.createElement(
+      "div",
+      { className: "dshc-acctcard-credits" },
+      React.createElement("span", { className: "dshc-acctcard-credits-num" }, formatNumber(credits)),
+      React.createElement("span", { className: "dshc-acctcard-credits-unit" }, "\u79EF\u5206"),
+      creditsAt ? React.createElement(
+        "span",
+        { className: "dshc-acctcard-updated", title: `\u4F59\u989D\u66F4\u65B0\u4E8E ${formatAbsolute(creditsAt)}` },
+        relativeTime(creditsAt)
+      ) : null,
+      account.credits_expiring > 0 ? React.createElement("span", {
+        className: "dshc-acctcard-expiring",
+        title: "\u8BE5\u7A97\u53E3\u5185\u5373\u5C06\u8FC7\u671F\u7684\u79EF\u5206\uFF08\u4F18\u5148\u6D88\u8017\uFF09"
+      }, `${formatNumber(account.credits_expiring)} \u5C06\u8FC7\u671F`) : null
+    ),
+    // 在途占用：数值 + 细进度条（有在途时才显示）
+    target ? React.createElement(
+      "div",
+      { className: "dshc-acctcard-bar", title: `\u5355\u53F7\u5728\u9014\u4E0A\u9650 ${target}` },
+      React.createElement(
+        "span",
+        { className: "dshc-acctcard-track" },
+        React.createElement("span", {
+          className: `dshc-acctcard-fill${inFlight >= target ? " full" : ""}`,
+          style: { width: `${busyPct}%` }
+        })
+      ),
+      React.createElement("span", { className: "dshc-acctcard-bartext" }, `\u5728\u9014 ${inFlight}/${target}`)
+    ) : null,
+    // 底行：渠道 · 域 · 成败 —— 从 11px 右下小字改为独立一行，字号可读
+    React.createElement(
+      "div",
+      { className: "dshc-acctcard-foot" },
+      React.createElement("span", { className: "dshc-chip" }, channelLabel(channel) || "\u2014"),
+      account.realm ? React.createElement("span", { className: "dshc-chip" }, account.realm === "global" ? "\u56FD\u9645\u7248" : "\u56FD\u5185\u7248") : null,
+      // 成败比：新网关恒透出（零值也写），旧网关缺字段时退回在途数、不编造。
+      hasOutcome ? React.createElement(
+        "span",
+        { className: "dshc-chip" },
+        `${account.success_count} \u6210\u529F / ${account.err_total} \u5931\u8D25`
+      ) : React.createElement("span", {
+        className: "dshc-chip dshc-chip-dim",
+        title: "\u8BE5\u7F51\u5173\u7248\u672C\u672A\u900F\u51FA\u8FD0\u884C\u8BA1\u6570\uFF08success_count / err_total\uFF09\uFF1B\u5347\u7EA7 chanhub \u540E\u53EF\u89C1"
+      }, "\u6210\u8D25\u8BA1\u6570\u4E0D\u53EF\u7528"),
+      lastSuccess ? React.createElement("span", { className: "dshc-chip dshc-chip-dim" }, `\u6700\u8FD1\u6210\u529F ${relativeTime(lastSuccess)}`) : null
     )
   );
 }
@@ -1535,10 +2199,45 @@ function segmentButton(id, label, active, onChange, count) {
     `${label}${count === void 0 ? "" : ` ${count}`}`
   );
 }
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
+function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
+  const ran = (state?.run_count ?? 0) > 0;
+  const failed = Boolean(state?.last_error);
+  const dot = busy ? tone.info.fg : failed ? tone.err.fg : ran ? tone.ok.fg : tone.idle.fg;
+  const scheduleItem = SCHEDULE_ITEMS.find((item) => item.id === task.name);
+  const planned = scheduleItem ? scheduleHoursText(scheduleItem, scheduleConfig) : "";
+  const hours = planned === "\u9ED8\u8BA4" ? "" : planned;
+  const meta = busy ? "\u8FD0\u884C\u4E2D\u2026" : ran ? `${state?.last_start ? relativeTime(state.last_start) : ""}${typeof state?.duration_sec === "number" ? " \xB7 " + formatDuration(state.duration_sec) : ""}` : hours;
+  return React.createElement(
+    "button",
+    {
+      type: "button",
+      className: `dshc-tasktile${busy ? " running" : ""}${failed ? " failed" : ""}`,
+      disabled: busy,
+      onClick: () => onRun(task.name),
+      title: [
+        `${task.label}\uFF1A\u70B9\u5373\u6267\u884C`,
+        ran ? `\u4E0A\u6B21\u6267\u884C ${state?.last_start ? formatAbsolute(state.last_start) : "\u2014"}` : "\u5C1A\u672A\u6267\u884C\u8FC7",
+        state?.run_count != null ? `\u7D2F\u8BA1 ${state.run_count} \u6B21` : "",
+        hours ? `\u8BA1\u5212 ${hours}` : "",
+        failed ? `\u4E0A\u6B21\u9519\u8BEF\uFF1A${state.last_error}` : ""
+      ].filter(Boolean).join("\n")
+    },
+    React.createElement("span", { className: "dshc-tasktile-ico" }, task.icon),
+    React.createElement("span", { className: "dshc-tasktile-name" }, task.label),
+    React.createElement(
+      "span",
+      { className: "dshc-tasktile-meta" },
+      React.createElement("span", { className: "dshc-dot", style: { background: dot } }),
+      meta || "\u672A\u6267\u884C"
+    )
+  );
+}
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
   const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
   const byName = new Map(taskList.map((task) => [task.task, task]));
+  const doneCount = (queueData?.items ?? []).filter((it) => it.status === "done" || it.status === "error").length;
+  const pct = queueData?.total > 0 ? Math.round(doneCount / queueData.total * 100) : 100;
   if (taskData && taskData.available === false) {
     return React.createElement(Unavailable, {
       title: "\u4EFB\u52A1\u8FD0\u884C\u72B6\u6001\u4E0E\u624B\u52A8\u89E6\u53D1",
@@ -1549,78 +2248,94 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
   return React.createElement(
     "div",
     null,
-    // 任务中心（panel 对照补齐）：扫描待办 → 执行队列 → 队列进度。
-    React.createElement(TaskCenterCard, { adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }),
-    // 批量动作区（真实可用）
+    // 任务磁贴：一行七个，点即触发，状态就地显示。
+    // 原先「操作台按钮」与「执行历史表」把同一批任务各列一遍（7 按钮 + 7 行 × 6 列），
+    // 状态还得跨区块对照 —— 磁贴把触发与状态收进同一格，整张表随之删除。
     React.createElement(
       "div",
       { style: s.card },
       React.createElement(
         "div",
-        { className: "dshc-row", style: { justifyContent: "space-between" } },
-        React.createElement("div", { style: { ...s.label } }, "\u6279\u91CF\u4EFB\u52A1"),
-        React.createElement(
-          "button",
-          { type: "button", style: s.btnLink, onClick: onRefresh },
-          React.createElement(Icons.refresh, null),
-          "\u5237\u65B0\u72B6\u6001"
-        )
-      ),
-      React.createElement(
-        "div",
-        { className: "dshc-row", style: { marginTop: 10 } },
-        ...TASK_DEFS.map((task) => {
-          const state = byName.get(task.name);
-          const busy = runningName === task.name || state?.running === true;
-          return React.createElement(
-            "button",
-            {
-              key: task.name,
-              type: "button",
-              style: { ...s.btnGhost, opacity: busy ? 0.5 : 1 },
-              disabled: busy,
-              onClick: () => onRunTask(task.name),
-              title: state?.last_end ? `\u4E0A\u6B21\u6267\u884C\uFF1A${relativeTime(state.last_end)}` : "\u5C1A\u672A\u6267\u884C\u8FC7"
-            },
-            `${task.icon} ${task.label}`,
-            busy ? " \xB7 \u8FD0\u884C\u4E2D" : ""
-          );
-        })
-      ),
-      React.createElement("div", { style: { ...s.warn, marginTop: 12 } }, INTUITION_FACTS.batchIndependent),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, marginTop: 8 } },
-        "\u4EFB\u52A1\u5728\u7F51\u5173\u4FA7\u5F02\u6B65\u6267\u884C\uFF08\u811A\u672C\u7C7B\u4EFB\u52A1\u53EF\u80FD\u8DD1\u6570\u5206\u949F\uFF09\uFF1B\u6B64\u5904\u663E\u793A\u7684\u662F\u542F\u52A8\u56DE\u6267\uFF0C\u7ED3\u679C\u7ECF\u300C\u5237\u65B0\u72B6\u6001\u300D\u67E5\u770B\u3002"
-      )
-    ),
-    // 执行状态（含签到的逐账号结构化结果）
-    React.createElement(
-      "div",
-      { style: s.card },
-      React.createElement("div", { style: { ...s.label, marginBottom: 10 } }, "\u4EFB\u52A1\u72B6\u6001"),
-      React.createElement(
-        "div",
-        { className: "dshc-row", style: { marginBottom: 8 } },
-        ...TASK_DEFS.map((task) => {
-          const state = byName.get(task.name);
-          const glyph = state?.running ? "\u25CF" : state?.run_count > 0 ? "\u2713" : "\xB7";
-          const cls = state?.running ? "dshc-dp run" : state?.run_count > 0 ? "dshc-dp ok" : "dshc-dp wait";
-          return React.createElement("span", {
+        { className: "dshc-taskgrid" },
+        ...TASK_DEFS.map(
+          (task) => React.createElement(TaskTile, {
             key: task.name,
-            className: cls,
-            title: `${task.label}\uFF1A${state ? `\u5DF2\u6267\u884C ${state.run_count} \u6B21` : "\u5C1A\u672A\u6267\u884C"}`
-          }, glyph);
-        }),
-        React.createElement(
-          "span",
-          { style: { ...s.muted, marginLeft: 6 } },
-          `${[...byName.values()].filter((t) => t.run_count > 0).length} / ${TASK_DEFS.length} \u9879\u6267\u884C\u8FC7`
+            task,
+            state: byName.get(task.name),
+            busy: runningName === task.name || byName.get(task.name)?.running === true,
+            onRun: onRunTask,
+            scheduleConfig
+          })
         )
+      ),
+      adminAvailable ? React.createElement(
+        "div",
+        { className: "dshc-row", style: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)" } },
+        React.createElement("button", {
+          type: "button",
+          style: { ...s.btnGhost, height: 28 },
+          disabled: scanning,
+          onClick: onScan,
+          title: "\u53EA\u8BFB\u626B\u63CF\uFF1A\u5217\u51FA\u6BCF\u4E2A\u8D26\u53F7\u672A\u5B8C\u6210\u4E14\u53EF\u81EA\u52A8\u5316\u7684\u4EFB\u52A1"
+        }, scanning ? "\u626B\u63CF\u4E2D\u2026" : "\u626B\u63CF\u5F85\u529E"),
+        React.createElement("button", {
+          type: "button",
+          style: { ...s.btnGhost, height: 28 },
+          onClick: onQueueStart,
+          title: "\u628A\u626B\u63CF\u51FA\u7684\u5F85\u529E\u6392\u961F\u6267\u884C\uFF08\u8D26\u53F7\u5185\u4E32\u884C\u3001\u8D26\u53F7\u95F4\u5E76\u53D1\uFF09"
+        }, "\u6267\u884C\u961F\u5217"),
+        queueData ? React.createElement(
+          "span",
+          { className: "dshc-row", style: { gap: 8, flexGrow: 1, minWidth: 140 } },
+          React.createElement(
+            "span",
+            { className: "dshc-progress" },
+            React.createElement("span", { style: { width: `${pct}%` } })
+          ),
+          React.createElement(
+            "span",
+            { style: { ...s.muted, whiteSpace: "nowrap" } },
+            `${doneCount}/${queueData.total}${queueData.running ? "" : " \u5DF2\u7ED3\u675F"}`
+          )
+        ) : null
+      ) : null
+    ),
+    // 签到逐账号结果：摘要常驻（一眼可见），明细折起（默认不占版面）。
+    React.createElement(CheckinOutcomesCard, { task: byName.get("checkin") }),
+    // 待办扫描 / 队列明细：只在有数据时出现，且折起。
+    scanData?.accounts?.length > 0 ? React.createElement(
+      "div",
+      { style: s.card },
+      React.createElement(
+        "div",
+        { className: "dshc-taskgrid-head" },
+        React.createElement("span", { style: s.label }, "\u5F85\u529E\u626B\u63CF\u7ED3\u679C"),
+        React.createElement("span", { style: s.muted }, `${scanData.accounts.length} \u4E2A\u8D26\u53F7`)
+      ),
+      ...scanData.accounts.map(
+        (it) => React.createElement(
+          "div",
+          { key: it.uid, className: "dshc-row", style: { marginTop: 6 } },
+          React.createElement("span", { style: { ...s.label, minWidth: 0 } }, it.nickname || it.uid.slice(0, 8)),
+          it.growth?.length > 0 ? React.createElement(Tag, { text: `\u6210\u957F\u5F85\u529E ${it.growth.length}`, tone: "warn", title: it.growth.join(" \xB7 ") }) : React.createElement(Tag, { text: "\u6210\u957F\u65E0\u5F85\u529E", tone: "ok" }),
+          it.chances > 0 ? React.createElement(Tag, { text: `\u62BD\u5956 ${it.chances}`, tone: "info" }) : null,
+          it.growthErr ? React.createElement(Tag, { text: "\u6210\u957F\u67E5\u8BE2\u5931\u8D25", tone: "err", title: it.growthErr }) : null,
+          it.schoolErr ? React.createElement(Tag, { text: "\u5F00\u5B66\u5B63\u67E5\u8BE2\u5931\u8D25", tone: "err", title: it.schoolErr }) : null
+        )
+      )
+    ) : null,
+    queueData?.items?.length > 0 ? React.createElement(
+      "div",
+      { style: s.card },
+      React.createElement(
+        "div",
+        { className: "dshc-taskgrid-head" },
+        React.createElement("span", { style: s.label }, "\u6267\u884C\u961F\u5217\u660E\u7EC6"),
+        React.createElement("span", { style: s.muted }, `${doneCount}/${queueData.total}`)
       ),
       React.createElement(
         "div",
-        { className: "dshc-tblwrap" },
+        { className: "dshc-tblwrap", style: { marginTop: 8 } },
         React.createElement(
           "table",
           null,
@@ -1630,52 +2345,40 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
             React.createElement(
               "tr",
               null,
-              ...["\u4EFB\u52A1", "\u72B6\u6001", "\u6B21\u6570", "\u4E0A\u6B21\u5F00\u59CB", "\u8017\u65F6", "\u9519\u8BEF"].map(
-                (h) => React.createElement("th", { key: h }, h)
-              )
+              ...["\u8D26\u53F7", "\u4EFB\u52A1", "\u72B6\u6001", "\u8BF4\u660E"].map((h2) => React.createElement("th", { key: h2 }, h2))
             )
           ),
           React.createElement(
             "tbody",
             null,
-            ...TASK_DEFS.map((task) => {
-              const state = byName.get(task.name);
-              return React.createElement(
+            ...queueData.items.map(
+              (it, i) => React.createElement(
                 "tr",
-                { key: task.name },
-                React.createElement("td", null, `${task.icon} ${task.label}`),
+                { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
+                React.createElement("td", null, it.nickname || it.uid.slice(0, 8)),
+                React.createElement("td", { style: { ...s.code }, title: it.kind === "school" ? "\u5F00\u5B66\u5B63" : "\u6210\u957F" }, it.code),
                 React.createElement(
                   "td",
                   null,
                   React.createElement(Tag, {
-                    text: state?.running ? "\u8FD0\u884C\u4E2D" : state?.run_count > 0 ? "\u5DF2\u6267\u884C" : "\u672A\u6267\u884C",
-                    tone: state?.running ? "info" : state?.run_count > 0 ? "ok" : "idle"
+                    text: { pending: "\u5F85\u6267\u884C", running: "\u6267\u884C\u4E2D", done: "\u5B8C\u6210", skipped: "\u8DF3\u8FC7", error: "\u5931\u8D25" }[it.status] ?? it.status,
+                    tone: { done: "ok", error: "err", running: "info", skipped: "idle", pending: "idle" }[it.status] ?? "idle"
                   })
                 ),
-                React.createElement("td", null, String(state?.run_count ?? 0)),
-                React.createElement("td", null, state?.last_start ? relativeTime(state.last_start) : "\u2014"),
-                React.createElement(
-                  "td",
-                  null,
-                  typeof state?.duration_sec === "number" ? `${state.duration_sec.toFixed(1)}s` : "\u2014"
-                ),
-                React.createElement(
-                  "td",
-                  null,
-                  state?.last_error ? React.createElement("span", { style: { color: tone.err.fg } }, state.last_error.slice(0, 60)) : "\u2014"
-                )
-              );
-            })
+                React.createElement("td", { style: { ...s.muted, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: it.message || "" }, it.message || "\u2014")
+              )
+            )
           )
         )
       )
-    ),
-    // 签到的逐账号结果（chanhub 比 panel 强的一点：结构化结果可查）
-    React.createElement(CheckinOutcomesCard, { task: byName.get("checkin") }),
+    ) : null,
     // 开学季（真实子任务状态：来自网关 GET /v1/accounts/{uid}/school-tasks）
     React.createElement(SchoolTasksCard, {
-      schoolData: schoolForAccount(schoolData, accounts),
-      accountCount: (accounts || []).length,
+      schoolData: schoolData?.[schoolUid],
+      accounts,
+      byUid: schoolData,
+      selectedUid: schoolUid,
+      onSelectUid: setSchoolUid,
       running: runningName === "school",
       onRunTask,
       vouchersData,
@@ -1685,63 +2388,65 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
     }),
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
     React.createElement(GrowthTasksCard, {
-      growthData: growthForAccount(growthData, accounts),
-      accountCount: (accounts || []).length,
+      growthData: growthData?.[growthUid],
+      accounts,
+      byUid: growthData,
+      selectedUid: growthUid,
+      onSelectUid: setGrowthUid,
       onRefresh,
       onGrowthWrite,
       writeBusy: growthWriteBusy,
       adminAvailable
-    }),
-    // 按账号（保留主轴结构）
-    React.createElement(
-      "div",
-      { style: s.card },
-      React.createElement("div", { style: { ...s.label, marginBottom: 10 } }, "\u6309\u8D26\u53F7\u67E5\u770B"),
-      accounts.length === 0 ? React.createElement("div", { style: s.muted }, "\u6682\u65E0\u8D26\u53F7\u3002") : React.createElement(
-        "div",
-        null,
-        ...accounts.map(
-          (account) => React.createElement(AccountFold, {
-            key: account.uid,
-            account,
-            maxInFlight,
-            channel: channelOf(account),
-            onAction: () => {
-            },
-            busy: false,
-            scheduleConfig
-          })
-        )
-      )
-    )
+    })
   );
 }
-function firstGrowthAccountUid(growthByUid) {
-  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
-    if (entry?.available === true) return uid;
+function defaultAccountUid(byUid, accounts) {
+  for (const account of accounts ?? []) {
+    if (byUid?.[account.uid]?.available === true) return account.uid;
   }
-  for (const [uid, entry] of Object.entries(growthByUid ?? {})) {
-    if (entry) return uid;
+  for (const account of accounts ?? []) {
+    if (byUid?.[account.uid]) return account.uid;
   }
   return void 0;
 }
-function schoolForAccount(schoolByUid, accounts) {
-  for (const account of accounts ?? []) {
-    const entry = schoolByUid?.[account.uid];
-    if (entry && entry.available === true) return entry;
-  }
-  for (const account of accounts ?? []) {
-    const entry = schoolByUid?.[account.uid];
-    if (entry) return entry;
-  }
-  return void 0;
+function AccountPicker({ accounts, byUid, value, onChange, label = "\u8D26\u53F7" }) {
+  const list = accounts ?? [];
+  if (list.length <= 1) return null;
+  return React.createElement(
+    "div",
+    { className: "dshc-acctpick" },
+    React.createElement("span", { className: "dshc-acctpick-label" }, label),
+    ...list.map((account) => {
+      const entry = byUid?.[account.uid];
+      const dot = !entry ? tone.idle.fg : entry.available === true ? tone.ok.fg : tone.err.fg;
+      const name2 = account.nickname || account.uid.slice(0, 8);
+      const active = account.uid === value;
+      return React.createElement(
+        "button",
+        {
+          key: account.uid,
+          type: "button",
+          className: `dshc-acctpick-btn${active ? " on" : ""}`,
+          onClick: () => onChange(account.uid),
+          title: entry?.available === false ? `${name2}\uFF1A${entry.reason ?? "\u8BE5\u8D26\u53F7\u6570\u636E\u4E0D\u53EF\u7528"}` : name2
+        },
+        React.createElement("span", { className: "dshc-dot", style: { background: dot } }),
+        name2
+      );
+    })
+  );
+}
+function useSelectedUid(selected, byUid, accounts) {
+  const fallback = defaultAccountUid(byUid, accounts);
+  if (selected && byUid?.[selected]) return selected;
+  return fallback;
 }
 var SCHOOL_STATUS = {
   claimed: { text: "\u5DF2\u9886\u53D6", tone: "ok" },
   completed: { text: "\u5DF2\u5B8C\u6210", tone: "ok" },
   pending: { text: "\u5F85\u5B8C\u6210", tone: "warn" }
 };
-function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
+function SchoolTasksCard({ schoolData, accounts, byUid, selectedUid, onSelectUid, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
   if (schoolData && schoolData.available === false) {
     return React.createElement(Unavailable, {
       title: "\u5F00\u5B66\u5B63\u5B50\u4EFB\u52A1\u72B6\u6001",
@@ -1753,36 +2458,71 @@ function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, voucher
     return React.createElement(
       "div",
       { style: s.card },
-      React.createElement("div", { style: s.label }, "\u5F00\u5B66\u5B63\u5B50\u4EFB\u52A1\u72B6\u6001"),
+      React.createElement(CardHead, { title: "\u5F00\u5B66\u5B63" }),
       React.createElement("div", { style: { ...s.muted, marginTop: 8 } }, "\u52A0\u8F7D\u4E2D\u2026")
     );
   }
   const data = schoolData.school;
   const tasks = Array.isArray(data.tasks) ? data.tasks : [];
   const counts = data.counts ?? {};
+  const claimed = counts.claimed ?? 0;
+  const total = counts.total ?? tasks.length;
+  const stale = data.in_period === false;
   return React.createElement(
     "div",
     { style: s.card },
+    React.createElement(CardHead, {
+      title: "\u{1F393} \u5F00\u5B66\u5B63",
+      actions: [
+        React.createElement("button", {
+          key: "run",
+          type: "button",
+          className: `dshc-taskbtn${running ? " running" : ""}`,
+          style: { ...s.btnGhost, height: 26, padding: "0 10px", fontSize: 12 },
+          disabled: running,
+          onClick: () => onRunTask("school")
+        }, running ? "\u6267\u884C\u4E2D\u2026" : "\u6267\u884C"),
+        adminAvailable ? React.createElement("button", {
+          key: "vouchers",
+          type: "button",
+          style: { ...s.btnLink, fontSize: 12 },
+          disabled: vouchersLoading,
+          onClick: onViewVouchers,
+          title: "\u67E5\u8BE2\u5404\u8D26\u53F7\u62BD\u4E2D\u7684\u7B2C\u4E09\u65B9\u5238\u7801\uFF08KFC/\u745E\u5E78/\u9177\u72D7\u7B49\uFF0C\u53EA\u8BFB\uFF09"
+        }, vouchersLoading ? "\u67E5\u8BE2\u4E2D\u2026" : "\u5238\u7801") : null
+      ]
+    }),
+    // 账号选择器：逐账号数据必须能切换（此前固定显示第 1 个账号）
+    React.createElement(AccountPicker, {
+      accounts,
+      byUid,
+      value: selectedUid,
+      onChange: onSelectUid
+    }),
+    // 进度条 + 计数（比 "已领 4/5" 标签更直观，且一眼看出还剩多少）
     React.createElement(
       "div",
-      { className: "dshc-row", style: { justifyContent: "space-between" } },
-      React.createElement("div", { style: { ...s.label } }, "\u{1F393} \u5F00\u5B66\u5B63"),
+      { className: "dshc-row", style: { marginTop: 12 } },
       React.createElement(
-        "div",
-        { className: "dshc-row" },
-        React.createElement(Tag, {
-          text: data.in_period ? "\u6D3B\u52A8\u8FDB\u884C\u4E2D" : "\u6D3B\u52A8\u672A\u5F00\u59CB/\u5DF2\u7ED3\u675F",
-          tone: data.in_period ? "ok" : "warn",
-          title: data.in_period ? void 0 : "in_period=false\uFF1A\u4EE5\u4E0B\u72B6\u6001\u4E3A\u8FC7\u671F\u5FEB\u7167\uFF0C\u4E0D\u4EE3\u8868\u5F53\u524D\u53EF\u64CD\u4F5C"
-        }),
-        React.createElement(Tag, { text: `\u5DF2\u9886 ${counts.claimed ?? 0}/${counts.total ?? tasks.length}`, tone: "ok" }),
-        accountCount > 1 ? React.createElement(Tag, { text: `\u5F53\u524D\u663E\u793A\u7B2C 1 \u4E2A\u8D26\u53F7\uFF08\u5171 ${accountCount} \u4E2A\uFF09`, tone: "idle" }) : null
-      )
+        "span",
+        { className: "dshc-progress" },
+        React.createElement("span", {
+          style: {
+            width: `${total > 0 ? Math.round(claimed / total * 100) : 0}%`,
+            background: claimed >= total ? tone.ok.fg : "var(--dsw-alias-button-info-fill,#4176e6)"
+          }
+        })
+      ),
+      React.createElement("span", { style: { ...s.muted, whiteSpace: "nowrap" } }, `${claimed}/${total}`)
     ),
-    React.createElement("div", { style: { ...s.tip, marginTop: 8, marginBottom: 10 } }, INTUITION_FACTS.schoolSeason()),
-    tasks.length === 0 ? React.createElement("div", { style: s.muted }, "\u7F51\u5173\u672A\u8FD4\u56DE\u5B50\u4EFB\u52A1\u3002") : React.createElement(
+    stale ? React.createElement(
       "div",
-      { className: "dshc-sub" },
+      { style: { ...s.warn, marginTop: 10 } },
+      "\u6D3B\u52A8\u672A\u5F00\u59CB\u6216\u5DF2\u7ED3\u675F \u2014\u2014 \u4EE5\u4E0B\u4E3A\u8FC7\u671F\u5FEB\u7167\uFF0C\u4E0D\u4EE3\u8868\u5F53\u524D\u53EF\u64CD\u4F5C\u3002"
+    ) : null,
+    tasks.length === 0 ? React.createElement("div", { style: { ...s.muted, marginTop: 10 } }, "\u7F51\u5173\u672A\u8FD4\u56DE\u5B50\u4EFB\u52A1\u3002") : React.createElement(
+      "div",
+      { className: "dshc-sub", style: { marginTop: 12 } },
       ...tasks.map((task) => {
         const status = SCHOOL_STATUS[task.status] ?? { text: task.status ?? "\u2014", tone: "idle" };
         const done = ["claimed", "completed"].includes(task.status);
@@ -1790,243 +2530,91 @@ function SchoolTasksCard({ schoolData, accountCount, running, onRunTask, voucher
         const manual = task.task_code === "task_student_verify";
         return React.createElement(
           "div",
-          { key: task.task_code, className: "dshc-row", style: { marginBottom: 5 } },
+          { key: task.task_code, className: "dshc-srow" },
           React.createElement("span", {
             className: done ? "dshc-ck on" : manual ? "dshc-ck na" : "dshc-ck",
             title: done ? "\u5DF2\u9886\u53D6" : manual ? "\u4EBA\u5DE5\u9879\uFF08\u7F51\u5173\u4E0D\u53EF\u4EE3\u505A\uFF09" : status.text
           }, done ? "\u2713" : manual ? "\u2014" : "\u25CB"),
           React.createElement(
             "span",
-            { style: { ...s.label, minWidth: 0, flexGrow: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+            { className: "dshc-stitle", title: task.task_code },
             task.title || task.task_code
           ),
-          React.createElement("span", { style: { ...s.code, minWidth: 160 } }, task.task_code),
-          task.has_progress ? React.createElement("span", { style: { ...s.code, minWidth: 44, textAlign: "right" } }, `${task.current}/${task.target}`) : React.createElement("span", { style: { ...s.code, minWidth: 44, textAlign: "right" } }, "\u2014"),
-          React.createElement(Tag, { text: status.text, tone: status.tone }),
-          manual ? React.createElement(Tag, { text: "\u4EBA\u5DE5\u9879", tone: "idle" }) : null,
-          recurring ? React.createElement(Tag, { text: "\u6BCF\u65E5", tone: "info" }) : null
+          // 进度：claimed 但未满时（上游实测存在，如 desktop_chat_1_time 为
+          // claimed + 0/1）不隐藏也不改写 —— 如实显示，但加注说明这是上游口径，
+          // 避免与左侧「已领取」勾看起来自相矛盾。
+          React.createElement("span", {
+            className: `dshc-sprog${done && task.has_progress && task.current < task.target ? " odd" : ""}`,
+            ...done && task.has_progress && task.current < task.target ? { title: `\u4E0A\u6E38\u53E3\u5F84\uFF1A\u8BE5\u4EFB\u52A1\u5DF2\u9886\u53D6\uFF0C\u4F46\u8FDB\u5EA6\u8BA1\u6570\u4E3A ${task.current}/${task.target}` } : {}
+          }, task.has_progress ? `${task.current}/${task.target}` : "\u2014"),
+          React.createElement(
+            "span",
+            { className: "dshc-ssrc" },
+            recurring ? React.createElement(Tag, { text: "\u6BCF\u65E5", tone: "info" }) : null,
+            manual ? React.createElement(Tag, { text: "\u4EBA\u5DE5", tone: "idle" }) : null
+          ),
+          React.createElement(Tag, { text: status.text, tone: status.tone })
         );
       })
     ),
-    // recurring 任务的重置提示（已领但每日可再做）
-    tasks.some((task) => task.task_type === "recurring" && ["claimed", "completed"].includes(task.status) && task.next_unlock_at) ? React.createElement(
-      "div",
-      { style: { ...s.tip, marginTop: 10, lineHeight: 1.7 } },
-      "\u6807\u300C\u6BCF\u65E5\u300D\u7684\u4EFB\u52A1\u6BCF\u5929\u53EF\u5B8C\u6210\u4E00\u6B21\uFF1A\u4E0A\u9762\u663E\u793A\u7684\u662F**\u4ECA\u65E5**\u72B6\u6001\uFF0C\u660E\u65E5 00:00 \u91CD\u7F6E\u540E\u53EF\u518D\u505A",
-      "\uFF08\u811A\u672C /admin/tasks/school \u4F1A\u81EA\u52A8\u8865\u505A\uFF09\u3002"
-    ) : null,
-    React.createElement(
-      "div",
-      { style: s.block },
-      React.createElement(
-        "button",
-        {
-          type: "button",
-          style: { ...s.btnGhost, opacity: running ? 0.5 : 1 },
-          disabled: running,
-          onClick: () => onRunTask("school")
-        },
-        running ? "\u{1F393} \u6267\u884C\u4E2D\u2026" : "\u{1F393} \u6267\u884C\u5F00\u5B66\u5B63"
-      ),
-      adminAvailable ? React.createElement("button", {
-        type: "button",
-        style: { ...s.btnGhost, marginLeft: 8 },
-        disabled: vouchersLoading,
-        onClick: onViewVouchers,
-        title: "\u67E5\u8BE2\u5404\u8D26\u53F7\u62BD\u4E2D\u7684\u7B2C\u4E09\u65B9\u5238\u7801\uFF08KFC/\u745E\u5E78/\u9177\u72D7\u7B49\uFF0C\u53EA\u8BFB\uFF09"
-      }, vouchersLoading ? "\u67E5\u8BE2\u4E2D\u2026" : "\u{1F39F} \u6211\u7684\u5238\u7801") : null,
-      React.createElement(
-        "span",
-        { style: { ...s.muted, marginLeft: 10 } },
-        "\u811A\u672C\u6574\u4F53\u6267\u884C\uFF08\u70B9\u4EAE + \u9886\u5956 + \u62BD\u5956\uFF09\uFF0C\u6267\u884C\u540E\u5237\u65B0\u53EF\u89C1\u9010\u9879\u72B6\u6001\u53D8\u5316\u3002"
-      )
-    ),
-    // 券码视图（按需加载；panel 的「我的券码」对照能力，二维码不做 —— 弹窗形态
-    // 与宿主侧边栏不匹配，code 文本可复制即满足核销）。
+    // 券码（按需加载）：只读表格，折进结果区
     vouchersData ? React.createElement(
-      "div",
-      { className: "dshc-tblwrap", style: { marginTop: 10 } },
+      "details",
+      { className: "dshc-fold", style: { marginTop: 10 }, open: true },
+      React.createElement("summary", null, React.createElement("span", { style: s.label }, "\u5238\u7801")),
       React.createElement(
-        "table",
-        null,
+        "div",
+        { className: "dshc-body" },
         React.createElement(
-          "thead",
-          null,
+          "div",
+          { className: "dshc-tblwrap" },
           React.createElement(
-            "tr",
-            null,
-            ...["\u8D26\u53F7", "\u5956\u54C1", "\u5238\u7801", "\u6709\u6548\u671F"].map((h2) => React.createElement("th", { key: h2 }, h2))
-          )
-        ),
-        React.createElement(
-          "tbody",
-          null,
-          ...(function() {
-            const rows = [];
-            for (const r of vouchersData.rows ?? []) {
-              if ((r.vouchers ?? []).length === 0) continue;
-              for (const v of r.vouchers) {
-                rows.push(React.createElement(
-                  "tr",
-                  { key: `${r.uid}-${v.grant_id}` },
-                  React.createElement("td", null, r.nickname || r.uid.slice(0, 8)),
-                  React.createElement("td", null, v.prize_name || v.sku_code || "\u2014"),
-                  React.createElement("td", { style: { ...s.code, userSelect: "all" } }, v.code || "\u2014"),
-                  React.createElement("td", null, v.valid_to || "\u2014")
-                ));
-              }
-            }
-            if (rows.length === 0) {
-              rows.push(React.createElement(
-                "tr",
-                { key: "empty" },
-                React.createElement(
-                  "td",
-                  { colSpan: 4, style: { ...s.muted, textAlign: "center" } },
-                  "\u6682\u65E0\u5238\u7801\u8BB0\u5F55\u3002"
-                )
-              ));
-            }
-            return rows;
-          })()
-        )
-      )
-    ) : null,
-    React.createElement("div", { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, data.note ?? "")
-  );
-}
-function growthForAccount(growthByUid, accounts) {
-  for (const account of accounts ?? []) {
-    const entry = growthByUid?.[account.uid];
-    if (entry && entry.available === true) return entry;
-  }
-  for (const account of accounts ?? []) {
-    const entry = growthByUid?.[account.uid];
-    if (entry) return entry;
-  }
-  return void 0;
-}
-function TaskCenterCard({ adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }) {
-  if (!adminAvailable) {
-    return React.createElement(Unavailable, {
-      title: "\u4EFB\u52A1\u4E2D\u5FC3",
-      needs: "GET /admin/tasks/scan + POST /admin/tasks/queue/start\uFF08\u9700\u7F51\u5173\u5F00\u542F admin.enabled\uFF09",
-      hint: "\u4EFB\u52A1\u4E2D\u5FC3\u652F\u6301\u8DE8\u8D26\u53F7\u626B\u63CF\u5F85\u529E\u5E76\u6392\u961F\u6267\u884C\uFF08\u8D26\u53F7\u5185\u4E32\u884C\u3001\u8D26\u53F7\u95F4\u5E76\u53D1\uFF09\u3002"
-    });
-  }
-  const scanAccounts = scanData?.accounts ?? [];
-  const totalPending = scanAccounts.reduce(
-    (sum, it) => sum + (it.growth?.length ?? 0) + (it.school?.length > 0 ? 1 : 0),
-    0
-  );
-  const doneCount = (queueData?.items ?? []).filter((it) => it.status === "done" || it.status === "error").length;
-  return React.createElement(
-    "div",
-    { style: s.card },
-    React.createElement(
-      "div",
-      { className: "dshc-row", style: { justifyContent: "space-between" } },
-      React.createElement("div", { style: { ...s.label } }, "\u{1F5C2} \u4EFB\u52A1\u4E2D\u5FC3"),
-      React.createElement(
-        "div",
-        { className: "dshc-row" },
-        React.createElement("button", {
-          type: "button",
-          style: s.btnGhost,
-          disabled: scanning,
-          onClick: onScan,
-          title: "\u53EA\u8BFB\u626B\u63CF\uFF1A\u5217\u51FA\u6BCF\u4E2A\u8D26\u53F7\u672A\u5B8C\u6210\u4E14\u53EF\u81EA\u52A8\u5316\u7684\u4EFB\u52A1"
-        }, scanning ? "\u626B\u63CF\u4E2D\u2026" : "\u626B\u63CF\u5F85\u529E"),
-        React.createElement("button", {
-          type: "button",
-          style: s.btnGhost,
-          onClick: onQueueStart,
-          title: "\u628A\u626B\u63CF\u51FA\u7684\u5F85\u529E\u6392\u961F\u6267\u884C\uFF1A\u8D26\u53F7\u5185\u4E32\u884C\u3001\u8D26\u53F7\u95F4\u5E76\u53D1\uFF08\u81EA\u52A8\u9886\u5956\uFF09"
-        }, "\u6267\u884C\u961F\u5217")
-      )
-    ),
-    React.createElement(
-      "div",
-      { style: { ...s.muted, marginTop: 6, lineHeight: 1.7 } },
-      "\u626B\u63CF\u662F\u53EA\u8BFB\u7684\uFF1B\u300C\u6267\u884C\u961F\u5217\u300D\u6309\u626B\u63CF\u7ED3\u679C\u6392\u961F\uFF08\u5148 accept \u518D\u70B9\u4EAE\u52A8\u4F5C\u518D\u81EA\u52A8\u9886\u5956\uFF09\u3002\u5BF9\u8BDD\u7C7B\u7801\u4F1A\u771F\u5B9E\u53D1\u8D77\u5BF9\u8BDD\uFF08\u6D88\u8017\u5C11\u91CF\u989D\u5EA6\uFF09\u3002"
-    ),
-    // 队列进度（若已启动过）
-    queueData ? React.createElement(
-      "div",
-      { style: { marginTop: 10 } },
-      React.createElement(
-        "div",
-        { className: "dshc-row", style: { marginBottom: 6 } },
-        React.createElement(Tag, { text: queueData.running ? `\u6267\u884C\u4E2D ${doneCount}/${queueData.total}` : `\u5DF2\u7ED3\u675F ${doneCount}/${queueData.total}`, tone: queueData.running ? "info" : "ok" })
-      ),
-      React.createElement(
-        "div",
-        { className: "dshc-tblwrap" },
-        React.createElement(
-          "table",
-          null,
-          React.createElement(
-            "thead",
+            "table",
             null,
             React.createElement(
-              "tr",
+              "thead",
               null,
-              ...["\u8D26\u53F7", "\u7C7B\u578B", "\u4EFB\u52A1", "\u72B6\u6001", "\u8BF4\u660E"].map((h2) => React.createElement("th", { key: h2 }, h2))
-            )
-          ),
-          React.createElement(
-            "tbody",
-            null,
-            ...(queueData.items ?? []).map(
-              (it, i) => React.createElement(
+              React.createElement(
                 "tr",
-                { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
-                React.createElement("td", null, it.nickname || it.uid.slice(0, 8)),
-                React.createElement("td", null, it.kind === "school" ? "\u5F00\u5B66\u5B63" : "\u6210\u957F"),
-                React.createElement("td", { style: { ...s.code } }, it.code),
-                React.createElement(
-                  "td",
-                  null,
-                  React.createElement(Tag, {
-                    text: { pending: "\u5F85\u6267\u884C", running: "\u6267\u884C\u4E2D", done: "\u5B8C\u6210", skipped: "\u8DF3\u8FC7", error: "\u5931\u8D25" }[it.status] ?? it.status,
-                    tone: { done: "ok", error: "err", running: "info", skipped: "idle", pending: "idle" }[it.status] ?? "idle"
-                  })
-                ),
-                React.createElement("td", { style: { ...s.muted, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.message || "\u2014")
+                null,
+                ...["\u8D26\u53F7", "\u5956\u54C1", "\u5238\u7801", "\u6709\u6548\u671F"].map((h2) => React.createElement("th", { key: h2 }, h2))
               )
+            ),
+            React.createElement(
+              "tbody",
+              null,
+              ...(function() {
+                const rows = [];
+                for (const r of vouchersData.rows ?? []) {
+                  if ((r.vouchers ?? []).length === 0) continue;
+                  for (const v of r.vouchers) {
+                    rows.push(React.createElement(
+                      "tr",
+                      { key: `${r.uid}-${v.grant_id}` },
+                      React.createElement("td", null, r.nickname || r.uid.slice(0, 8)),
+                      React.createElement("td", null, v.prize_name || v.sku_code || "\u2014"),
+                      React.createElement("td", { style: { ...s.code, userSelect: "all" } }, v.code || "\u2014"),
+                      React.createElement("td", null, v.valid_to || "\u2014")
+                    ));
+                  }
+                }
+                if (rows.length === 0) {
+                  rows.push(React.createElement(
+                    "tr",
+                    { key: "empty" },
+                    React.createElement("td", { colSpan: 4, style: { ...s.muted, textAlign: "center" } }, "\u6682\u65E0\u5238\u7801\u3002")
+                  ));
+                }
+                return rows;
+              })()
             )
           )
         )
       )
-    ) : null,
-    // 扫描结果
-    scanAccounts.length > 0 ? React.createElement(
-      "div",
-      { style: { marginTop: 10 } },
-      ...scanAccounts.map(
-        (it) => React.createElement(
-          "div",
-          { key: it.uid, style: { marginBottom: 8 } },
-          React.createElement(
-            "div",
-            { className: "dshc-row" },
-            React.createElement("span", { style: { ...s.label, minWidth: 0 } }, it.nickname || it.uid.slice(0, 8)),
-            it.growth?.length > 0 ? React.createElement(Tag, { text: `\u6210\u957F\u5F85\u529E ${it.growth.length}`, tone: "warn" }) : React.createElement(Tag, { text: "\u6210\u957F\u65E0\u5F85\u529E", tone: "ok" }),
-            it.chances > 0 ? React.createElement(Tag, { text: `\u62BD\u5956 ${it.chances} \u6B21`, tone: "info" }) : null
-          ),
-          it.growth?.length > 0 ? React.createElement("div", { style: { ...s.code, marginLeft: 12, marginTop: 3 } }, it.growth.join(" \xB7 ")) : null,
-          it.growthErr ? React.createElement("div", { style: { ...s.muted, marginLeft: 12 } }, `\u6210\u957F\u67E5\u8BE2\u5931\u8D25\uFF1A${it.growthErr}`) : null,
-          it.schoolErr ? React.createElement("div", { style: { ...s.muted, marginLeft: 12 } }, `\u5F00\u5B66\u5B63\u67E5\u8BE2\u5931\u8D25\uFF1A${it.schoolErr}`) : null
-        )
-      )
-    ) : scanning ? null : React.createElement(
-      "div",
-      { style: { ...s.muted, marginTop: 8 } },
-      `\u5F85\u529E\u5408\u8BA1 ${totalPending} \u9879\uFF08\u672A\u626B\u63CF\u65F6\u663E\u793A 0\uFF0C\u4E0D\u4EE3\u8868\u6CA1\u6709\uFF09\u3002\u70B9\u300C\u626B\u63CF\u5F85\u529E\u300D\u67E5\u770B\u3002`
-    )
+    ) : null
   );
 }
-function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
+function GrowthTasksCard({ growthData, accounts, byUid, selectedUid, onSelectUid, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
   if (growthData && growthData.available === false) {
     return React.createElement(Unavailable, {
       title: "\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6\uFF08\u9010\u7801\uFF09",
@@ -2038,7 +2626,7 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, w
     return React.createElement(
       "div",
       { style: s.card },
-      React.createElement("div", { style: s.label }, "\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6"),
+      React.createElement(CardHead, { title: "\u6210\u957F\u4EFB\u52A1" }),
       React.createElement("div", { style: { ...s.muted, marginTop: 8 } }, "\u52A0\u8F7D\u4E2D\u2026")
     );
   }
@@ -2048,18 +2636,14 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, w
     return React.createElement(
       "div",
       { style: s.card },
-      React.createElement("div", { style: s.label }, "\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6"),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, marginTop: 8 } },
-        "\u7F51\u5173\u672A\u8FD4\u56DE\u4EFB\u4F55\u4EFB\u52A1\uFF08\u8D26\u53F7\u53EF\u80FD\u65E0\u6210\u957F\u4EFB\u52A1\u8D44\u683C\uFF09\u3002"
-      )
+      React.createElement(CardHead, { title: "\u6210\u957F\u4EFB\u52A1" }),
+      React.createElement("div", { style: { ...s.muted, marginTop: 8 } }, "\u8D26\u53F7\u53EF\u80FD\u65E0\u6210\u957F\u4EFB\u52A1\u8D44\u683C\u3002")
     );
   }
-  const active = tasks.filter((t) => t.has_progress && !["completed", "claimed"].includes(t.accept_status) && t.current < (t.target || 1));
-  const done = tasks.filter((t) => ["completed", "claimed"].includes(t.accept_status));
-  const noProgress = tasks.filter((t) => !t.has_progress);
-  const others = tasks.filter((t) => t.has_progress && !["completed", "claimed"].includes(t.accept_status) && t.current >= (t.target || 1));
+  const actionable = tasks.filter((t) => t.has_progress && !["completed", "claimed"].includes(t.accept_status) && t.current < (t.target || 1));
+  const claimable = tasks.filter((t) => ["completed", "claimed"].includes(t.accept_status) || t.has_progress && t.target > 0 && t.current >= t.target && t.accept_status !== "claimed");
+  const pending = tasks.filter((t) => !t.has_progress);
+  const claimableUnclaimed = claimable.filter((t) => t.accept_status !== "claimed");
   const statusTone = { claimed: "ok", completed: "ok", accepted: "info", in_progress: "info", not_accepted: "idle" };
   const statusLabel = {
     claimed: "\u5DF2\u9886\u53D6",
@@ -2069,186 +2653,235 @@ function GrowthTasksCard({ growthData, accountCount, onRefresh, onGrowthWrite, w
     not_accepted: "\u672A\u63A5\u53D7"
   };
   const renderRow = (t) => {
-    const progress = t.has_progress ? `${t.current}/${t.target}` : "\u2014";
+    const progress = t.has_progress ? `${t.current}/${t.target}` : null;
     const full = t.has_progress && t.target > 0 && t.current >= t.target;
     const claimed = t.accept_status === "claimed";
     const completed = t.accept_status === "completed";
     const busyThis = writeBusy === `${t.task_code}`;
-    const showAccept = adminAvailable && !claimed && !completed && !t.locked;
-    const showClaim = adminAvailable && (completed || full);
+    const showAccept = adminAvailable && !claimed && !completed && !t.locked && !full;
+    const showClaim = adminAvailable && (completed || full) && !claimed;
+    const badges = [];
+    if (t.from_mp) badges.push({ text: "\u5C0F\u7A0B\u5E8F", tone: "info" });
+    if (t.scheduled) badges.push({ text: `\u5B9A\u65F6 ${t.scheduled}`, tone: "info" });
+    if (t.locked) {
+      badges.push({
+        text: "\u672A\u89E3\u9501",
+        tone: "warn",
+        title: "\u4E0A\u6E38\u5BF9\u8BE5\u4EFB\u52A1\u6807\u8BB0\u4E3A\u672A\u5F00\u653E\uFF08locked\uFF09\uFF1A\u5F53\u524D\u4E0D\u53EF\u505A\uFF0C\u9762\u677F\u4E5F\u4E0D\u4F1A\u4EE3\u505A\u3002\u8FD9\u901A\u5E38\u662F\u4E0A\u6E38\u7684\u7070\u5EA6/\u8D44\u683C\u63A7\u5236\uFF0C\u4E0E\u8D26\u53F7\u72B6\u6001\u65E0\u5173\u3002"
+      });
+    }
     return React.createElement(
       "div",
-      { key: t.task_code, className: "dshc-row", style: { marginBottom: 5 } },
-      // 左侧色条：进行中未满 = 橙（提示还有活干），已满/已领 = 绿
+      { key: t.task_code, className: "dshc-growrow" },
       React.createElement("span", {
         className: "dshc-codebar",
-        style: { background: full || ["completed", "claimed"].includes(t.accept_status) ? tone.ok.fg : t.has_progress ? tone.warn.fg : "transparent" }
+        style: { background: full || claimed || completed ? tone.ok.fg : t.has_progress ? tone.warn.fg : "transparent" }
       }),
+      React.createElement("span", { className: "dshc-stitle", title: t.task_code }, t.title || t.task_code),
+      React.createElement("span", { className: "dshc-sprog" }, progress ?? "\u2014"),
       React.createElement(
         "span",
-        { style: { ...s.label, minWidth: 0, flexGrow: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-        t.title || t.task_code
+        { className: "dshc-ssrc" },
+        ...badges.map((b) => React.createElement(Tag, { key: b.text, text: b.text, tone: b.tone, title: b.title }))
       ),
-      React.createElement("span", { style: { ...s.code, minWidth: 84 } }, t.task_code),
-      React.createElement("span", { style: { ...s.code, minWidth: 46, textAlign: "right" } }, progress),
-      React.createElement(Tag, {
-        text: statusLabel[t.accept_status] ?? t.accept_status ?? "\u2014",
-        tone: statusTone[t.accept_status] ?? "idle"
-      }),
-      t.from_mp ? React.createElement(Tag, { text: "\u5C0F\u7A0B\u5E8F", tone: "info" }) : null,
-      t.scheduled ? React.createElement(Tag, { text: `\u5B9A\u65F6\u2192${t.scheduled}`, tone: "info" }) : null,
-      t.locked ? React.createElement(Tag, { text: "\u5DF2\u9501\u5B9A", tone: "warn" }) : null,
-      showAccept ? React.createElement("button", {
-        type: "button",
-        style: { ...s.btnGhost, height: 22, padding: "0 8px", fontSize: 11 },
-        disabled: busyThis,
-        onClick: () => onGrowthWrite("accept", t.task_code),
-        title: "\u5BF9\u4E0A\u6E38 accept \u8BE5\u7801\uFF08\u5F00\u59CB\u505A\uFF1B\u5BF9\u8BDD\u7C7B\u7801\u4F1A\u771F\u5B9E\u53D1\u8D77\u5BF9\u8BDD\uFF09"
-      }, busyThis ? "\u2026" : "\u70B9\u4EAE") : null,
-      showClaim ? React.createElement("button", {
-        type: "button",
-        style: { ...s.btnGhost, height: 22, padding: "0 8px", fontSize: 11 },
-        disabled: busyThis,
-        onClick: () => onGrowthWrite("claim", t.task_code),
-        title: "\u9886\u53D6\u8BE5\u7801\u5956\u52B1\uFF08\u5E42\u7B49\uFF1A\u91CD\u590D\u9886\u53D6\u8FD4\u56DE\u5DF2\u9886\u6001\uFF0C\u4E0D\u7B97\u5931\u8D25\uFF09"
-      }, busyThis ? "\u2026" : "\u9886\u53D6") : null
+      React.createElement(Tag, { text: statusLabel[t.accept_status] ?? t.accept_status ?? "\u2014", tone: statusTone[t.accept_status] ?? "idle" }),
+      React.createElement(
+        "span",
+        { className: "dshc-sact" },
+        showAccept ? React.createElement("button", {
+          type: "button",
+          style: { ...s.btnLink, fontSize: 12 },
+          disabled: busyThis,
+          onClick: () => onGrowthWrite("accept", t.task_code),
+          title: "\u5BF9\u4E0A\u6E38 accept \u8BE5\u7801\uFF08\u5F00\u59CB\u505A\uFF1B\u5BF9\u8BDD\u7C7B\u7801\u4F1A\u771F\u5B9E\u53D1\u8D77\u5BF9\u8BDD\uFF09"
+        }, busyThis ? "\u2026" : "\u70B9\u4EAE") : null,
+        showClaim ? React.createElement("button", {
+          type: "button",
+          style: { ...s.btnLink, fontSize: 12 },
+          disabled: busyThis,
+          onClick: () => onGrowthWrite("claim", t.task_code),
+          title: "\u9886\u53D6\u8BE5\u7801\u5956\u52B1\uFF08\u5E42\u7B49\uFF1A\u91CD\u590D\u9886\u53D6\u8FD4\u56DE\u5DF2\u9886\u6001\uFF0C\u4E0D\u7B97\u5931\u8D25\uFF09"
+        }, busyThis ? "\u2026" : "\u9886\u53D6") : null
+      )
     );
   };
+  const doneCount = claimable.length;
+  const coverage = codeCoverage();
   return React.createElement(
     "div",
     { style: s.card },
-    React.createElement(
-      "div",
-      { className: "dshc-row", style: { justifyContent: "space-between" } },
-      React.createElement("div", { style: { ...s.label } }, "\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6"),
-      accountCount > 1 ? React.createElement(Tag, {
-        text: `\u5F53\u524D\u663E\u793A\u7B2C 1 \u4E2A\u8D26\u53F7\uFF08\u5171 ${accountCount} \u4E2A\uFF09`,
-        tone: "idle",
-        title: "\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6\u662F\u9010\u8D26\u53F7\u7684\uFF1B\u5207\u6362\u8D26\u53F7\u9700\u5728\u8D26\u53F7\u6C60\u5C55\u5F00\u5BF9\u5E94\u8D26\u53F7\u3002\u591A\u8D26\u53F7\u7684\u8FDB\u5EA6\u53EF\u80FD\u4E0D\u540C\u3002"
-      }) : null,
-      React.createElement(
-        "div",
-        { className: "dshc-row" },
-        React.createElement(Tag, { text: `\u5DF2\u5B8C\u6210 ${done.length}/${tasks.length}`, tone: "ok" }),
-        active.length > 0 ? React.createElement(Tag, { text: `\u8FDB\u884C\u4E2D ${active.length}`, tone: "warn" }) : null,
-        // 「全部领取」：对当前 completed 未领的码逐个 claim（不自动 accept ——
-        // accept 会引发真实对话副作用链，是否点亮由用户逐码决定）。
+    React.createElement(CardHead, {
+      title: "\u6210\u957F\u4EFB\u52A1",
+      actions: [
         adminAvailable ? React.createElement("button", {
+          key: "claim-all",
           type: "button",
-          style: s.btnGhost,
-          disabled: writeBusy === "claim-claimable" || done.every((t) => t.accept_status === "claimed"),
+          style: { ...s.btnGhost, height: 26, padding: "0 10px", fontSize: 12 },
+          disabled: writeBusy === "claim-claimable" || claimableUnclaimed.length === 0,
           onClick: () => onGrowthWrite("claim-claimable"),
           title: "\u9886\u53D6\u5F53\u524D\u5168\u90E8\u5DF2\u5B8C\u6210\u672A\u9886\u7684\u5956\u52B1\uFF08\u5E42\u7B49\uFF09"
         }, writeBusy === "claim-claimable" ? "\u9886\u53D6\u4E2D\u2026" : "\u5168\u90E8\u9886\u53D6") : null,
-        React.createElement("button", { type: "button", style: s.btnLink, onClick: onRefresh }, "\u5237\u65B0")
-      )
-    ),
+        React.createElement("button", {
+          key: "refresh",
+          type: "button",
+          style: { ...s.btnLink, fontSize: 12 },
+          onClick: onRefresh
+        }, "\u5237\u65B0")
+      ]
+    }),
+    // 账号选择器：逐账号数据必须能切换（此前固定显示第 1 个账号）
+    React.createElement(AccountPicker, {
+      accounts,
+      byUid,
+      value: selectedUid,
+      onChange: onSelectUid
+    }),
     React.createElement(
       "div",
-      { style: { ...s.muted, marginTop: 6 } },
-      `\u6765\u6E90\uFF1A\u4E0A\u6E38\u6210\u957F\u4EFB\u52A1\u5217\u8868\uFF08\u7F51\u5173\u5DF2\u5408\u5E76\u9ED8\u8BA4\u4E0E\u5C0F\u7A0B\u5E8F\u4E24\u4E2A\u4E0B\u53D1\u53E3\u5F84${data.mp_error ? "\uFF1B\u5C0F\u7A0B\u5E8F\u53E3\u5F84\u67E5\u8BE2\u5931\u8D25\uFF1A" + data.mp_error : ""}\uFF09\u3002`,
-      INTUITION_FACTS.scheduledCoverage()
-    ),
-    // 进行中未满（最值得看的）
-    active.length > 0 ? React.createElement(
-      "div",
-      { style: s.block },
-      React.createElement("div", { style: { ...s.label, marginBottom: 6 } }, `\u8FDB\u884C\u4E2D\u672A\u6EE1\uFF08${active.length}\uFF09`),
-      ...active.map(renderRow)
-    ) : null,
-    // 已满但状态未推进（accepted 且进度已满 —— 通常点一次执行即可领）
-    others.length > 0 ? React.createElement(
-      "div",
-      { style: s.block },
-      React.createElement("div", { style: { ...s.label, marginBottom: 6 } }, `\u8FDB\u5EA6\u5DF2\u6EE1\uFF08${others.length}\uFF09`),
-      ...others.map(renderRow)
-    ) : null,
-    // 无进度对象（公益提问等，无法代做）
-    noProgress.length > 0 ? React.createElement(
-      "div",
-      { style: s.block },
-      React.createElement("div", { style: { ...s.label, marginBottom: 6 } }, `\u65E0\u8FDB\u5EA6\u6570\u636E\uFF08${noProgress.length}\uFF09`),
-      ...noProgress.map(renderRow),
+      { className: "dshc-row", style: { marginTop: 12 } },
       React.createElement(
-        "div",
-        { style: { ...s.muted, marginTop: 6 } },
-        "\u8FD9\u4E9B\u4EFB\u52A1\u4E0A\u6E38\u4E0D\u4E0B\u53D1\u8FDB\u5EA6\u5BF9\u8C61\uFF08\u901A\u5E38\u662F\u4E0D\u53EF\u4EE3\u505A\u7684\u771F\u5B9E\u884C\u4E3A\uFF0C\u5982\u516C\u76CA\u6350\u6B3E\uFF09\u3002"
-      )
-    ) : null,
-    // 已完成折叠
-    done.length > 0 ? React.createElement(
+        "span",
+        { className: "dshc-progress" },
+        React.createElement("span", {
+          style: {
+            width: `${tasks.length > 0 ? Math.round(doneCount / tasks.length * 100) : 0}%`,
+            background: doneCount >= tasks.length ? tone.ok.fg : "var(--dsw-alias-button-info-fill,#4176e6)"
+          }
+        })
+      ),
+      React.createElement("span", { style: { ...s.muted, whiteSpace: "nowrap" } }, `${doneCount}/${tasks.length}`),
+      actionable.length > 0 ? React.createElement(Tag, {
+        text: `\u5F85\u505A ${actionable.length}`,
+        tone: "warn",
+        title: "\u6709\u8FDB\u5EA6\u672A\u6EE1\u3001\u53EF\u7EE7\u7EED\u63A8\u52A8\u7684\u7801"
+      }) : null,
+      // 事实②（定时覆盖只有 2/24）压成一个 chip：它的内容是「别的码没有定时入口」，
+      // 逐行看不到（缺席不可见），故必须有一处汇总 —— 但一句话即可，不写整段散文。
+      React.createElement(Tag, {
+        text: `\u5B9A\u65F6\u8986\u76D6 ${coverage.scheduled}/${coverage.total}`,
+        tone: "idle",
+        title: `\u53EA\u6709 ${coverage.scheduled} \u4E2A\u7801\u6709\u5B9A\u65F6\u6392\u7A0B\uFF08chat_5 \u8D70\u6D3B\u8DC3\u5730\u56FE\u3001black_cat \u8D70\u591C\u732B\u5B50\uFF09\uFF1B\u5176\u4F59 ${coverage.unscheduled} \u4E2A\u6CA1\u6709\u4EFB\u4F55\u5B9A\u65F6\u5165\u53E3\uFF0C\u53EA\u80FD\u624B\u52A8\u70B9\u300C\u70B9\u4EAE\u300D\u3002`
+      })
+    ),
+    // 只有一类常驻展开：需要动手的。其余折叠。
+    actionable.length > 0 ? React.createElement(
+      "div",
+      { className: "dshc-rows", style: { marginTop: 12 } },
+      ...actionable.map(renderRow)
+    ) : React.createElement("div", { style: { ...s.muted, marginTop: 12 } }, "\u6CA1\u6709\u5F85\u505A\u7684\u7801\u3002"),
+    claimable.length > 0 ? React.createElement(
       "details",
       { className: "dshc-fold", style: { marginTop: 8 } },
       React.createElement(
         "summary",
         null,
-        React.createElement("span", { style: s.label }, `\u5DF2\u5B8C\u6210 / \u5DF2\u9886\u53D6\uFF08${done.length}\uFF09`),
-        React.createElement("span", { style: { ...s.muted, marginLeft: "auto" } }, "\u70B9\u5F00\u67E5\u770B")
+        React.createElement("span", { style: s.label }, "\u5DF2\u5B8C\u6210 / \u5DF2\u9886\u53D6"),
+        React.createElement("span", { style: { ...s.muted, marginLeft: "auto" } }, `${claimable.length} \u4E2A`)
       ),
-      React.createElement("div", { className: "dshc-body" }, ...done.map(renderRow))
+      React.createElement("div", { className: "dshc-body" }, ...claimable.map(renderRow))
     ) : null,
-    React.createElement("div", { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } }, data.note ?? "")
+    pending.length > 0 ? React.createElement(
+      "details",
+      { className: "dshc-fold" },
+      React.createElement(
+        "summary",
+        null,
+        React.createElement("span", { style: s.label }, "\u65E0\u8FDB\u5EA6\u6570\u636E"),
+        React.createElement("span", { style: { ...s.muted, marginLeft: "auto" } }, `${pending.length} \u4E2A`)
+      ),
+      React.createElement(
+        "div",
+        { className: "dshc-body" },
+        ...pending.map(renderRow),
+        React.createElement(
+          "div",
+          { style: { ...s.muted, marginTop: 6 } },
+          "\u4E0A\u6E38\u4E0D\u4E0B\u53D1\u8FDB\u5EA6\u5BF9\u8C61\uFF0C\u901A\u5E38\u662F\u4E0D\u53EF\u4EE3\u505A\u7684\u771F\u5B9E\u884C\u4E3A\uFF08\u5982\u516C\u76CA\u6350\u6B3E\uFF09\u3002"
+        )
+      )
+    ) : null
   );
 }
 function CheckinOutcomesCard({ task }) {
   const outcomes = task?.outcomes;
   if (!Array.isArray(outcomes) || outcomes.length === 0) return null;
   const summary = task.outcome_summary ?? {};
+  const attention = outcomes.filter((oc) => oc.status === "fail" || oc.status === "skipped");
   return React.createElement(
     "div",
     { style: s.card },
-    React.createElement(
-      "div",
-      { className: "dshc-row", style: { justifyContent: "space-between" } },
-      React.createElement("div", { style: s.label }, "\u7B7E\u5230\u9010\u8D26\u53F7\u7ED3\u679C"),
-      React.createElement(
-        "span",
-        { style: s.muted },
-        `${task.last_end ? relativeTime(task.last_end) : ""} \xB7 \u8017\u65F6 ${typeof task.duration_sec === "number" ? task.duration_sec.toFixed(1) : "\u2014"}s`
-      )
-    ),
+    React.createElement(CardHead, {
+      title: "\u7B7E\u5230",
+      extra: task.last_end ? `${relativeTime(task.last_end)}${typeof task.duration_sec === "number" ? " \xB7 " + formatDuration(task.duration_sec) : ""}` : void 0
+    }),
     React.createElement(
       "div",
       { className: "dshc-row", style: { marginTop: 10 } },
-      React.createElement(Tag, { text: `\u5171 ${summary.total ?? outcomes.length}`, tone: "idle" }),
       React.createElement(Tag, { text: `\u6210\u529F ${summary.ok ?? 0}`, tone: "ok" }),
       React.createElement(Tag, { text: `\u5DF2\u7B7E\u8FC7 ${summary.already ?? 0}`, tone: "info" }),
-      React.createElement(Tag, { text: `\u5931\u8D25 ${summary.fail ?? 0}`, tone: (summary.fail ?? 0) > 0 ? "err" : "idle" }),
-      React.createElement(Tag, { text: `\u8DF3\u8FC7 ${summary.skipped ?? 0}`, tone: "idle" })
+      (summary.fail ?? 0) > 0 ? React.createElement(Tag, { text: `\u5931\u8D25 ${summary.fail}`, tone: "err" }) : null,
+      (summary.skipped ?? 0) > 0 ? React.createElement(Tag, { text: `\u8DF3\u8FC7 ${summary.skipped}`, tone: "idle" }) : null,
+      React.createElement("span", { style: { ...s.muted, marginLeft: "auto" } }, `\u5171 ${summary.total ?? outcomes.length} \u4E2A`)
+    ),
+    ...attention.map(
+      (oc) => React.createElement(
+        "div",
+        { key: oc.uid, className: "dshc-row", style: { marginTop: 6 } },
+        React.createElement("span", { className: "dshc-dot", style: { background: oc.status === "fail" ? tone.err.fg : tone.idle.fg } }),
+        React.createElement("span", { style: { ...s.label, minWidth: 0 } }, oc.nickname || oc.uid.slice(0, 8)),
+        React.createElement("span", {
+          style: { ...s.muted, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+          title: oc.detail || ""
+        }, oc.detail || TASK_STATUS_LABEL[oc.status] || oc.status)
+      )
     ),
     React.createElement(
-      "div",
-      { className: "dshc-tblwrap", style: { marginTop: 10 } },
+      "details",
+      { className: "dshc-fold", style: { marginTop: 10 } },
       React.createElement(
-        "table",
+        "summary",
         null,
+        React.createElement("span", { style: s.label }, "\u9010\u8D26\u53F7\u660E\u7EC6"),
+        React.createElement("span", { style: { ...s.muted, marginLeft: "auto" } }, `${outcomes.length} \u4E2A\u8D26\u53F7`)
+      ),
+      React.createElement(
+        "div",
+        { className: "dshc-body" },
         React.createElement(
-          "thead",
-          null,
+          "div",
+          { className: "dshc-tblwrap" },
           React.createElement(
-            "tr",
+            "table",
             null,
-            ...["\u8D26\u53F7", "\u7ED3\u679C", "\u7B7E\u5230\u540E\u4F59\u989D", "\u8BF4\u660E"].map((h) => React.createElement("th", { key: h }, h))
-          )
-        ),
-        React.createElement(
-          "tbody",
-          null,
-          ...outcomes.map(
-            (oc) => React.createElement(
-              "tr",
-              { key: oc.uid },
-              React.createElement("td", null, oc.nickname || oc.uid.slice(0, 8)),
+            React.createElement(
+              "thead",
+              null,
               React.createElement(
-                "td",
+                "tr",
                 null,
-                React.createElement(Tag, {
-                  text: TASK_STATUS_LABEL[oc.status] ?? oc.status,
-                  tone: TASK_STATUS_TONE[oc.status] ?? "idle"
-                })
-              ),
-              React.createElement("td", null, typeof oc.credits === "number" ? formatNumber(oc.credits) : "\u2014"),
-              React.createElement("td", null, oc.detail || "\u2014")
+                ...["\u8D26\u53F7", "\u7ED3\u679C", "\u4F59\u989D", "\u8BF4\u660E"].map((h) => React.createElement("th", { key: h }, h))
+              )
+            ),
+            React.createElement(
+              "tbody",
+              null,
+              ...outcomes.map(
+                (oc) => React.createElement(
+                  "tr",
+                  { key: oc.uid },
+                  React.createElement("td", null, oc.nickname || oc.uid.slice(0, 8)),
+                  React.createElement(
+                    "td",
+                    null,
+                    React.createElement(Tag, {
+                      text: TASK_STATUS_LABEL[oc.status] ?? oc.status,
+                      tone: TASK_STATUS_TONE[oc.status] ?? "idle"
+                    })
+                  ),
+                  React.createElement("td", null, typeof oc.credits === "number" ? formatNumber(oc.credits) : "\u2014"),
+                  React.createElement("td", { style: { ...s.muted } }, oc.detail || "\u2014")
+                )
+              )
             )
           )
         )
@@ -2268,7 +2901,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
       React.createElement(
         "div",
         { className: "dshc-row", style: { justifyContent: "space-between" } },
-        React.createElement("div", { style: s.label }, "\u65F6\u5E8F\u5206\u6876"),
+        React.createElement("div", { style: s.label }, "\u7528\u91CF"),
         React.createElement(
           "div",
           { className: "dshc-row" },
@@ -2291,7 +2924,11 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
               option.label
             )
           ),
-          React.createElement("button", { type: "button", style: s.btnLink, onClick: onRefresh }, "\u5237\u65B0")
+          React.createElement(
+            "button",
+            { type: "button", style: { ...s.btnLink, padding: "0 4px" }, onClick: onRefresh, title: "\u5237\u65B0" },
+            React.createElement(Icons.refresh, null)
+          )
         )
       ),
       !bucketsAvailable ? React.createElement(
@@ -2299,8 +2936,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
         { style: { ...s.tip, marginTop: 10 } },
         usage?.reason ?? "\u7F51\u5173\u672A\u63D0\u4F9B\u5206\u6876\u7AEF\u70B9\uFF0C\u9700\u5728\u7F51\u5173\u4FA7\u652F\u6301 GET /v1/stats/buckets\u3002"
       ) : React.createElement(UsageBucketBody, { usage: usageData })
-    ),
-    React.createElement(ModelStatsCard, { stats })
+    )
   );
 }
 function UsageBucketBody({ usage }) {
@@ -2309,6 +2945,13 @@ function UsageBucketBody({ usage }) {
   }
   const buckets = usage.buckets ?? [];
   const maxRequests = Math.max(1, ...buckets.map((bucket) => bucket.requests));
+  const [dim, setDim] = React.useState("uid");
+  const dimRows = usage[`by_${dim}`] ?? [];
+  const dimMeta = {
+    uid: { label: "\u6309\u8D26\u53F7", columns: ["\u8D26\u53F7", "\u8BF7\u6C42", "\u5931\u8D25", "Tokens", "\u6263\u8D39", "\u5E73\u5747\u5EF6\u8FDF"] },
+    realm: { label: "\u6309\u57DF", columns: ["\u57DF", "\u8BF7\u6C42", "\u5931\u8D25", "Tokens", "\u6263\u8D39", "\u5E73\u5747\u5EF6\u8FDF"] },
+    model: { label: "\u6309\u6A21\u578B", columns: ["\u6A21\u578B", "\u8BF7\u6C42", "\u5931\u8D25", "Tokens", "\u6263\u8D39", "\u5E73\u5747\u5EF6\u8FDF"] }
+  };
   return React.createElement(
     "div",
     { style: { marginTop: 12 } },
@@ -2318,17 +2961,7 @@ function UsageBucketBody({ usage }) {
       { style: { ...s.warn, marginBottom: 10 } },
       "\u26A0\uFE0F \u5206\u6876\u952E\u5DF2\u8D85\u51FA\u5BB9\u91CF\u4E0A\u9650\uFF0C\u7F51\u5173\u5DF2\u964D\u7EA7\u4E3A\u300C\u69FD \xD7 \u57DF\u300D\u4E24\u7EF4 \u2014\u2014 \u6309\u8D26\u53F7 / \u6309\u6A21\u578B\u4E24\u4E2A\u7EF4\u5EA6\u5C06\u4E0D\u518D\u7EC6\u5206\u3002"
     ) : null,
-    // 合计
-    React.createElement(
-      "div",
-      { className: "dshc-five", style: { marginBottom: 12 } },
-      ...usageStat("\u603B\u8BF7\u6C42", usage.total?.requests ?? 0),
-      ...usageStat("\u6210\u529F", usage.total?.success ?? 0),
-      ...usageStat("\u5931\u8D25", usage.total?.failed ?? 0),
-      ...usageStat("Prompt tokens", usage.total?.prompt_tokens ?? 0),
-      ...usageStat("Completion tokens", usage.total?.completion_tokens ?? 0)
-    ),
-    // 时序柱
+    // 时序柱（渐变柱）
     buckets.length === 0 ? React.createElement(
       "div",
       { style: { ...s.muted, marginBottom: 12 } },
@@ -2338,99 +2971,36 @@ function UsageBucketBody({ usage }) {
       { style: { marginBottom: 14 } },
       React.createElement(
         "div",
-        { style: { ...s.muted, marginBottom: 6 } },
-        `\u5171 ${buckets.length} \u4E2A\u6876\uFF08\u7A97\u53E3 ${usage.window}\uFF09`
-      ),
-      React.createElement(
-        "div",
-        { className: "dshc-row", style: { alignItems: "flex-end", gap: 3, overflowX: "auto" } },
+        { className: "dshc-bars" },
         ...buckets.slice(-48).map(
           (bucket, index) => React.createElement("span", {
             key: `${bucket.slot}-${bucket.uid}-${bucket.model}-${index}`,
+            className: bucket.failed > 0 ? "bad" : "",
             title: `${bucket.slot} \xB7 ${bucket.uid ? bucket.uid.slice(0, 8) : "\u5168\u90E8\u8D26\u53F7"} \xB7 ${bucket.model || "\u5168\u90E8\u6A21\u578B"}
 \u8BF7\u6C42 ${bucket.requests} \xB7 \u5931\u8D25 ${bucket.failed} \xB7 tokens ${bucket.total_tokens}`,
-            style: {
-              width: 12,
-              flexShrink: 0,
-              height: Math.max(3, Math.round(bucket.requests / maxRequests * 60)),
-              background: bucket.failed > 0 ? tone.warn.fg : tone.ok.fg,
-              borderRadius: 2
-            }
+            style: { height: Math.max(3, Math.round(bucket.requests / maxRequests * 72)) }
           })
+        )
+      ),
+      React.createElement(
+        "div",
+        { className: "dshc-row", style: { marginTop: 6, justifyContent: "space-between" } },
+        React.createElement(
+          "span",
+          { style: { ...s.muted, fontSize: 11 } },
+          `\u8BF7\u6C42 ${formatNumber(usage.total?.requests ?? 0)} \xB7 \u5931\u8D25 ${formatNumber(usage.total?.failed ?? 0)} \xB7 tokens ${formatNumber(usage.total?.completion_tokens ?? 0)}`
         )
       )
     ),
-    ...["ByUID", "ByRealm", "ByModel"].map((key) => {
-      const label = { ByUID: "\u6309\u8D26\u53F7", ByRealm: "\u6309\u57DF", ByModel: "\u6309\u6A21\u578B" }[key];
-      const rows = usage[`by_${key.slice(2).toLowerCase()}`] ?? usage[key.toLowerCase()] ?? [];
-      return React.createElement(
-        "div",
-        { key, style: { marginBottom: 12 } },
-        React.createElement("div", { style: { ...s.label, marginBottom: 6 } }, label),
-        rows.length === 0 ? React.createElement("div", { style: s.muted }, "\u65E0\u6570\u636E") : React.createElement(
-          "div",
-          { className: "dshc-tblwrap" },
-          React.createElement(
-            "table",
-            null,
-            React.createElement(
-              "thead",
-              null,
-              React.createElement(
-                "tr",
-                null,
-                ...["\u952E", "\u8BF7\u6C42", "\u6210\u529F", "\u5931\u8D25", "Prompt", "Completion", "\u5408\u8BA1", "\u6263\u8D39", "\u5E73\u5747\u5EF6\u8FDF"].map(
-                  (h) => React.createElement("th", { key: h }, h)
-                )
-              )
-            ),
-            React.createElement(
-              "tbody",
-              null,
-              ...rows.map(
-                (row) => React.createElement(
-                  "tr",
-                  { key: row.key },
-                  React.createElement("td", null, row.key),
-                  React.createElement("td", null, formatNumber(row.requests ?? 0)),
-                  React.createElement("td", null, formatNumber(row.success ?? 0)),
-                  React.createElement("td", null, formatNumber(row.failed ?? 0)),
-                  React.createElement("td", null, formatNumber(row.prompt_tokens ?? 0)),
-                  React.createElement("td", null, formatNumber(row.completion_tokens ?? 0)),
-                  React.createElement("td", null, formatNumber(row.total_tokens ?? 0)),
-                  React.createElement("td", null, typeof row.credit === "number" ? row.credit.toFixed(4) : "\u2014"),
-                  React.createElement("td", null, `${(row.avg_latency_ms ?? 0).toFixed(0)} ms`)
-                )
-              )
-            )
-          )
-        )
-      );
-    }),
-    React.createElement("div", { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, usage.note ?? "")
-  );
-}
-function ModelStatsCard({ stats }) {
-  if (!stats) {
-    return React.createElement(Unavailable, {
-      title: "\u5168\u5C40\u6309\u6A21\u578B\u7EDF\u8BA1",
-      needs: "GET /v1/stats\uFF08\u672C\u7F51\u5173\u672A\u63D0\u4F9B\uFF09",
-      hint: "\u8BE5\u7AEF\u70B9\u5728 chanhub \u4E2D\u5DF2\u5B9E\u73B0\uFF08\u4EC5\u6309\u6A21\u578B\u805A\u5408\u3001\u4EC5\u5185\u5B58\uFF09\u3002"
-    });
-  }
-  const models = Array.isArray(stats.models) ? stats.models : [];
-  return React.createElement(
-    "div",
-    { style: s.card },
+    // 维度切换（单表）
     React.createElement(
       "div",
-      { className: "dshc-row", style: { justifyContent: "space-between" } },
-      React.createElement("div", { style: s.label }, "\u5168\u5C40\u6309\u6A21\u578B\u7EDF\u8BA1"),
-      React.createElement(Tag, { text: `\u8FD0\u884C ${formatDuration(stats.uptime_sec)}`, tone: "idle" })
+      { className: "dshc-row", style: { marginBottom: 6 } },
+      ...Object.entries(dimMeta).map(([key, meta]) => segmentButton(key, meta.label, dim, setDim))
     ),
-    models.length === 0 ? React.createElement("div", { style: { ...s.muted, marginTop: 10 } }, "\u6682\u65E0\u8BF7\u6C42\u8BB0\u5F55\u3002") : React.createElement(
+    dimRows.length === 0 ? React.createElement("div", { style: s.muted }, "\u65E0\u6570\u636E") : React.createElement(
       "div",
-      { className: "dshc-tblwrap", style: { marginTop: 10 } },
+      { className: "dshc-tblwrap" },
       React.createElement(
         "table",
         null,
@@ -2440,61 +3010,31 @@ function ModelStatsCard({ stats }) {
           React.createElement(
             "tr",
             null,
-            ...["\u6A21\u578B", "\u8BF7\u6C42", "\u6210\u529F", "\u5931\u8D25", "TTFB", "\u5EF6\u8FDF", "\u541E\u5410", "Prompt", "Completion", "\u7F13\u5B58\u547D\u4E2D", "\u6263\u8D39", "\u6700\u8FD1"].map(
-              (h) => React.createElement("th", { key: h }, h)
-            )
+            ...dimMeta[dim].columns.map((h) => React.createElement("th", { key: h }, h))
           )
         ),
         React.createElement(
           "tbody",
           null,
-          ...models.map(
-            (model) => React.createElement(
+          ...dimRows.map(
+            (row) => React.createElement(
               "tr",
-              { key: model.model },
-              React.createElement("td", null, model.model),
-              React.createElement("td", null, formatNumber(model.requests ?? 0)),
-              React.createElement("td", null, formatNumber(model.success ?? 0)),
-              React.createElement("td", null, formatNumber(model.failed ?? 0)),
-              React.createElement("td", null, `${(model.avg_ttfb_ms ?? 0).toFixed(0)} ms`),
-              React.createElement("td", null, `${(model.avg_latency_ms ?? 0).toFixed(0)} ms`),
-              React.createElement("td", null, (model.tokens_per_sec ?? 0).toFixed(1)),
-              React.createElement("td", null, formatNumber(model.prompt_tokens ?? 0)),
-              React.createElement("td", null, formatNumber(model.completion_tokens ?? 0)),
-              React.createElement("td", null, `${((model.cache_hit_rate ?? 0) * 100).toFixed(1)}%`),
-              React.createElement("td", null, typeof model.credit === "number" ? model.credit.toFixed(4) : "\u2014"),
-              React.createElement("td", null, relativeTime(model.last_seen))
+              { key: row.key },
+              React.createElement("td", null, row.key),
+              React.createElement("td", null, formatNumber(row.requests ?? 0)),
+              React.createElement("td", null, formatNumber(row.failed ?? 0)),
+              React.createElement("td", {
+                title: `Prompt ${formatNumber(row.prompt_tokens ?? 0)} \xB7 Completion ${formatNumber(row.completion_tokens ?? 0)}`
+              }, formatNumber(row.total_tokens ?? 0)),
+              React.createElement("td", null, typeof row.credit === "number" ? row.credit.toFixed(4) : "\u2014"),
+              React.createElement("td", null, `${(row.avg_latency_ms ?? 0).toFixed(0)} ms`)
             )
           )
         )
       )
     ),
-    React.createElement(
-      "div",
-      { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } },
-      "\u26A0\uFE0F \u8BE5\u8868\u7684\u4E24\u4E2A\u5C40\u9650\uFF1A**\u4EC5\u5185\u5B58**\uFF08\u8FDB\u7A0B\u91CD\u542F\u6E05\u96F6\uFF09\u3001**\u53EA\u6709\u6A21\u578B\u4E00\u7EF4**\uFF08\u65E0\u6CD5\u56DE\u7B54\u300C\u54EA\u4E2A\u8D26\u53F7\u7528\u4E86\u591A\u5C11\u300D\uFF09\u3002",
-      "\u4E0A\u9762\u7684\u5206\u6876\u89C6\u56FE\u8865\u4E0A\u4E86\u8D26\u53F7 / \u57DF / \u65F6\u5E8F\u4E09\u4E2A\u7EF4\u5EA6\u3002"
-    )
+    React.createElement("div", { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, usage.note ?? "")
   );
-}
-function usageStat(label, value) {
-  return [
-    React.createElement(
-      "div",
-      {
-        key: label,
-        style: {
-          background: "var(--dsw-alias-bg-layer-1,#fff)",
-          border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
-          borderRadius: 8,
-          padding: "8px 10px",
-          minWidth: 0
-        }
-      },
-      React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, label),
-      React.createElement("div", { style: { fontSize: 16, fontWeight: 600 } }, formatNumber(value))
-    )
-  ];
 }
 function LogsTab({ logs, logChannel, onChannelChange, onRefresh, onClear }) {
   if (logs && logs.available === false) {
@@ -2672,28 +3212,44 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
   return React.createElement(
     "div",
     null,
+    // 服务操作（置顶：重启网关 + 可写状态）
     React.createElement(
       "div",
       { style: s.card },
       React.createElement(
         "div",
         { className: "dshc-row", style: { justifyContent: "space-between" } },
-        React.createElement("div", { style: s.label }, "\u7F51\u5173\u914D\u7F6E\uFF08config.json \u5168\u91CF 53 \u9879\uFF09"),
-        React.createElement(Tag, {
-          text: editable ? "\u53EF\u5199" : "\u53EA\u8BFB",
-          tone: editable ? "ok" : "warn"
-        })
+        React.createElement(
+          "div",
+          { className: "dshc-row" },
+          React.createElement(
+            "span",
+            { style: { ...s.label, display: "flex", alignItems: "center", gap: 6 } },
+            React.createElement(Icons.bolt, { style: { width: 15, height: 15, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }),
+            "\u670D\u52A1\u64CD\u4F5C"
+          ),
+          React.createElement(Tag, {
+            text: editable ? "\u914D\u7F6E\u53EF\u5199" : "\u914D\u7F6E\u53EA\u8BFB",
+            tone: editable ? "ok" : "warn"
+          })
+        ),
+        React.createElement(
+          "button",
+          {
+            type: "button",
+            style: { ...s.btnGhost, borderColor: tone.warn.fg, color: tone.warn.fg },
+            disabled: serviceBusy,
+            onClick: onServiceControl
+          },
+          serviceBusy ? "\u91CD\u542F\u4E2D\u2026" : "\u21BB \u91CD\u542F\u7F51\u5173"
+        )
       ),
-      React.createElement(
+      serviceControlResult ? React.createElement(
         "div",
-        { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
-        `\u914D\u7F6E\u6587\u4EF6\uFF1A${configInfo?.path ?? "\u2014"}`
-      ),
-      configInfo?.reason ? React.createElement("div", { style: { ...s.warn, marginTop: 10 } }, configInfo.reason) : null,
-      !editable ? React.createElement(
-        "div",
-        { style: { ...s.tip, marginTop: 10 } },
-        "\u5F53\u524D\u4E3A\u53EA\u8BFB\uFF1A\u6539\u52A8\u4E0D\u4F1A\u88AB\u4FDD\u5B58\u3002\u5BB9\u5668\u90E8\u7F72\u5E38\u89C1 `./config.json:/app/config.json:ro`\uFF0C\u9700\u53BB\u6389 `:ro` \u540E\u91CD\u542F\u5BB9\u5668\u3002"
+        { style: { ...serviceControlResult.ok ? s.tip : s.err, marginTop: 10, lineHeight: 1.7 } },
+        serviceControlResult.ok ? `\u547D\u4EE4\u5DF2\u6267\u884C\uFF1A${serviceControlResult.command}` : `${serviceControlResult.message ?? "\u6267\u884C\u5931\u8D25"}`,
+        serviceControlResult.stdout ? React.createElement("div", { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stdout) : null,
+        serviceControlResult.stderr ? React.createElement("div", { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stderr) : null
       ) : null
     ),
     ...groups.map(
@@ -2714,7 +3270,7 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
         },
         React.createElement(
           "div",
-          null,
+          { className: "dshc-cfggrid" },
           ...group.fields.map(
             (field) => React.createElement(ConfigField, {
               key: field.path,
@@ -2775,45 +3331,7 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
       validation.restart.size > 0 ? React.createElement(
         "div",
         { style: { ...s.warn, marginTop: 10 } },
-        `\u5176\u4E2D ${validation.restart.size} \u9879\u5C5E\u4E8E\u300C\u9700\u91CD\u542F\u300D\u5B57\u6BB5 \u2014\u2014 chanhub \u6CA1\u6709\u914D\u7F6E\u70ED\u52A0\u8F7D\uFF0C\u4FDD\u5B58\u540E\u9700\u91CD\u542F\u7F51\u5173\u624D\u751F\u6548\u3002`
-      ) : null
-    ),
-    // 服务控制（放本 Tab 底部，与「需重启」说明同处）
-    React.createElement(
-      "div",
-      { style: s.card },
-      React.createElement("div", { style: { ...s.label, marginBottom: 8 } }, "\u{1F504} \u670D\u52A1\u63A7\u5236"),
-      React.createElement(
-        "div",
-        { style: { ...s.tip, marginBottom: 10, lineHeight: 1.7 } },
-        "chanhub \u81EA\u8EAB\u6CA1\u6709\u91CD\u542F\u80FD\u529B\uFF08\u65E0\u70ED\u52A0\u8F7D\u3001\u65E0 SIGHUP \u5904\u7406\uFF09\u3002\u91CD\u542F\u5FC5\u987B\u7531**\u63D2\u4EF6\u5BBF\u4E3B**\u6267\u884C\u672C\u673A\u547D\u4EE4\uFF0C",
-        "\u56E0\u6B64\u9ED8\u8BA4\u5173\u95ED\uFF1A\u9700\u5728\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u6253\u5F00 allowServiceControl \u5E76\u586B\u5199\u91CD\u542F\u547D\u4EE4\u3002"
-      ),
-      React.createElement(
-        "div",
-        { style: { ...s.code, background: "var(--dsw-alias-bg-layer-1,#fff)", padding: "8px 10px", borderRadius: 6 } },
-        "docker compose restart <\u670D\u52A1\u540D>   # \u767D\u540D\u5355\u524D\u7F00\u4E4B\u4E00"
-      ),
-      React.createElement(
-        "div",
-        { className: "dshc-row", style: { marginTop: 10 } },
-        React.createElement(
-          "button",
-          {
-            type: "button",
-            style: s.btnGhost,
-            disabled: serviceBusy,
-            onClick: onServiceControl
-          },
-          serviceBusy ? "\u6267\u884C\u4E2D\u2026" : "\u4E00\u952E\u91CD\u542F\u670D\u52A1"
-        )
-      ),
-      serviceControlResult ? React.createElement(
-        "div",
-        { style: { ...serviceControlResult.ok ? s.tip : s.err, marginTop: 10, lineHeight: 1.7 } },
-        serviceControlResult.ok ? `\u547D\u4EE4\u5DF2\u6267\u884C\uFF1A${serviceControlResult.command}` : `${serviceControlResult.message ?? "\u6267\u884C\u5931\u8D25"}`,
-        serviceControlResult.stdout ? React.createElement("div", { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stdout) : null,
-        serviceControlResult.stderr ? React.createElement("div", { style: { ...s.code, marginTop: 6 } }, serviceControlResult.stderr) : null
+        `\u5176\u4E2D ${validation.restart.size} \u9879\u9700\u91CD\u542F\u7F51\u5173\u751F\u6548\u3002`
       ) : null
     )
   );
@@ -2848,40 +3366,89 @@ function ConfigField({ field, value, error, dirty, disabled, onChange, onReset }
   } else {
     control = React.createElement("input", { ...inputProps, type: "text", placeholder: field.default ?? "" });
   }
+  const rowTitle = [field.path, field.default ? `\u9ED8\u8BA4 ${field.default}` : "", field.note ?? ""].filter(Boolean).join(" \xB7 ");
   return React.createElement(
     "div",
-    { style: { marginBottom: 10, minWidth: 0 } },
+    { className: `dshc-cfgrow${field.danger ? " danger" : ""}`, style: { flexWrap: field.note && field.danger ? "wrap" : "nowrap" } },
     React.createElement(
-      "div",
-      { className: "dshc-row", style: { marginBottom: 4 } },
-      React.createElement("span", { style: { ...s.label, minWidth: 150 } }, field.label),
-      React.createElement("span", { style: { ...s.code, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, field.path),
+      "label",
+      { title: rowTitle },
+      field.label,
+      field.restart !== false ? " \u21BB" : ""
+    ),
+    React.createElement(
+      "span",
+      { className: "dshc-cfgctl" },
+      control,
       dirty ? React.createElement(
         "span",
-        { style: { ...s.btnLink, cursor: "pointer" }, onClick: onReset, title: "\u8FD8\u539F\u4E3A\u5F53\u524D\u6587\u4EF6\u503C" },
+        { style: { ...s.btnLink, cursor: "pointer", flexShrink: 0 }, onClick: onReset, title: "\u8FD8\u539F\u4E3A\u5F53\u524D\u6587\u4EF6\u503C" },
         "\u8FD8\u539F"
-      ) : null,
-      field.danger ? React.createElement(Tag, { text: "\u5371\u9669\u8BED\u4E49", tone: "warn" }) : null,
-      field.restart !== false ? React.createElement(Tag, { text: "\u9700\u91CD\u542F", tone: "idle" }) : null,
-      field.type ? React.createElement(Tag, { text: field.type, tone: "idle" }) : null,
-      field.default ? React.createElement("span", { style: s.muted }, `\u9ED8\u8BA4 ${field.default}`) : null
+      ) : null
     ),
-    control,
-    field.note ? React.createElement(
-      "div",
-      {
-        style: {
-          ...s.muted,
-          marginTop: 4,
-          ...field.danger ? { color: tone.warn.fg } : {}
-        }
-      },
-      field.note
-    ) : null,
-    error ? React.createElement("div", { style: { ...s.muted, marginTop: 4, color: tone.err.fg } }, error) : null
+    field.danger ? React.createElement(Tag, { text: "\u5371\u9669", tone: "warn" }) : null,
+    error ? React.createElement("span", { style: { ...s.muted, color: tone.err.fg, flexBasis: "100%" } }, error) : null
   );
 }
-function TabBar({ active, onChange, statusText }) {
+function maskKey(value) {
+  if (!value) return "";
+  if (value.length <= 8) return "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+  return `${value.slice(0, 4)}\u2022\u2022\u2022\u2022${value.slice(-4)}`;
+}
+function ApiKeyPill({ onReveal }) {
+  const [plain, setPlain] = React.useState("");
+  const [revealed, setRevealed] = React.useState(false);
+  const display = revealed && plain ? plain : maskKey(plain || "sk-\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022");
+  const toggleEye = async () => {
+    if (revealed) {
+      setRevealed(false);
+      return;
+    }
+    let value = plain;
+    if (!value) {
+      value = await onReveal();
+      if (!value) return;
+      setPlain(value);
+    }
+    setRevealed(true);
+  };
+  const copyAll = async () => {
+    let value = plain;
+    if (!value) value = await onReveal();
+    if (!value) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+    } catch {
+    }
+  };
+  return React.createElement(
+    "span",
+    { className: "dshc-keypill", style: { marginLeft: "auto" }, onClick: copyAll, title: "\u70B9\u51FB\u590D\u5236\u5B8C\u6574 API Key" },
+    React.createElement("span", { style: { fontFamily: "ui-monospace,Menlo,monospace" } }, display),
+    React.createElement("button", {
+      type: "button",
+      className: "dshc-keypill-ico",
+      title: revealed ? "\u9690\u85CF" : "\u663E\u793A",
+      onClick: (e) => {
+        e.stopPropagation();
+        void toggleEye();
+      }
+    }, revealed ? React.createElement(Icons.eyeOff, null) : React.createElement(Icons.eye, null)),
+    React.createElement("span", { className: "dshc-keypill-ico", title: "\u590D\u5236" }, React.createElement(Icons.copy, null))
+  );
+}
+function TabBar({ active, onChange, statusText, onAdd }) {
   return React.createElement(
     "div",
     { className: "dshc-tabs" },
@@ -2916,11 +3483,20 @@ function TabBar({ active, onChange, statusText }) {
         label
       );
     }),
-    React.createElement(
+    // statusText 目前恒为空串（v2 把连接状态移到顶栏了），故条件渲染 ——
+    // 否则这个空 span 的 paddingLeft 会在「添加账号」左侧留下 12px 死空隙。
+    statusText ? React.createElement(
       "span",
       { style: { ...s.muted, marginLeft: "auto", paddingLeft: 12, whiteSpace: "nowrap" } },
       statusText
-    )
+    ) : null,
+    // 添加账号：与「账号池 … 配置」同一行、贴最右。是否渲染由 onAdd 是否存在决定。
+    onAdd ? React.createElement("button", {
+      type: "button",
+      className: "dshc-tabadd",
+      onClick: onAdd,
+      title: "OAuth \u8BBE\u5907\u6388\u6743\u767B\u5F55\uFF1A\u6D4F\u89C8\u5668\u5B8C\u6210\u6388\u6743\u540E\u81EA\u52A8\u843D\u76D8\u5E76\u70ED\u52A0\u8F7D\u8FDB\u6C60\uFF0C\u65E0\u9700\u91CD\u542F\u7F51\u5173"
+    }, "\uFF0B \u6DFB\u52A0\u8D26\u53F7") : null
   );
 }
 function ChanhubPanel({ rpcCall }) {
@@ -2933,6 +3509,8 @@ function ChanhubPanel({ rpcCall }) {
   const [creditsByUid, setCreditsByUid] = React.useState({});
   const [growthByUid, setGrowthByUid] = React.useState({});
   const [schoolByUid, setSchoolByUid] = React.useState({});
+  const [growthUid, setGrowthUid] = React.useState("");
+  const [schoolUid, setSchoolUid] = React.useState("");
   const [usage, setUsage] = React.useState(null);
   const [logs, setLogs] = React.useState(null);
   const [usageWindow, setUsageWindow] = React.useState("72h");
@@ -2940,6 +3518,7 @@ function ChanhubPanel({ rpcCall }) {
   const [runningTask, setRunningTask] = React.useState("");
   const [err, setErr] = React.useState("");
   const [refreshing, setRefreshing] = React.useState(false);
+  const [refreshDegraded, setRefreshDegraded] = React.useState("");
   const [busyAccount, setBusyAccount] = React.useState({});
   const [saving, setSaving] = React.useState(false);
   const [serviceBusy, setServiceBusy] = React.useState(false);
@@ -2972,7 +3551,7 @@ function ChanhubPanel({ rpcCall }) {
     setRefreshing(true);
     try {
       const [statusResult, configResult, accountsResult, statsResult, tasksResult, usageResult, logsResult] = await Promise.all([
-        rpcCall(ENDPOINTS.getStatus, {}),
+        rpcCall(ENDPOINTS.refreshStatus, {}),
         rpcCall(ENDPOINTS.getConfig, {}),
         rpcCall(ENDPOINTS.getAccounts, {}),
         rpcCall(ENDPOINTS.getStats, {}),
@@ -2987,6 +3566,7 @@ function ChanhubPanel({ rpcCall }) {
       }
       setErr("");
       setData(statusResult?.value ?? null);
+      setRefreshDegraded(statusResult?.value?.refreshed === false ? statusResult.value.refreshError?.message ?? "\u5237\u65B0\u672A\u751F\u6548" : "");
       setConfigInfo(configResult?.ok === false ? { ok: false, message: configResult?.error?.message } : configResult?.value ?? null);
       setAuthInfo(accountsResult?.value ?? null);
       setStats(statsResult?.value?.available ? statsResult.value.stats : null);
@@ -3043,20 +3623,6 @@ function ChanhubPanel({ rpcCall }) {
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
-  const [visible, setVisible] = React.useState(true);
-  React.useEffect(() => {
-    if (typeof document === "undefined") return void 0;
-    const handler = () => setVisible(!document.hidden);
-    document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
-  }, []);
-  React.useEffect(() => {
-    if (!visible) return void 0;
-    const timer = setInterval(() => {
-      void refresh();
-    }, 8e3);
-    return () => clearInterval(timer);
-  }, [visible, refresh]);
   const onAccountAction = React.useCallback(
     async (account, action) => {
       const endpoint = {
@@ -3132,6 +3698,25 @@ function ChanhubPanel({ rpcCall }) {
   const [taskQueueData, setTaskQueueData] = React.useState(null);
   const [vouchersData, setVouchersData] = React.useState(null);
   const [vouchersLoading, setVouchersLoading] = React.useState(false);
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [loginChannels, setLoginChannels] = React.useState(null);
+  const [loginRealms, setLoginRealms] = React.useState([]);
+  React.useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const result = await rpcCall(ENDPOINTS.getChannels, {});
+        if (!alive) return;
+        setLoginChannels(result?.value?.loginChannels ?? []);
+        setLoginRealms(result?.value?.realms ?? []);
+      } catch {
+        if (alive) setLoginChannels([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [rpcCall]);
   const onTaskScan = React.useCallback(
     async () => {
       setTaskScanning(true);
@@ -3206,6 +3791,31 @@ function ChanhubPanel({ rpcCall }) {
     },
     [rpcCall, refresh, showToast]
   );
+  const onLoginStart = React.useCallback(
+    async (channel, realm) => {
+      try {
+        const result = await rpcCall(ENDPOINTS.loginStart, { channel, realm });
+        if (result?.ok === false && channel === "workbuddy") {
+          const message = result.error?.message ?? "";
+          if (/unknown channel/i.test(message)) {
+            return { ok: false, error: { message: "\u8BE5\u7F51\u5173\u7248\u672C\u4E0D\u652F\u6301\u5728\u9762\u677F\u91CC\u6DFB\u52A0 workbuddy \u8D26\u53F7 \u2014\u2014 \u8BF7\u5347\u7EA7 chanhub \u7F51\u5173\u540E\u91CD\u8BD5\u3002" } };
+          }
+        }
+        return result;
+      } catch (error) {
+        return { ok: false, error: { message: String(error?.message ?? error) } };
+      }
+    },
+    [rpcCall]
+  );
+  const onLoginPoll = React.useCallback(
+    async (channel) => rpcCall(ENDPOINTS.loginPoll, { channel }),
+    [rpcCall]
+  );
+  const onLoginCallback = React.useCallback(
+    async (channel, callback) => rpcCall(ENDPOINTS.loginCallback, { channel, callback }),
+    [rpcCall]
+  );
   const onViewVouchers = React.useCallback(
     async () => {
       setVouchersLoading(true);
@@ -3224,9 +3834,12 @@ function ChanhubPanel({ rpcCall }) {
     },
     [rpcCall, showToast]
   );
+  const taskAccounts = data?.status?.accounts ?? [];
+  const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, taskAccounts);
+  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, taskAccounts);
   const onGrowthWrite = React.useCallback(
     async (action, code) => {
-      const uid = firstGrowthAccountUid(growthByUid);
+      const uid = effectiveGrowthUid;
       if (!uid) {
         showToast("\u6210\u957F\u4EFB\u52A1\u8FDB\u5EA6\u662F\u9010\u8D26\u53F7\u7684\uFF1A\u5F53\u524D\u6CA1\u6709\u53EF\u64CD\u4F5C\u7684\u8D26\u53F7\u6570\u636E\u3002");
         return;
@@ -3256,7 +3869,7 @@ function ChanhubPanel({ rpcCall }) {
         setGrowthWriteBusy("");
       }
     },
-    [rpcCall, refresh, showToast, growthByUid]
+    [rpcCall, refresh, showToast, effectiveGrowthUid]
   );
   const onRunTask = React.useCallback(
     async (name2) => {
@@ -3312,6 +3925,19 @@ function ChanhubPanel({ rpcCall }) {
   const status = data?.status;
   const maxInFlight = maxInFlightOf(configInfo?.config);
   const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
+  const onReveal = React.useCallback(async () => {
+    try {
+      const result = await rpcCall(ENDPOINTS.revealApiKey, {});
+      if (result?.ok === false) {
+        showToast(`\u83B7\u53D6\u5931\u8D25\uFF1A${result?.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        return "";
+      }
+      return String(result?.value?.apiKey ?? "");
+    } catch (error) {
+      showToast(`\u83B7\u53D6\u5931\u8D25\uFF1A${error?.message ?? error}`);
+      return "";
+    }
+  }, [rpcCall, showToast]);
   const statusText = (() => {
     if (data?.reachable === false) return "\u25CF \u672A\u8FDE\u63A5";
     if (data?.error) return `\u25CF ${data.error.code === "auth-failed" ? "\u9274\u6743\u5931\u8D25" : "\u5F02\u5E38"}`;
@@ -3325,49 +3951,79 @@ function ChanhubPanel({ rpcCall }) {
     "div",
     { style: { display: "flex", flexDirection: "column", gap: 0, minWidth: 0 } },
     React.createElement("style", null, FOLD_CSS),
-    // 顶部品牌行
+    // 顶栏（单行药丸条）：标题 + 连接状态 + API_KEY 药丸 + 刷新
     React.createElement(
       "div",
-      { style: { ...s.card, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" } },
-      React.createElement(Icons.gateway, { style: { color: "var(--dsw-alias-brand-primary,#4f6ef7)", width: 22, height: 22 } }),
+      { className: "dshc-topbar" },
+      React.createElement(Icons.hub, { style: { color: "var(--dsw-alias-brand-primary,#4f6ef7)", width: 20, height: 20, flexShrink: 0 } }),
+      React.createElement("span", { className: "dshc-topbar-title" }, "\u6E20\u9053\u4E2D\u5FC3"),
       React.createElement(
-        "div",
-        { style: { minWidth: 0, flexGrow: 1 } },
-        React.createElement("div", { style: { ...s.label, fontSize: 15 } }, "chanhub \u7F51\u5173\u9762\u677F"),
+        "span",
+        { className: "dshc-row", style: { gap: 6, marginLeft: 4 } },
+        React.createElement("span", {
+          className: "dshc-statusdot",
+          style: { background: data?.reachable === false || data?.error ? tone.err.fg : data?.reachable ? tone.ok.fg : tone.idle.fg }
+        }),
         React.createElement(
-          "div",
-          { style: s.muted },
-          "\u8D26\u53F7\u6C60 \xB7 \u79EF\u5206 \xB7 \u7194\u65AD\u51B7\u5374 \xB7 \u914D\u7F6E \u2014\u2014 \u6570\u636E\u76F4\u8FDE lament-z/chanhub\uFF08WorkBuddy2API\uFF09\u7F51\u5173"
+          "span",
+          { style: { ...s.muted, whiteSpace: "nowrap" } },
+          data?.reachable === true ? `\u5DF2\u8FDE\u63A5 ${(data.baseURL ?? "").replace(/^https?:\/\//, "")}` : data?.reachable === false ? "\u672A\u8FDE\u63A5" : data?.error ? "\u5F02\u5E38" : "\u52A0\u8F7D\u4E2D\u2026"
         )
       ),
-      React.createElement(Tag, {
-        text: statusText,
-        tone: data?.reachable === false || data?.error ? "err" : data?.reachable ? "ok" : "idle"
-      })
+      React.createElement(ApiKeyPill, { onReveal }),
+      React.createElement(
+        "button",
+        {
+          type: "button",
+          // 刷新反馈：图标旋转 + 文案切换 + 禁用态。此前只有 disabled（无任何视觉
+          // 差异），点下去看不出有没有生效 —— 与「刷新没反应」的报告一致。
+          style: { ...s.btnGhost, height: 26, padding: "0 10px", marginLeft: "auto", flexShrink: 0, gap: 5, opacity: refreshing ? 0.65 : 1 },
+          onClick: refresh,
+          disabled: refreshing,
+          title: refreshing ? "\u6B63\u5728\u5237\u65B0\u2026" : "\u5237\u65B0\u6570\u636E\uFF08\u91CD\u65B0\u62C9\u53D6\u8D26\u53F7\u3001\u4EFB\u52A1\u3001\u7528\u91CF\u3001\u65E5\u5FD7\uFF09"
+        },
+        React.createElement(
+          "span",
+          { className: refreshing ? "dshc-spin" : "" },
+          React.createElement(Icons.refresh, null)
+        ),
+        refreshing ? React.createElement("span", { style: { fontSize: 12 } }, "\u5237\u65B0\u4E2D\u2026") : null
+      )
     ),
-    // 不可达时的说明（区分「网关没起来」与「key 不对」——处置完全不同）
+    // 出错时的细警示条（仅出错时出现，替代原整卡说明）
     data?.reachable === false ? React.createElement(
       "div",
-      { style: { ...s.err, marginBottom: 14, lineHeight: 1.7 } },
-      `\u65E0\u6CD5\u8FDE\u63A5\u7F51\u5173\uFF1A${data.error?.message ?? "\u672A\u77E5\u539F\u56E0"}`,
-      React.createElement(
-        "div",
-        { style: { marginTop: 6 } },
-        "\u8BF7\u786E\u8BA4\u7F51\u5173\u5DF2\u542F\u52A8\u3001\u5730\u5740\u6B63\u786E\uFF0C\u5E76\u5728\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u914D\u7F6E apiKeyEnv\uFF08\u9ED8\u8BA4 WB2API_API_KEY\uFF09\u3002"
-      )
+      { style: { ...s.err, marginBottom: 12, lineHeight: 1.7 } },
+      `\u65E0\u6CD5\u8FDE\u63A5\u7F51\u5173\uFF1A${data.error?.message ?? "\u672A\u77E5\u539F\u56E0"} \u2014\u2014 \u8BF7\u786E\u8BA4\u7F51\u5173\u5DF2\u542F\u52A8\u3001\u5730\u5740\u6B63\u786E\u3002`
     ) : null,
     data?.reachable === true && data?.error ? React.createElement(
       "div",
-      { style: { ...s.err, marginBottom: 14, lineHeight: 1.7 } },
+      { style: { ...s.err, marginBottom: 12, lineHeight: 1.7 } },
       `\u7F51\u5173\u53EF\u8FBE\uFF0C\u4F46\u53D6\u72B6\u6001\u5931\u8D25\uFF1A${data.error.message}`,
-      data.error.code === "auth-failed" ? React.createElement(
-        "div",
-        { style: { marginTop: 6 } },
-        "\u7F51\u5173\u786E\u8BA4\u5728\u7EBF\uFF0C\u662F API key \u4E0D\u5339\u914D\u3002\u8BF7\u5728\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u6838\u5BF9 apiKeyEnv \u6307\u5411\u7684\u51ED\u8BC1\uFF0C\u6216\u7F51\u5173 config.json \u7684 api_key\u3002"
-      ) : null
+      data.error.code === "auth-failed" ? "\uFF08API key \u4E0D\u5339\u914D\uFF0C\u8BF7\u6838\u5BF9\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u51ED\u8BC1\uFF09" : ""
     ) : null,
-    err ? React.createElement("div", { style: { ...s.err, marginBottom: 14 } }, err) : null,
-    React.createElement(TabBar, { active: activeTab, onChange: setActiveTab, statusText }),
+    err ? React.createElement("div", { style: { ...s.err, marginBottom: 12 } }, err) : null,
+    // 刷新降级提示：网关没开 admin.enabled（或版本较旧）时刷新拿不到新余额，
+    // 显示的是缓存值。必须说出来 —— 否则用户会以为积分卡住了。
+    refreshDegraded ? React.createElement(
+      "div",
+      { style: { ...s.warn, marginBottom: 12, lineHeight: 1.7 } },
+      `\u79EF\u5206\u53EF\u80FD\u4E0D\u662F\u6700\u65B0\u7684\uFF1A${refreshDegraded}`,
+      React.createElement(
+        "div",
+        { style: { marginTop: 4 } },
+        "\u5728\u7F51\u5173 config.json \u91CC\u8BBE\u7F6E ",
+        React.createElement("code", { style: s.code }, "admin.enabled: true"),
+        " \u540E\u91CD\u542F\u7F51\u5173\uFF0C\u5237\u65B0\u5373\u53EF\u540C\u6B65\u6700\u65B0\u4F59\u989D\u3002"
+      )
+    ) : null,
+    // onAdd 为空（loginChannels 空数组 = 旧网关，或 null = 尚未探完）时不渲染按钮。
+    React.createElement(TabBar, {
+      active: activeTab,
+      onChange: setActiveTab,
+      statusText: "",
+      onAdd: loginChannels && loginChannels.length > 0 ? () => setAddOpen(true) : void 0
+    }),
     // Tab 内容
     activeTab === "accounts" ? React.createElement(AccountsTab, {
       status,
@@ -3376,13 +4032,9 @@ function ChanhubPanel({ rpcCall }) {
       onAction: onAccountAction,
       busy: busyAccount,
       onRefresh: refresh,
-      refreshing,
       error: "",
       creditsByUid,
       scheduleConfig: configInfo?.config?.schedule,
-      onRunTask,
-      runningName: runningTask,
-      taskData: tasks,
       onRemove: onRemoveAccount
     }) : null,
     activeTab === "tasks" ? React.createElement(TasksTab, {
@@ -3392,6 +4044,10 @@ function ChanhubPanel({ rpcCall }) {
       taskData: tasks,
       growthData: growthByUid,
       schoolData: schoolByUid,
+      growthUid: effectiveGrowthUid,
+      setGrowthUid,
+      schoolUid: effectiveSchoolUid,
+      setSchoolUid,
       onRunTask,
       runningName: runningTask,
       onRefresh: refresh,
@@ -3430,6 +4086,17 @@ function ChanhubPanel({ rpcCall }) {
       serviceControlResult: serviceResult,
       serviceBusy
     }) : null,
+    // 添加账号弹窗（OAuth 设备授权）。会话态在网关侧，故关掉弹窗不丢失在途登录；
+    // 重开只是重新发起——这是有意的：避免面板里藏一个不可见的后台轮询。
+    addOpen ? React.createElement(AddAccountDialog, {
+      channels: loginChannels ?? [],
+      realms: loginRealms,
+      onStart: onLoginStart,
+      onPoll: onLoginPoll,
+      onCallback: onLoginCallback,
+      onClose: () => setAddOpen(false),
+      onDone: refresh
+    }) : null,
     // 轻量提示条
     toast ? React.createElement(
       "div",
@@ -3465,7 +4132,7 @@ function apply(ctx) {
         name: "settings.section",
         id: "dsh-chanhub",
         order: 11,
-        label: () => "chanhub",
+        label: () => "\u6E20\u9053\u4E2D\u5FC3",
         inject: () => ({ rpcCall })
       },
       ChanhubPanel
