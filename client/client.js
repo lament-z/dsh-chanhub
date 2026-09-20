@@ -2234,6 +2234,10 @@ function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
 }
 function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
+  const accountsMap = React.useMemo(
+    () => new Map(accounts.map((account) => [account.uid, account])),
+    [accounts]
+  );
   const wbAccounts = accounts.filter((account) => (channelOf?.(account) ?? "workbuddy") === "workbuddy");
   const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
   const byName = new Map(taskList.map((task) => [task.task, task]));
@@ -2302,7 +2306,13 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
       ) : null
     ),
     // 签到逐账号结果：摘要常驻（一眼可见），明细折起（默认不占版面）。
-    React.createElement(CheckinOutcomesCard, { task: byName.get("checkin") }),
+    // 余额列取实时值（status.accounts[].credits —— 与账号池 Tab 同源，刷新时
+    // 网关已把余额写回池）：outcomes.credits 是任务执行那一刻的回读快照，
+    // 之后余额变化它不会自己变，两处会对不上（真机踩过：账号池 800 / 签到卡 650）。
+    React.createElement(CheckinOutcomesCard, {
+      task: byName.get("checkin"),
+      liveByUid: accountsMap
+    }),
     // 待办扫描 / 队列明细：只在有数据时出现，且折起。
     scanData?.accounts?.length > 0 ? React.createElement(
       "div",
@@ -2807,10 +2817,15 @@ function GrowthTasksCard({ growthData, accounts, byUid, selectedUid, onSelectUid
     ) : null
   );
 }
-function CheckinOutcomesCard({ task }) {
+function CheckinOutcomesCard({ task, liveByUid }) {
   const outcomes = task?.outcomes;
   if (!Array.isArray(outcomes) || outcomes.length === 0) return null;
   const summary = task.outcome_summary ?? {};
+  const balanceOf = (oc) => {
+    const live = liveByUid?.get?.(oc.uid);
+    if (typeof live?.credits === "number") return live.credits;
+    return typeof oc.credits === "number" ? oc.credits : null;
+  };
   const attention = outcomes.filter((oc) => oc.status === "fail" || oc.status === "skipped");
   return React.createElement(
     "div",
@@ -2883,7 +2898,7 @@ function CheckinOutcomesCard({ task }) {
                       tone: TASK_STATUS_TONE[oc.status] ?? "idle"
                     })
                   ),
-                  React.createElement("td", null, typeof oc.credits === "number" ? formatNumber(oc.credits) : "\u2014"),
+                  React.createElement("td", null, typeof balanceOf(oc) === "number" ? formatNumber(balanceOf(oc)) : "\u2014"),
                   React.createElement("td", { style: { ...s.muted } }, oc.detail || "\u2014")
                 )
               )

@@ -1205,6 +1205,11 @@ function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
  */
 function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
+  // uid → 账号实时快照（含 credits）：签到卡余额列的实时来源（与账号池同源）。
+  const accountsMap = React.useMemo(
+    () => new Map(accounts.map((account) => [account.uid, account])),
+    [accounts],
+  );
   // 成长任务/开学季是 workbuddy 专属能力（Trae/Qoder 渠道没有这套体系，
   // 网关 /v1/accounts/{uid}/growth-tasks、school-tasks 对非 workbuddy 恒 501）。
   // 选号器只列 workbuddy 账号；列表为空说明池里全是 trae/qoder，两张卡
@@ -1268,7 +1273,13 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
     ),
 
     // 签到逐账号结果：摘要常驻（一眼可见），明细折起（默认不占版面）。
-    React.createElement(CheckinOutcomesCard, { task: byName.get('checkin') }),
+    // 余额列取实时值（status.accounts[].credits —— 与账号池 Tab 同源，刷新时
+    // 网关已把余额写回池）：outcomes.credits 是任务执行那一刻的回读快照，
+    // 之后余额变化它不会自己变，两处会对不上（真机踩过：账号池 800 / 签到卡 650）。
+    React.createElement(CheckinOutcomesCard, {
+      task: byName.get('checkin'),
+      liveByUid: accountsMap,
+    }),
 
     // 待办扫描 / 队列明细：只在有数据时出现，且折起。
     scanData?.accounts?.length > 0
@@ -1811,10 +1822,18 @@ function GrowthTasksCard({ growthData, accounts, byUid, selectedUid, onSelectUid
   );
 }
 
-function CheckinOutcomesCard({ task }) {
+function CheckinOutcomesCard({ task, liveByUid }) {
   const outcomes = task?.outcomes;
   if (!Array.isArray(outcomes) || outcomes.length === 0) return null;
   const summary = task.outcome_summary ?? {};
+
+  // 余额列取实时值优先（liveByUid = status.accounts 快照，与账号池 Tab 同源），
+  // outcomes.credits（任务执行那一刻的回读）兜底：任务跑完后余额可能又变了。
+  const balanceOf = (oc) => {
+    const live = liveByUid?.get?.(oc.uid);
+    if (typeof live?.credits === 'number') return live.credits;
+    return typeof oc.credits === 'number' ? oc.credits : null;
+  };
 
   // 摘要常驻、明细折起：签到「多数号都成功」是常态，逐号表格常驻会挤掉下面
   // 更值得看的开学季/成长进度。失败与跳过的号才是要看的，故默认只展开它们。
@@ -1870,7 +1889,7 @@ function CheckinOutcomesCard({ task }) {
                       tone: TASK_STATUS_TONE[oc.status] ?? 'idle',
                     }),
                   ),
-                  React.createElement('td', null, typeof oc.credits === 'number' ? formatNumber(oc.credits) : '—'),
+                  React.createElement('td', null, typeof balanceOf(oc) === 'number' ? formatNumber(balanceOf(oc)) : '—'),
                   React.createElement('td', { style: { ...s.muted } }, oc.detail || '—'),
                 ),
               ),

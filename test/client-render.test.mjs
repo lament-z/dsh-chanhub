@@ -1376,6 +1376,44 @@ test('渲染：成长/开学季选号器过滤 trae/qoder 账号（workbuddy 专
   }
 });
 
+test('渲染：签到卡余额列显示实时值（status.accounts）而非任务快照', { skip }, async () => {
+  // 回归：outcomes.credits 是任务执行那一刻的回读快照，之后余额变化它不会
+  // 自己变——真机踩过「账号池显示 800、签到卡还是 650」。余额列应优先取
+  // status.accounts[].credits（账号池同源）。夹具里 status 的 uid-1 credits
+  // 是 2880、签到 outcome 快照故意写成 3000，两处不同才能区分数据源。
+  const base = realStatusFixture();
+  base.accounts[0].credits = 2880;
+  const rpc = async (endpoint, payload) => {
+    if (endpoint === 'getTasks') {
+      const fallback = await fakeRpc(base)(endpoint, payload);
+      fallback.value.tasks.tasks = fallback.value.tasks.tasks.map((t) =>
+        t.task === 'checkin'
+          ? { ...t, outcomes: t.outcomes.map((oc) => oc.uid === 'uid-1' ? { ...oc, credits: 3000 } : oc) }
+          : t);
+      return fallback;
+    }
+    return fakeRpc(base)(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await clickTab(document, '任务');
+    // 展开逐账号明细
+    const summary = [...document.querySelectorAll('.dshc-fold summary')].find((x) => x.textContent.includes('逐账号明细'));
+    assert.ok(summary, '缺逐账号明细折叠区');
+    await React.act(async () => {
+      summary.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    const html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('2,880'), '余额列应显示实时值 2880（status 同源）');
+    assert.ok(!html.includes('3,000'), '不应显示任务时刻的快照值 3000');
+  } finally {
+    await cleanup();
+  }
+});
+
 // ---- 「添加账号」在**真实面板**里的接线 ----
 //
 // D8 直接给 AddAccountDialog 喂 onStart，因此测不到 client/index.js 里
