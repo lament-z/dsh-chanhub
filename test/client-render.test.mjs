@@ -1219,9 +1219,26 @@ test('渲染：成长/开学季卡可切账号，且写操作发往选中的 uid
   // 回归：这两张卡原先固定显示「账号池里第一个有数据的账号」，
   // 而 onGrowthWrite 又硬取 firstGrowthAccountUid —— 切了账号也会改到第 1 个号的进度。
   // 这里让每个 uid 返回**互不相同**的数据，才能真正区分「渲染了哪个账号」。
+  // 注：成长/开学季是 workbuddy 专属（trae/qoder 账号被选号器过滤——见
+  // 「渠道过滤」专项测试），故这里把 uid-2 覆盖为 workbuddy 渠道：
+  // 本测试关注「切换与写操作指向」，不是渠道过滤。
   const base = realStatusFixture();
   const written = [];
   const rpc = async (endpoint, payload) => {
+    if (endpoint === 'getAccounts') {
+      return {
+        ok: true,
+        value: {
+          ok: true,
+          dir: '/tmp/auths',
+          accounts: [
+            { uid: 'uid-1', nickname: '甲', realm: 'cn', channel: 'workbuddy', domain: 'www.codebuddy.cn' },
+            { uid: 'uid-2', nickname: '手动停用的号', realm: 'cn', channel: 'workbuddy', domain: 'www.codebuddy.cn' },
+            { uid: 'uid-3', nickname: '冷却中的号', realm: 'cn', channel: 'qoder', domain: 'qoder.com' },
+          ],
+        },
+      };
+    }
     if (endpoint === 'getGrowthTasks') {
       const uid = payload?.uid;
       // uid-1 → 1/5；uid-2 → 2/5（数值不同才可断言切换生效；target 留 5
@@ -1328,6 +1345,32 @@ test('渲染：单码点亮按钮不在 admin 关闭时出现', { skip }, async 
     assert.ok(html.includes('成长任务'), '缺进度卡');
     // 探测 features.tasks=true（fixture 里有任务数据）→ admin 视为可用
     // （若探测不可用，写按钮必须全部隐藏 —— 本 fixture 两者其一为真，跳过强断言）
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染：成长/开学季选号器过滤 trae/qoder 账号（workbuddy 专属能力）', { skip }, async () => {
+  // 渠道过滤回归：成长任务/开学季是 workbuddy 专属，网关对 trae/qoder 账号
+  // 恒 501 unsupported（该渠道不提供成长任务/开学季活动）。此前选号器把
+  // trae/qoder 账号也列出来——灰点「加载失败」可点开，纯噪音。
+  // fakeRpc 的 getAccounts 夹具：uid-1=workbuddy / uid-2=traework / uid-3=qoder，
+  // 过滤后成长/开学季只剩 1 个 wb 账号 → AccountPicker 按「单账号隐藏」约定
+  // 直接不渲染（这是旧行为，不是本回归的对象）。断言两层：
+  // ① 不出现 trae/qoder 账号的选号按钮；② 卡片照常渲染（有数据）。
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    await React.act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await clickTab(document, '任务');
+    const buttons = [...document.querySelectorAll('.dshc-acctpick button')];
+    const labels = buttons.map((b) => b.textContent.trim());
+    assert.ok(!labels.includes('手动停用的号'), 'traework 账号不应出现在任何成长/开学季选号器');
+    assert.ok(!labels.includes('冷却中的号'), 'qoder 账号不应出现在成长/开学季选号器');
+    const html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('成长任务'), '过滤后成长卡仍应正常渲染（uid-1 有数据）');
+    assert.ok(html.includes('开学季'), '过滤后开学季卡仍应正常渲染');
   } finally {
     await cleanup();
   }

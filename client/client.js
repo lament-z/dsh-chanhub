@@ -2234,6 +2234,7 @@ function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
 }
 function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
+  const wbAccounts = accounts.filter((account) => (channelOf?.(account) ?? "workbuddy") === "workbuddy");
   const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
   const byName = new Map(taskList.map((task) => [task.task, task]));
   const doneCount = (queueData?.items ?? []).filter((it) => it.status === "done" || it.status === "error").length;
@@ -2373,9 +2374,13 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
       )
     ) : null,
     // 开学季（真实子任务状态：来自网关 GET /v1/accounts/{uid}/school-tasks）
+    // 账号列表按渠道过滤：成长任务/开学季是 workbuddy 专属（Trae/Qoder 无此体系，
+    // 网关侧恒 501 unsupported）。不过滤的话 trae/qoder 账号会在选号器里显示成
+    // 永远「加载失败」的灰点，且可被点开 —— 纯噪音。
+    // 全是 workbuddy 账号时传全量（保持原行为，AccountPicker 单账号自动隐藏）。
     React.createElement(SchoolTasksCard, {
       schoolData: schoolData?.[schoolUid],
-      accounts,
+      accounts: wbAccounts ?? accounts,
       byUid: schoolData,
       selectedUid: schoolUid,
       onSelectUid: setSchoolUid,
@@ -2389,7 +2394,7 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
     React.createElement(GrowthTasksCard, {
       growthData: growthData?.[growthUid],
-      accounts,
+      accounts: wbAccounts ?? accounts,
       byUid: growthData,
       selectedUid: growthUid,
       onSelectUid: setGrowthUid,
@@ -3509,6 +3514,10 @@ function ChanhubPanel({ rpcCall }) {
   const [creditsByUid, setCreditsByUid] = React.useState({});
   const [growthByUid, setGrowthByUid] = React.useState({});
   const [schoolByUid, setSchoolByUid] = React.useState({});
+  const channelOf = React.useMemo(
+    () => channelResolver(authInfo?.ok ? authInfo.accounts : []),
+    [authInfo]
+  );
   const [growthUid, setGrowthUid] = React.useState("");
   const [schoolUid, setSchoolUid] = React.useState("");
   const [usage, setUsage] = React.useState(null);
@@ -3835,8 +3844,9 @@ function ChanhubPanel({ rpcCall }) {
     [rpcCall, showToast]
   );
   const taskAccounts = data?.status?.accounts ?? [];
-  const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, taskAccounts);
-  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, taskAccounts);
+  const wbTaskAccounts = taskAccounts.filter((account) => (channelOf?.(account) ?? "workbuddy") === "workbuddy");
+  const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
+  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
   const onGrowthWrite = React.useCallback(
     async (action, code) => {
       const uid = effectiveGrowthUid;
@@ -3918,10 +3928,6 @@ function ChanhubPanel({ rpcCall }) {
       setServiceBusy(false);
     }
   }, [rpcCall]);
-  const channelOf = React.useMemo(
-    () => channelResolver(authInfo?.ok ? authInfo.accounts : []),
-    [authInfo]
-  );
   const status = data?.status;
   const maxInFlight = maxInFlightOf(configInfo?.config);
   const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;

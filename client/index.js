@@ -1205,6 +1205,11 @@ function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
  */
 function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
   const accounts = status?.accounts ?? [];
+  // 成长任务/开学季是 workbuddy 专属能力（Trae/Qoder 渠道没有这套体系，
+  // 网关 /v1/accounts/{uid}/growth-tasks、school-tasks 对非 workbuddy 恒 501）。
+  // 选号器只列 workbuddy 账号；列表为空说明池里全是 trae/qoder，两张卡
+  // 走「网关未提供」的降级分支而非无限加载。
+  const wbAccounts = accounts.filter((account) => (channelOf?.(account) ?? 'workbuddy') === 'workbuddy');
   // taskData 是宿主 getTasks 的 value，形如 {available, tasks:{tasks:[...]}}。
   // 逐层取并把非数组一律当空 —— 形状不符时降级为空表，而不是抛异常炸掉整个 Tab。
   const taskList = Array.isArray(taskData?.tasks?.tasks) ? taskData.tasks.tasks : [];
@@ -1319,9 +1324,13 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
       : null,
 
     // 开学季（真实子任务状态：来自网关 GET /v1/accounts/{uid}/school-tasks）
+    // 账号列表按渠道过滤：成长任务/开学季是 workbuddy 专属（Trae/Qoder 无此体系，
+    // 网关侧恒 501 unsupported）。不过滤的话 trae/qoder 账号会在选号器里显示成
+    // 永远「加载失败」的灰点，且可被点开 —— 纯噪音。
+    // 全是 workbuddy 账号时传全量（保持原行为，AccountPicker 单账号自动隐藏）。
     React.createElement(SchoolTasksCard, {
       schoolData: schoolData?.[schoolUid],
-      accounts,
+      accounts: wbAccounts ?? accounts,
       byUid: schoolData,
       selectedUid: schoolUid,
       onSelectUid: setSchoolUid,
@@ -1336,7 +1345,7 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
     React.createElement(GrowthTasksCard, {
       growthData: growthData?.[growthUid],
-      accounts,
+      accounts: wbAccounts ?? accounts,
       byUid: growthData,
       selectedUid: growthUid,
       onSelectUid: setGrowthUid,
@@ -2549,6 +2558,14 @@ function ChanhubPanel({ rpcCall }) {
   const [creditsByUid, setCreditsByUid] = React.useState({});
   const [growthByUid, setGrowthByUid] = React.useState({});
   const [schoolByUid, setSchoolByUid] = React.useState({});
+
+  // 渠道解析器：account → 'workbuddy' | 'traework' | 'qoder'。
+  // 供账号列表分组、以及成长任务/开学季卡的 workbuddy 过滤共用。
+  // 声明须在 wbTaskAccounts/effectiveGrowthUid 等首次使用之前（TDZ）。
+  const channelOf = React.useMemo(
+    () => channelResolver(authInfo?.ok ? authInfo.accounts : []),
+    [authInfo],
+  );
   // 逐账号卡各自记住选中的账号（两张卡独立 —— 开学季与成长任务的进度本就无关）。
   // 空串 = 未显式选择 → 由 useSelectedUid 给出默认（账号池顺序里第一个有数据的）。
   const [growthUid, setGrowthUid] = React.useState('');
@@ -2953,10 +2970,12 @@ function ChanhubPanel({ rpcCall }) {
 
   // 逐账号卡的有效选中 uid：用户显式选择优先；刷新后账号池变化导致选中失效时，
   // 回落到「账号池顺序里第一个有数据的账号」（而不是显示空白）。
+  // 成长任务/开学季是 workbuddy 专属：兜底选号只在 wb 账号里挑，避免默认选中
+  // trae/qoder 账号后卡片一直显示「加载失败」（网关对非 workbuddy 恒 501）。
   const taskAccounts = data?.status?.accounts ?? [];
-  const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, taskAccounts);
-  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, taskAccounts);
-
+  const wbTaskAccounts = taskAccounts.filter((account) => (channelOf?.(account) ?? 'workbuddy') === 'workbuddy');
+  const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
+  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
   /** 单码/批量成长码写操作（点亮 accept / 领取 claim / 全部领取）。 */
   const onGrowthWrite = React.useCallback(
     async (action, code) => {
@@ -3048,11 +3067,6 @@ function ChanhubPanel({ rpcCall }) {
       setServiceBusy(false);
     }
   }, [rpcCall]);
-
-  const channelOf = React.useMemo(
-    () => channelResolver(authInfo?.ok ? authInfo.accounts : []),
-    [authInfo],
-  );
 
   const status = data?.status;
   const maxInFlight = maxInFlightOf(configInfo?.config);
