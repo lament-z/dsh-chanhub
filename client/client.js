@@ -1238,6 +1238,11 @@ function earnedCredits(accounts = [], creditsByUid = {}) {
 }
 function accountExpiry({ account, authAccounts = [], creditsDetail, now = Date.now() }) {
   const uid = account?.uid;
+  const loginRaw = Number(account?.login_expires_at);
+  if (Number.isFinite(loginRaw) && loginRaw > 0) {
+    const at = loginRaw < 1e12 ? loginRaw * 1e3 : loginRaw;
+    return decorateExpiry(at, "credential", now);
+  }
   const auth = (Array.isArray(authAccounts) ? authAccounts : []).find((entry) => entry?.uid === uid);
   const raw = Number(auth?.expiresAt);
   if (Number.isFinite(raw) && raw > 0) {
@@ -5641,10 +5646,10 @@ function ExpiryChip({ expiry }) {
   const date = new Date(expiry.at);
   const pad = (value) => String(value).padStart(2, "0");
   const dayText = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  const prefix = expiry.kind === "credential" ? "\u5230\u671F" : "\u79EF\u5206\u5230\u671F";
+  const prefix = expiry.kind === "credential" ? "\u767B\u5F55\u5230\u671F" : "\u79EF\u5206\u5230\u671F";
   const left = expiry.days;
   const urgent = expiry.expired || left <= 3;
-  const title = expiry.kind === "credential" ? `\u767B\u5F55\u51ED\u8BC1\u5230\u671F\uFF1A${formatAbsolute(new Date(expiry.at).toISOString())}${expiry.expired ? "\uFF08\u5DF2\u8FC7\u671F\uFF09" : `\uFF08\u8FD8\u6709 ${left} \u5929\uFF09`}` : `\u6700\u65E9\u4E00\u6279\u79EF\u5206\u5230\u671F\uFF1A${dayText}${expiry.expired ? "\uFF08\u5DF2\u8FC7\u671F\uFF09" : `\uFF08\u8FD8\u6709 ${left} \u5929\uFF09`} \u2014\u2014 \u51ED\u8BC1\u5230\u671F\u65F6\u95F4\u672A\u80FD\u8BFB\u53D6\uFF08\u5BBF\u4E3B\u4E0E\u7F51\u5173\u4E0D\u540C\u673A\u65F6\u8BFB\u4E0D\u5230 auths \u76EE\u5F55\uFF09`;
+  const title = expiry.kind === "credential" ? `\u767B\u5F55\u6001\u5230\u671F\uFF08\u8FC7\u671F\u540E\u9700\u91CD\u65B0\u767B\u5F55\uFF09\uFF1A${formatAbsolute(new Date(expiry.at).toISOString())}${expiry.expired ? "\uFF08\u5DF2\u8FC7\u671F\uFF09" : `\uFF08\u8FD8\u6709 ${left} \u5929\uFF09`}` : `\u6700\u65E9\u4E00\u6279\u79EF\u5206\u5230\u671F\uFF1A${dayText}${expiry.expired ? "\uFF08\u5DF2\u8FC7\u671F\uFF09" : `\uFF08\u8FD8\u6709 ${left} \u5929\uFF09`} \u2014\u2014 \u767B\u5F55\u6001\u5230\u671F\u65F6\u95F4\u672A\u80FD\u53D6\u5F97\uFF08\u7F51\u5173\u672A\u900F\u51FA login_expires_at \u4E14\u8BFB\u4E0D\u5230\u51ED\u8BC1\u76EE\u5F55\uFF09`;
   return React.createElement("span", {
     className: `dshc-chip${urgent ? " dshc-chip-warn" : " dshc-chip-dim"}`,
     title

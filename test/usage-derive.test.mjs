@@ -396,10 +396,34 @@ test('U23 earnedCredits：只算取到明细的账号，缺明细的绝不拿余
   assert.deepEqual(earnedCredits([], {}), { total: 0, used: 0, remain: 0, covered: 0, missing: 0, count: 0 });
 });
 
-test('U24 accountExpiry：凭证到期优先，降级取最早积分到期，都没有则 null', () => {
+test('U24 accountExpiry：登录态到期优先（网关透出），其次凭证盘点，降级取最早积分到期，都没有则 null', () => {
   const now = Date.parse('2026-09-21T12:00:00Z');
   const tomorrow = Math.floor(now / 1000) + 86400;
-  // ① 凭证到期（Unix 秒）
+  // ⓪ 登录态到期：网关 /status 透出的 login_expires_at（Unix 秒）—— 权威来源。
+  //    关键场景：插件与网关不同机、auths 目录读不到时，只有它能给出账号真实到期日。
+  const viaLogin = accountExpiry({
+    account: { uid: 'a', login_expires_at: tomorrow },
+    authAccounts: [],
+    now,
+  });
+  assert.equal(viaLogin.kind, 'credential', 'login_expires_at 必须识别为登录态到期');
+  assert.equal(viaLogin.days, 1, '整整 24 小时后到期 → 1 天');
+  assert.equal(viaLogin.expired, false);
+  // ⓪b login_expires_at 优先于同机凭证盘点（两者都在时以网关透出为准）
+  const both = accountExpiry({
+    account: { uid: 'a', login_expires_at: tomorrow },
+    authAccounts: [{ uid: 'a', expiresAt: tomorrow + 86400 * 10 }],
+    now,
+  });
+  assert.equal(both.days, 1, 'login_expires_at 应压过 auths 盘点的 expiresAt');
+  // ⓪c 老网关给毫秒时按量级判定（不硬乘 1000）
+  const viaMillis = accountExpiry({
+    account: { uid: 'a', login_expires_at: (tomorrow) * 1000 },
+    authAccounts: [],
+    now,
+  });
+  assert.equal(viaMillis.days, 1, '毫秒量级也要正确换算');
+  // ① 凭证到期（Unix 秒）—— 网关未透出 login_expires_at 时的同源兜底
   const viaAuth = accountExpiry({
     account: { uid: 'a' },
     authAccounts: [{ uid: 'a', expiresAt: tomorrow }],

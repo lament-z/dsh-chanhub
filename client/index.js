@@ -975,8 +975,10 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
 /**
  * 到期小标签。
  *
- * 文案刻意带**语义前缀**（「到期」vs「积分到期」）：账号整体失效与「一批
- * 积分要作废」是两件事，混成一个「到期」会让人以为号要没了。
+ * 文案刻意带**语义前缀**（「登录到期」vs「积分到期」）：账号整体失效（需重新登录）
+ * 与「一批积分要作废」是两件事，混成一个「到期」会让人分不清是号没了还是分没了。
+ * 「登录到期」正是判断「账号可用到什么时候 / 续期是否成功」的依据 —— 续期成功后
+ * 这个日期会往后推。
  * 近 3 天内（含已过期）转警示色 —— 这是唯一需要抢注意力的情形。
  *
  * @param props - `{expiry}`：`accountExpiry()` 的输出。
@@ -986,13 +988,13 @@ function ExpiryChip({ expiry }) {
   const date = new Date(expiry.at);
   const pad = (value) => String(value).padStart(2, '0');
   const dayText = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  const prefix = expiry.kind === 'credential' ? '到期' : '积分到期';
+  const prefix = expiry.kind === 'credential' ? '登录到期' : '积分到期';
   const left = expiry.days;
   const urgent = expiry.expired || left <= 3;
   const title = expiry.kind === 'credential'
-    ? `登录凭证到期：${formatAbsolute(new Date(expiry.at).toISOString())}${expiry.expired ? '（已过期）' : `（还有 ${left} 天）`}`
+    ? `登录态到期（过期后需重新登录）：${formatAbsolute(new Date(expiry.at).toISOString())}${expiry.expired ? '（已过期）' : `（还有 ${left} 天）`}`
     : `最早一批积分到期：${dayText}${expiry.expired ? '（已过期）' : `（还有 ${left} 天）`}`
-      + ' —— 凭证到期时间未能读取（宿主与网关不同机时读不到 auths 目录）';
+      + ' —— 登录态到期时间未能取得（网关未透出 login_expires_at 且读不到凭证目录）';
   return React.createElement('span', {
     className: `dshc-chip${urgent ? ' dshc-chip-warn' : ' dshc-chip-dim'}`,
     title,

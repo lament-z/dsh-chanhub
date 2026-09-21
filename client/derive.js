@@ -322,13 +322,17 @@ export function earnedCredits(accounts = [], creditsByUid = {}) {
 /**
  * 账号「什么时候到期」。
  *
- * 两个真实来源，按可信度取先者：
- *   1. **凭证到期**（`auths/*.json` 的 `expiresAt`，宿主只读盘点透出）——
- *      这才是「账号什么时候到期」：登录态过期后该号整体失效。
- *   2. **积分到期**（逐套餐明细里最近的 `expire_at`，只取还有余额的）——
- *      凭证不可读（插件与网关不同机）时的降级来源，语义是「最早一批积分作废」。
+ * 三个真实来源，按可信度取先者：
+ *   1. **登录态到期**（`/status` 的 `accounts[].login_expires_at`，网关直接透出）——
+ *      权威来源：这才是「这个账号什么时候到期」——登录态过期后该号整体失效、
+ *      需重新登录（续期成功后该时刻后推）。网关自己持有凭证，因此**恒可透出**，
+ *      不依赖插件宿主能否读到 auths 目录。
+ *   2. **凭证到期**（`auths/*.json` 的 `expiresAt`，宿主只读盘点透出）——与 ① 同源，
+ *      仅当网关版本较旧（尚未透出 ①）且恰好同机可读时的兜底。
+ *   3. **积分到期**（逐套餐明细里最近的 `expire_at`，只取还有余额的）——
+ *      前两者都不可得时的最后降级，语义是「最早一批积分作废」，**不是账号到期**。
  *
- * 两个都没有 → 返回 `null`：由 UI 显示「—」或干脆不渲染，不编造「永不过期」。
+ * 三个都没有 → 返回 `null`：由 UI 显示「—」或干脆不渲染，不编造「永不过期」。
  *
  * @param props - `{account, authAccounts, creditsDetail, now}`。
  *   `creditsDetail` 是 `creditsByUid[uid]`（含 `{available, credits:{items}}`）。
@@ -337,8 +341,15 @@ export function earnedCredits(accounts = [], creditsByUid = {}) {
 export function accountExpiry({ account, authAccounts = [], creditsDetail, now = Date.now() }) {
   const uid = account?.uid;
 
-  // ① 凭证到期：expiresAt 是 Unix **秒**（真机实测 1792591200）；个别网关可能
-  //    给毫秒，按量级判定而不是硬乘 1000。
+  // ① 登录态到期：网关 /status 透出的 login_expires_at（Unix 秒，老网关给毫秒时
+  //    按量级判定而不是硬乘 1000）。
+  const loginRaw = Number(account?.login_expires_at);
+  if (Number.isFinite(loginRaw) && loginRaw > 0) {
+    const at = loginRaw < 1e12 ? loginRaw * 1000 : loginRaw;
+    return decorateExpiry(at, 'credential', now);
+  }
+
+  // ② 宿主凭证盘点透出的 expiresAt（同机部署时的同源兜底）
   const auth = (Array.isArray(authAccounts) ? authAccounts : []).find((entry) => entry?.uid === uid);
   const raw = Number(auth?.expiresAt);
   if (Number.isFinite(raw) && raw > 0) {
@@ -346,7 +357,7 @@ export function accountExpiry({ account, authAccounts = [], creditsDetail, now =
     return decorateExpiry(at, 'credential', now);
   }
 
-  // ② 积分到期：最近的、还有余额的套餐到期日
+  // ③ 积分到期：最近的、还有余额的套餐到期日
   const items = creditsDetail?.available === true ? creditsDetail?.credits?.items : undefined;
   if (Array.isArray(items)) {
     let nearest = NaN;
