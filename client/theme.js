@@ -8,7 +8,10 @@
 /** 卡片 / 按钮 / 标签等共享样式（与 dsh-bridge-gateway 对齐并扩充）。 */
 export const s = {
   card: {
-    background: 'var(--dsw-alias-bg-layer-2,#f9fafb)',
+    // 参考 dsh-usage-panel / dsh-token-monitor：卡片用 layer-1（白）浮在灰页面上。
+    // 原先用 layer-2（比页面更暗）会让卡片「后退」，整页发闷 —— 这是本轮
+    // 「差点意思」的主要来源之一。
+    background: 'var(--dsw-alias-bg-layer-1,#fff)',
     border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
     borderRadius: 12,
     padding: '16px 18px',
@@ -117,7 +120,7 @@ export const s = {
   kpi: {
     border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
     borderRadius: 10,
-    background: 'var(--dsw-alias-bg-layer-2,#f9fafb)',
+    background: 'var(--dsw-alias-bg-layer-1,#fff)',
     padding: '10px 12px',
     minWidth: 0,
     boxSizing: 'border-box',
@@ -199,7 +202,7 @@ export const FOLD_CSS = `
 .dshc-tblwrap { overflow-x: auto; min-width: 0; }
 .dshc-tblwrap > table { min-width: 600px; border-collapse: collapse; width: 100%; font-size: 12px; }
 .dshc-tblwrap th { text-align: left; font-weight: 500; color: var(--dsw-alias-label-tertiary,#8b93a1); padding: 6px 8px; border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); white-space: nowrap; }
-.dshc-tblwrap td { padding: 6px 8px; border-bottom: 1px solid var(--dsw-alias-border-l2,#f3f4f6); color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-tblwrap td { padding: 6px 8px; border-bottom: 1px solid var(--dsw-alias-border-l2,#f3f4f6); color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
 .dshc-codebar { width: 3px; border-radius: 2px; align-self: stretch; flex-shrink: 0; }
 .dshc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .dshc-palette { display: inline-flex; align-items: center; max-width: 420px; min-width: 80px; height: 12px; border-radius: 3px; overflow: hidden; flex-grow: 1; background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
@@ -243,6 +246,54 @@ export const FOLD_CSS = `
    —— 它是常驻入口，不该随 Tab 横向滚动而消失。 */
 .dshc-tabadd { position: sticky; right: 0; flex-shrink: 0; align-self: center; margin: 0 0 4px 8px; font: inherit; cursor: pointer; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dsw-alias-button-info-fill,#4176e6); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-button-info-fill,#4176e6); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
 .dshc-tabadd:hover { background: var(--dsw-alias-bg-layer-2,#eef2ff); }
+/* 数字排版：等宽数位（tabular-nums）—— 参考实现同款。
+   不做等宽时，KPI 与表格里的数字宽度随内容跳动，横排数字对不齐。 */
+.dshc-num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; letter-spacing: -.02em; }
+/* 热力图（GitHub 式）：周为列、周一→周日为行，顶部月份、左侧星期。 */
+.dshc-heat-wrap { display: flex; align-items: flex-start; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.dshc-heat-wrap::-webkit-scrollbar { display: none; }
+.dshc-heat-days { display: grid; grid-template-rows: repeat(7, 1fr); gap: 3px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-heat-main { min-width: 0; flex: 1 1 auto; }
+.dshc-heat-months { display: grid; gap: 3px; height: 13px; margin-bottom: 3px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-heat-months > span { white-space: nowrap; overflow: hidden; }
+.dshc-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; }
+.dshc-heat > i { width: 11px; height: 11px; border-radius: 2.5px; display: block; }
+.dshc-heat > i.blank { background: transparent; }
+.dshc-heat > i:hover { box-shadow: 0 0 0 1px var(--dsw-alias-border-l2,#d5d5d5); }
+/* 分位色阶（参考实现的蓝 ramp；深浅主题各一套） */
+.dshc-heat > i.h0 { background: var(--dsw-alias-bg-layer-2,#f1f4f9); }
+.dshc-heat > i.h1 { background: #dbeafe; }
+.dshc-heat > i.h2 { background: #93c5fd; }
+.dshc-heat > i.h3 { background: #3b82f6; }
+.dshc-heat > i.h4 { background: #1d4ed8; }
+body[data-ds-dark-theme] .dshc-heat > i.h0 { background: #1f2937; }
+body[data-ds-dark-theme] .dshc-heat > i.h1 { background: #1e3a8a; }
+body[data-ds-dark-theme] .dshc-heat > i.h2 { background: #2563eb; }
+body[data-ds-dark-theme] .dshc-heat > i.h3 { background: #3b82f6; }
+body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
+.dshc-heat-legend { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-left: auto; }
+.dshc-heat-legend > i { width: 11px; height: 11px; border-radius: 2.5px; display: inline-block; }
+/* 入场动效（数字 count-up 由 JS 驱动；此条只为热力图的逐列淡入） */
+@keyframes dshc-heat-in { from { opacity: 0 } to { opacity: 1 } }
+.dshc-heat > i.anim { animation: dshc-heat-in .45s linear both; }
+/* 尊重系统「减少动态效果」：参考实现同款处理 */
+@media (prefers-reduced-motion: reduce) {
+  .dshc-heat > i.anim { animation: none; }
+}
+/* 模型环形图 + 排行列表 */
+.dshc-models { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.dshc-donut { flex-shrink: 0; }
+.dshc-donut-seg { cursor: pointer; transition: stroke-width .15s; }
+.dshc-donut-seg.dim { opacity: .35; }
+.dshc-donut-total { fill: var(--dsw-alias-label-primary,currentColor); font-size: 17px; font-weight: 700; }
+.dshc-donut-cap { fill: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 10px; }
+.dshc-mlist { flex: 1 1 200px; min-width: 180px; }
+.dshc-mrow { display: flex; align-items: center; gap: 9px; padding: 6px 2px; font-size: 12px; min-width: 0; }
+.dshc-mrow + .dshc-mrow { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
+.dshc-mrow > i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.dshc-mname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-mtok { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
+.dshc-mpct { width: 52px; text-align: right; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; }
 /* 紧凑段控（窗口 / 指标 / 视图 / 维度切换共用）。
    与 .dshc-viewtoggle 的分工：那一款是「页级」视图切换（较大），本款是页内的
    轻量选择器 —— 边框只有 1px 且无外发光，让内容而非控件成为视觉主角。 */
@@ -260,7 +311,7 @@ export const FOLD_CSS = `
 /* KPI 行（可点击的统计格） */
 .dshc-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
 /* 渠道三卡 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
@@ -403,7 +454,7 @@ export const FOLD_CSS = `
 /* 环形百分比 */
 .dshc-uring { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-uring { grid-template-columns: 1fr; } }
-.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; text-align: center; min-width: 0; }
+.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 12px 14px; text-align: center; min-width: 0; }
 .dshc-uring svg { display: block; margin: 0 auto; }
 .dshc-uring .rv { font-size: 17px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-uring .rl { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-top: 2px; }
@@ -418,7 +469,7 @@ export const FOLD_CSS = `
 /* 英雄区 */
 .dshc-uhero { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 10px; }
 @media (max-width: 820px) { .dshc-uhero { grid-template-columns: 1fr; } }
-.dshc-ustock { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; min-width: 0; }
+.dshc-ustock { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 12px 14px; min-width: 0; }
 .dshc-ustock .big { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--dsw-alias-state-success-primary,#059669); }
 .dshc-uchans { display: flex; margin-top: 10px; border-top: 1px solid var(--dsw-alias-border-l2,#e5e7eb); padding-top: 8px; }
 .dshc-uchans > div { flex: 1; min-width: 0; text-align: center; border-right: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }

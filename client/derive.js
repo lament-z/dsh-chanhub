@@ -560,32 +560,6 @@ export function usageBySlot(buckets) {
 }
 
 /**
- * 按模型聚合分桶行（堆叠面积用）。
- *
- * @param buckets - buckets 数组。
- * @returns `{slots:[slot...], models:[{key,total,values:[...]}]}`；`values` 与 `slots` 对齐。
- */
-export function usageBySlotAndModel(buckets) {
-  const bySlot = usageBySlot(buckets);
-  const slots = bySlot.map((row) => row.slot);
-  const index = new Map(slots.map((slot, i) => [slot, i]));
-  const table = new Map();
-  for (const row of Array.isArray(buckets) ? buckets : []) {
-    if (!row || typeof row.slot !== 'string' || index.has(row.slot) === false) continue;
-    const key = typeof row.model === 'string' && row.model !== '' ? row.model : '-';
-    let entry = table.get(key);
-    if (!entry) {
-      entry = { key, total: 0, values: new Array(slots.length).fill(0) };
-      table.set(key, entry);
-    }
-    const requests = Number(row.requests) || 0;
-    entry.values[index.get(row.slot)] += requests;
-    entry.total += requests;
-  }
-  return { slots, models: [...table.values()].sort((a, b) => b.total - a.total) };
-}
-
-/**
  * 归因表占比与派生列。
  *
  * @param rows - `by_uid` / `by_realm` / `by_model` 之一。
@@ -814,4 +788,154 @@ export function usageSeriesByKey(buckets, field) {
     series.get(useKey)[slotIndex] += Number(row.requests) || 0;
   }
   return { slots, series };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   热力图 / 环形图派生（参考 dsh-usage-panel 的 GitHub 式热力图与 donut）
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 把分桶行折叠成「日历日 → 请求/Token/积分」。
+ *
+ * 为什么要合并两种槽：网关的槽粒度是混合的 —— 近 48h 是小时槽 `h:...`，
+ * 更早折叠成日槽 `d:...`（`internal/server/usage.go` 的 bucketSlot）。
+ * 但**热力图的单位是「天」**，小时槽属于哪天是确定的，所以两段可以在
+ * 「天」这一层安全相加 —— 这不是跨口径混算（两者同属窗口分桶）。
+ * 反面做法：直接把日槽当小时槽塞进「日期×小时」网格（上一版就这么干过，
+ * 会凭空造出不存在的小时分布）。
+ *
+ * @param rows - `usageBySlot()` 的输出。
+ * @returns `[{date, requests, tokens, credit, kind}]`，date 为本地 `YYYY-MM-DD`。
+ */
+export function usageByDay(rows) {
+  const table = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const at = Number(row?.at);
+    if (!Number.isFinite(at)) continue;
+    const date = localDayKey(new Date(at));
+    let entry = table.get(date);
+    if (!entry) {
+      entry = { date, requests: 0, tokens: 0, credit: 0, hours: 0, days: 0 };
+      table.set(date, entry);
+    }
+    entry.requests += Number(row.requests) || 0;
+    entry.tokens += Number(row.tokens) || 0;
+    entry.credit += Number(row.credit) || 0;
+    if (row.kind === 'hour') entry.hours += 1;
+    else entry.days += 1;
+  }
+  return [...table.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/** 本地日历日 `YYYY-MM-DD`。 */
+export function localDayKey(date) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * 分位阈值（参考实现同款）：对**非零**值取 4 分位，色阶 h0..h4。
+ *
+ * 为什么用分位而不是线性：用量分布长尾极重（一天几十、某天几千），
+ * 线性映射会让绝大多数格子落在最浅两档，热力图退化成一片浅色。
+ *
+ * @param values - 非零数值数组。
+ * @returns 4 个升序阈值；样本不足时按可用值退化。
+ */
+export function quartileThresholds(values) {
+  const list = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b);
+  if (list.length === 0) return [0, 0, 0, 0];
+  const at = (q) => list[Math.min(list.length - 1, Math.max(0, Math.floor(q * (list.length - 1))))];
+  return [at(0.25), at(0.5), at(0.75), at(1)];
+}
+
+/**
+ * 按分位阈值给数值定级（0=无用量，1..4 由浅到深）。
+ * @param value - 当日数值。
+ * @param thresholds - `quartileThresholds()` 的输出。
+ * @returns 0–4。
+ */
+export function heatLevel(value, thresholds) {
+  const v = Number(value) || 0;
+  if (v <= 0) return 0;
+  const [q1, q2, q3] = thresholds;
+  if (v <= q1) return 1;
+  if (v <= q2) return 2;
+  if (v <= q3) return 3;
+  return 4;
+}
+
+/**
+ * 构建热力图网格（周为列、周一→周日为行）。
+ *
+ * @param days - `usageByDay()` 的输出。
+ * @returns `{weeks, cells, monthLabels, max}`；`cells` 为按列优先的
+ *   `[{date, value, level, blank}]`，长度 = weeks × 7。
+ */
+export function heatGrid(days) {
+  const list = (Array.isArray(days) ? days : []).filter((d) => d && typeof d.date === 'string');
+  if (list.length === 0) return { weeks: 0, cells: [], monthLabels: [], max: 0 };
+
+  const byDate = new Map(list.map((d) => [d.date, d]));
+  const parsed = list.map((d) => new Date(`${d.date}T00:00:00`));
+  const first = parsed[0];
+  const last = parsed[parsed.length - 1];
+  // 周一为一周之始（参考实现用 UTC 的 weekdayIndex；本地时区下用同样的对齐）
+  const lead = (first.getDay() + 6) % 7;
+  const totalDays = lead + Math.round((last - first) / 86400e3) + 1;
+  const weeks = Math.ceil(totalDays / 7);
+
+  const nonzero = list.filter((d) => d.requests > 0).map((d) => d.requests);
+  const thresholds = quartileThresholds(nonzero);
+  const cells = [];
+  const monthLabels = [];
+  let prevMonth = -1;
+
+  for (let w = 0; w < weeks; w++) {
+    const monday = new Date(first.getTime() + (w * 7 - lead) * 86400e3);
+    const month = monday.getMonth();
+    monthLabels.push(w === 0 || month !== prevMonth ? `${month + 1}月` : '');
+    prevMonth = month;
+    for (let r = 0; r < 7; r++) {
+      const cur = new Date(monday.getTime() + r * 86400e3);
+      const key = localDayKey(cur);
+      const rec = byDate.get(key);
+      cells.push(rec
+        ? { date: key, value: rec.requests, level: heatLevel(rec.requests, thresholds), blank: false, week: w }
+        : { date: key, value: 0, level: 0, blank: true, week: w });
+    }
+  }
+  return {
+    weeks,
+    cells,
+    monthLabels,
+    max: nonzero.length > 0 ? Math.max(...nonzero) : 0,
+  };
+}
+
+/**
+ * 模型占比（donut 用）：按 token 占比降序，合并长尾为「其他」。
+ *
+ * @param rows - `by_model`。
+ * @param limit - 保留的前 N 名（其余合并）。
+ * @returns `[{key, tokens, share}]`。
+ */
+export function modelShares(rows, limit = 5) {
+  const list = (Array.isArray(rows) ? rows : [])
+    .map((row) => ({ key: row?.key || '—', tokens: Number(row?.total_tokens) || 0 }))
+    .filter((row) => row.tokens > 0)
+    .sort((a, b) => b.tokens - a.tokens);
+  const total = list.reduce((sum, row) => sum + row.tokens, 0);
+  if (total <= 0) return [];
+  const head = list.slice(0, limit);
+  const tail = list.slice(limit);
+  const out = head.map((row) => ({ ...row, share: row.tokens / total }));
+  if (tail.length > 0) {
+    const rest = tail.reduce((sum, row) => sum + row.tokens, 0);
+    out.push({ key: `其他 ${tail.length} 个`, tokens: rest, share: rest / total });
+  }
+  return out;
 }

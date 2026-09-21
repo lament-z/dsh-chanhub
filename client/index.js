@@ -32,8 +32,10 @@ import {
   formatPercent,
   formatTokens,
   groupByChannel,
+  heatGrid,
   healthSummary,
   isZeroTime,
+  modelShares,
   maxInFlightOf,
   niceMax,
   qualitySummary,
@@ -42,11 +44,11 @@ import {
   scheduleHoursText,
   scheduleState,
   slotLabel,
+  usageByDay,
   summaryCounters,
   tokenStructure,
   uptimeText,
   usageBySlot,
-  usageBySlotAndModel,
   usageShares,
   windowHours,
 } from './derive.js';
@@ -1937,10 +1939,10 @@ const USAGE_METRICS = [
 
 /** 分析视图定义（一次只画一个，避免图墙把页面拉到 2600px）。 */
 const USAGE_VIEWS = [
+  { id: 'models', label: '模型占比' },
   { id: 'combo', label: '双轴' },
   { id: 'burn', label: '燃尽投影' },
-  { id: 'stack', label: '模型堆叠' },
-  { id: 'heat', label: '时段热力' },
+  { id: 'heat', label: '活跃热力' },
 ];
 
 /** 归因维度定义。 */
@@ -2370,136 +2372,145 @@ function UsageBurnChart({ rows, stock, windowValue }) {
 }
 
 /**
- * 模型构成堆叠面积（每槽请求按模型拆分）。
+ * 近 30 天活跃热力图（GitHub contribution 布局：周为列、周一→周日为行）。
  *
- * @param props - `{buckets}`。
+ * 数据：把混合槽折叠到「日历日」（`usageByDay`）—— 小时槽（<48h）与日槽
+ * （>48h）同属窗口分桶，按天相加合法；**不再**把日槽硬塞进「日期×小时」网格
+ * （那会凭空造出不存在的小时分布，是 v1 的实现缺陷）。
+ *
+ * 视觉：分位色阶 h0..h4（长尾分布下线性映射会退化成一片浅色）、顶部月份标签、
+ * 左侧星期列、右下角图例、按周列延迟的入场淡入（尊重 prefers-reduced-motion）。
+ *
+ * @param props - `{rows, now}`。
  * @returns React 元素。
  */
-function UsageStackChart({ buckets }) {
-  const data = usageBySlotAndModel(buckets);
-  return React.createElement(React.Fragment, null,
-    React.createElement(UsageChart, {
-      deps: [data.slots.length, data.models.length],
-      render: (width) => {
-        const H = 180;
-        const PL = 46;
-        const PR = 14;
-        const PT = 12;
-        const PB = 24;
-        const innerW = Math.max(10, width - PL - PR);
-        const innerH = H - PT - PB;
-        const n = data.slots.length;
-        const totals = Array.from({ length: n }, (_, index) =>
-          data.models.reduce((sum, model) => sum + model.values[index], 0));
-        const max = niceMax(Math.max(1, ...totals));
-        const x = (index) => PL + (n <= 1 ? innerW / 2 : (index / (n - 1)) * innerW);
-        const y = (value) => PT + (1 - value / max) * innerH;
+function UsageHeatmap({ rows }) {
+  const days = React.useMemo(() => usageByDay(rows), [rows]);
+  const grid = React.useMemo(() => heatGrid(days), [days]);
 
-        const layers = data.models.map((model, layer) => {
-          const below = (index) => data.models.slice(0, layer).reduce((sum, item) => sum + item.values[index], 0);
-          const upper = model.values.map((value, index) => [x(index), y(below(index) + value)]);
-          const lower = model.values.map((value, index) => [x(index), y(below(index))]).reverse();
-          const d = `${usageLine(upper)}L${lower.map((point) => `${point[0].toFixed(1)},${point[1].toFixed(1)}`).join('L')}Z`;
-          return React.createElement('path', {
-            key: model.key, className: 'seg', d, fill: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length], opacity: 0.82,
-          });
-        });
+  if (grid.weeks === 0 || grid.max === 0) {
+    return React.createElement('div', { style: s.muted },
+      '该窗口内没有可统计的用量');
+  }
 
-        const grid = [0, 0.5, 1].map((frac) => {
-          const gy = PT + innerH * frac;
-          return React.createElement('g', { key: `g${frac}` },
-            React.createElement('line', { className: 'grid', x1: PL, x2: width - PR, y1: gy, y2: gy }),
-            React.createElement('text', { className: 'axt', x: PL - 6, y: gy + 3.5, textAnchor: 'end' }, formatTokens(max * (1 - frac))),
-          );
-        });
+  const weekdayLabels = ['一', '二', '三', '四', '五', '六', '日'];
+  const hoursCount = days.filter((day) => day.hours > 0).length;
+  const daysCount = days.filter((day) => day.days > 0).length;
 
-        return React.createElement('svg', { viewBox: `0 0 ${width} ${H}`, width, height: H },
-          ...grid,
-          ...layers,
-          React.createElement('text', { className: 'axt', x: PL, y: H - 8 }, slotLabel(data.slots[0])),
-          React.createElement('text', { className: 'axt', x: width - PR, y: H - 8, textAnchor: 'end' }, slotLabel(data.slots[n - 1])),
-        );
-      },
-    }),
-    React.createElement('div', { className: 'dshc-row', style: { marginTop: 8 } },
-      ...data.models.slice(0, 8).map((model, layer) =>
-        React.createElement('span', { key: model.key, style: { ...s.tag, display: 'inline-flex', alignItems: 'center', gap: 5 } },
-          React.createElement('i', {
-            style: {
-              display: 'inline-block', width: 9, height: 9, borderRadius: 2,
-              background: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length],
-            },
-          }),
-          `${model.key} `,
-          React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, formatNumber(model.total)),
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'dshc-heat-wrap' },
+      // 左侧星期列（只标 一/三/五，和 GitHub 一致，避免 7 行都塞字）
+      React.createElement('div', { className: 'dshc-heat-days' },
+        ...weekdayLabels.map((label, index) =>
+          React.createElement('span', { key: label, style: { visibility: index % 2 === 0 ? 'visible' : 'hidden' } }, label),
         ),
+      ),
+      React.createElement('div', { className: 'dshc-heat-main' },
+        React.createElement('div', {
+          className: 'dshc-heat-months',
+          style: { gridTemplateColumns: `repeat(${grid.weeks}, 11px)` },
+        },
+          ...grid.monthLabels.map((label, index) =>
+            React.createElement('span', { key: `m${index}` }, label),
+          ),
+        ),
+        React.createElement('div', {
+          className: 'dshc-heat',
+          style: { gridTemplateColumns: `repeat(${grid.weeks}, 11px)` },
+        },
+          ...grid.cells.map((cell) =>
+            React.createElement('i', {
+              key: cell.date,
+              className: `${cell.blank ? 'blank' : `h${cell.level} anim`}`,
+              style: cell.blank ? undefined : { animationDelay: `${(cell.week * 0.018).toFixed(3)}s` },
+              title: cell.blank ? `${cell.date}（窗口外）` : `${cell.date} · ${formatNumber(cell.value)} 请求`,
+            }),
+          ),
+        ),
+      ),
+    ),
+    React.createElement('div', { className: 'dshc-row', style: { marginTop: 8, gap: 12 } },
+      React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+        `活跃 ${days.filter((day) => day.requests > 0).length} 天 · 峰值 ${formatNumber(grid.max)} 请求/天`),
+      React.createElement('span', {
+        className: 'dshc-heat-legend',
+        title: `覆盖 ${days.length} 天；其中 ${hoursCount} 天来自小时槽、${daysCount} 天来自日槽（网关槽粒度混合，按天合并）`,
+      },
+        React.createElement('span', null, '少'),
+        ...['h0', 'h1', 'h2', 'h3', 'h4'].map((cls) =>
+          React.createElement('i', { key: cls, className: cls }),
+        ),
+        React.createElement('span', null, '多'),
       ),
     ),
   );
 }
 
 /**
- * 时段热力（行 = 小时槽覆盖的日期，列 = 小时）。
+ * 模型占比环形图 + 排行列表（参考 dsh-usage-panel 的 donut + 右侧明细）。
  *
- * **诚实性约束（必须遵守）**：日槽只有日期没有小时，无法还原到小时格子。
- * 所以这张图**只用小时槽**，并显式报告被排除的日槽 —— 不把日总量画成某小时的量。
+ * 为什么换成 donut：原来的「堆叠面积」要读者自己估每层厚度，模型一多就不可比；
+ * donut + 列表把「占比」这件事直读出来，并且能标出具体数值。
  *
- * @param props - `{rows}`。
+ * @param props - `{rows}`：`by_model`。
  * @returns React 元素。
  */
-function UsageHeatmap({ rows }) {
-  const hourRows = rows.filter((row) => row.kind === 'hour');
-  const dayRows = rows.filter((row) => row.kind === 'day');
-  if (hourRows.length === 0) {
-    return React.createElement('div', { style: s.muted },
-      '该窗口内没有小时槽（小时槽只保留近 48 小时；更早的数据被网关折叠成日槽，无小时维度）。',
-    );
+function UsageModelDonut({ rows }) {
+  const shares = React.useMemo(() => modelShares(rows, 5), [rows]);
+  const [active, setActive] = React.useState(null);
+  if (shares.length === 0) {
+    return React.createElement('div', { style: s.muted }, '该窗口内没有模型用量');
   }
-
-  const days = [...new Set(hourRows.map((row) => slotLabel(row.slot).slice(0, 5)))];
-  const cells = days.map((day) =>
-    Array.from({ length: 24 }, (_, hour) => hourRows
-      .filter((row) => slotLabel(row.slot).slice(0, 5) === day && new Date(row.at).getHours() === hour)
-      .reduce((sum, row) => sum + row.requests, 0)),
-  );
-  const max = Math.max(1, ...cells.flat());
-  let bestIndex = 0;
-  let bestValue = -1;
-  cells.flat().forEach((value, index) => {
-    if (value > bestValue) {
-      bestValue = value;
-      bestIndex = index;
-    }
+  const R = 46;
+  const CIRC = 2 * Math.PI * R;
+  let offset = 0;
+  const arcs = shares.map((item, index) => {
+    const len = item.share * CIRC;
+    const arc = { ...item, index, len, offset, color: USAGE_SEG_COLORS[index % USAGE_SEG_COLORS.length] };
+    offset += len;
+    return arc;
   });
 
-  return React.createElement('div', null,
-    React.createElement('div', {
-      className: 'dshc-uheat',
-      style: { gridTemplateColumns: '26px repeat(24, minmax(0, 1fr))' },
-    },
-      React.createElement('div', null),
-      ...Array.from({ length: 24 }, (_, hour) => React.createElement('div', {
-        key: `h${hour}`, className: 'hl', style: { textAlign: 'center' },
-      }, hour % 3 === 0 ? String(hour) : '')),
-      ...days.flatMap((day, dayIndex) => [
-        React.createElement('div', { key: `d${day}`, className: 'hl' }, day),
-        ...cells[dayIndex].map((value, hour) => {
-          const ratio = value / max;
-          return React.createElement('i', {
-            key: `${day}-${hour}`,
-            className: value === 0 ? 'zero' : '',
-            style: value === 0 ? undefined : { opacity: (0.12 + ratio * 0.88).toFixed(2) },
-            title: `${day} ${hour}:00 · ${formatNumber(value)} 请求 · 相对峰值 ${formatPercent(ratio, 0)}`,
-          });
-        }),
-      ]),
+  return React.createElement('div', { className: 'dshc-models' },
+    React.createElement('svg', { className: 'dshc-donut', viewBox: '0 0 120 120', width: 132, height: 132 },
+      React.createElement('g', { transform: 'rotate(-90 60 60)' },
+        ...arcs.map((arc) =>
+          React.createElement('circle', {
+            key: arc.key,
+            className: `dshc-donut-seg${active !== null && active !== arc.index ? ' dim' : ''}`,
+            cx: 60, cy: 60, r: R,
+            fill: 'none',
+            stroke: arc.color,
+            strokeWidth: active === arc.index ? 20 : 15,
+            strokeDasharray: `${arc.len.toFixed(2)} ${(CIRC - arc.len).toFixed(2)}`,
+            strokeDashoffset: (-arc.offset).toFixed(2),
+            onMouseEnter: () => setActive(arc.index),
+            onMouseLeave: () => setActive(null),
+          }, React.createElement('title', null,
+            `${arc.key} · ${formatTokens(arc.tokens)}（${formatPercent(arc.share, 1)}）`)),
+        ),
+      ),
+      // 中心显示「模型数」而不是合计 token —— 合计已经在英雄区的 Tokens 卡上，
+      // 同一屏把同一个数字摆两遍正是上一轮修掉的问题（去重用例会抓这个回归）。
+      React.createElement('text', { className: 'dshc-donut-total', x: 60, y: 57, textAnchor: 'middle' },
+        String(shares.length)),
+      React.createElement('text', { className: 'dshc-donut-cap', x: 60, y: 71, textAnchor: 'middle' },
+        '个模型'),
     ),
-    React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.7 } },
-      `峰值 ${days[Math.floor(bestIndex / 24)]} ${bestIndex % 24}:00 · ${formatNumber(bestValue)} 请求。`,
-      '仅覆盖小时槽（近 48h）。',
-      dayRows.length > 0
-        ? `另有 ${days.length > 0 ? '' : ''}${dayRows.length} 个日槽只有当天总量、无小时维度，未上此图（不是丢失数据）。`
-        : '',
+    React.createElement('div', { className: 'dshc-mlist' },
+      ...arcs.map((arc) =>
+        React.createElement('div', {
+          key: arc.key,
+          className: 'dshc-mrow',
+          onMouseEnter: () => setActive(arc.index),
+          onMouseLeave: () => setActive(null),
+        },
+          React.createElement('i', { style: { background: arc.color } }),
+          React.createElement('span', { className: 'dshc-mname', title: arc.key }, arc.key),
+          React.createElement('span', { className: 'dshc-mtok' }, formatTokens(arc.tokens)),
+          React.createElement('span', { className: 'dshc-mpct' }, formatPercent(arc.share, 1)),
+        ),
+      ),
     ),
   );
 }
@@ -2534,6 +2545,72 @@ function UsageRatioStrip({ items }) {
       ),
     ),
   );
+}
+
+/**
+ * 数字入场动效（900ms，与参考实现同款缓动）。
+ *
+ * 可访问性：系统开启「减少动态效果」时**直接返回终值**，不注册 rAF
+ * —— 动画是锦上添花，不该成为拒绝动画的用户被迫接受的东西。
+ * 另：组件卸载时取消 rAF，避免泄漏。
+ *
+ * @param target - 目标值。
+ * @param duration - 时长（毫秒）。
+ * @returns 当前应显示的值。
+ */
+function useCountUp(target, duration = 900) {
+  const value = Number(target) || 0;
+  const [shown, setShown] = React.useState(value);
+  const fromRef = React.useRef(value);
+
+  React.useEffect(() => {
+    // 动效必须「可失败」：任何环境下都不能把真实数字留成动画中间值。
+    // 因此（a）无 rAF / 关了动效 → 直接给终值；（b）rAF 被节流（标签页后台、
+    // 无头渲染）时，还有一个 setTimeout 兜底把终值落定 —— 否则用户会看到
+    // 一屏 0，这比没有动效糟得多。
+    const canAnimate = typeof requestAnimationFrame === 'function'
+      && typeof cancelAnimationFrame === 'function'
+      && !(typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (!canAnimate) {
+      fromRef.current = value;
+      setShown(value);
+      return undefined;
+    }
+
+    const from = fromRef.current;
+    const start = Date.now();
+    let frame = 0;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      fromRef.current = value;
+      setShown(value);
+    };
+    const tick = () => {
+      if (settled) return;
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(from + (value - from) * eased);
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else settle();
+    };
+    frame = requestAnimationFrame(tick);
+    const guard = setTimeout(settle, duration + 150);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      clearTimeout(guard);
+    };
+  }, [value, duration]);
+
+  // 值变化时（切窗口/刷新）立即从当前显示值起步，避免从 0 重播
+  const shownRef = React.useRef(shown);
+  shownRef.current = shown;
+  React.useEffect(() => { fromRef.current = shownRef.current; }, [value]);
+
+  return shown;
 }
 
 /**
@@ -2592,11 +2669,17 @@ function UsageHero({ total, stock, windowValue }) {
   const successRate = requests > 0 ? (requests - failed) / requests : 0;
   const perRequest = requests > 0 ? credit / requests : null;
 
+  // hooks 必须无条件调用（hook 顺序不变式）—— 四个值在顶层一次算好再组装。
+  const animRequests = useCountUp(requests);
+  const animCredit = useCountUp(credit);
+  const animStock = useCountUp(stock.usable);
+  const animTokens = useCountUp(structure.total);
+
   const tiles = [
     {
       key: 'requests',
       label: '请求',
-      value: formatNumber(requests),
+      value: formatNumber(Math.round(animRequests)),
       bar: React.createElement(UsageRatioBar, {
         segments: [
           { value: requests - failed, color: tone.ok.fg },
@@ -2611,14 +2694,14 @@ function UsageHero({ total, stock, windowValue }) {
     {
       key: 'credit',
       label: '积分消耗',
-      value: formatCredit(credit),
+      value: formatCredit(animCredit),
       tone: tone.ok.fg,
       note: perRequest === null ? '—' : `${formatCredit(perRequest)} / 请求`,
     },
     {
       key: 'stock',
       label: '可用积分',
-      value: formatNumber(Math.round(stock.usable)),
+      value: formatNumber(Math.round(animStock)),
       tone: tone.ok.fg,
       note: [
         burn === null
@@ -2639,7 +2722,7 @@ function UsageHero({ total, stock, windowValue }) {
     {
       key: 'tokens',
       label: 'Tokens',
-      value: formatTokens(structure.total),
+      value: formatTokens(animTokens),
       bar: React.createElement(UsageRatioBar, {
         segments: [
           { value: structure.prompt, color: 'var(--dsw-alias-brand-primary,#4f6ef7)' },
@@ -2664,8 +2747,10 @@ function UsageHero({ total, stock, windowValue }) {
       },
         React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, tile.label),
         React.createElement('div', {
+          // .dshc-num：等宽数位 + 负字距（参考实现同款，防止数字跳动）
+          className: 'dshc-num',
           style: {
-            fontSize: 26, fontWeight: 600, lineHeight: 1.15, letterSpacing: '-.02em',
+            fontSize: 26, fontWeight: 700, lineHeight: 1.15,
             color: tile.tone ?? 'var(--dsw-alias-label-primary,currentColor)',
           },
         }, tile.value),
@@ -2859,7 +2944,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
 
   const [metric, setMetric] = React.useState('requests');
   const [dim, setDim] = React.useState('uid');
-  const [view, setView] = React.useState('combo');
+  const [view, setView] = React.useState('models');
   // 分析视图是「探索型」控件：默认收起成一个标签，点开才展开四个选项。
   // 页面上先看到的是数据，而不是一排等我点它的按钮（P3）。
   const [viewOpen, setViewOpen] = React.useState(false);
@@ -2990,20 +3075,12 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
                 React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow }),
               )
             : null,
-          view === 'stack'
-            ? React.createElement('div', null,
-                React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
-                  '每个槽的请求按模型拆分堆叠（全窗口累计结构）'),
-                React.createElement(UsageStackChart, { buckets }),
-              )
+          view === 'models'
+            ? React.createElement(UsageModelDonut, { rows: usageData?.by_model ?? [] })
             : null,
           view === 'heat'
-            ? React.createElement('div', null,
-                React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
-                  '行 = 日期 · 列 = 小时 · 深浅 = 请求量'),
-                React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
-                  React.createElement(UsageHeatmap, { rows }),
-                ),
+            ? React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
+                React.createElement(UsageHeatmap, { rows }),
               )
             : null,
         )

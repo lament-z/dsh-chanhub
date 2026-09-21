@@ -16,13 +16,17 @@ import {
   formatCredit,
   formatPercent,
   formatTokens,
+  heatGrid,
+  heatLevel,
+  modelShares,
   niceMax,
+  quartileThresholds,
   slotKind,
   slotLabel,
   tokenStructure,
   uptimeText,
+  usageByDay,
   usageBySlot,
-  usageBySlotAndModel,
   usageSeriesByKey,
   usageShares,
   windowHours,
@@ -215,23 +219,70 @@ test('U14 usageSeriesByKey：保留时间轴，空键按网关规则跳过', () 
   assert.ok(!series.has('total'), 'uid 维度不得把空键归为 total');
 });
 
-test('U15 usageBySlotAndModel：堆叠层与槽对齐，按总量降序', () => {
-  const buckets = [
-    { slot: 'h:2026-09-21T08', model: 'm1', requests: 10 },
-    { slot: 'h:2026-09-21T08', model: 'm2', requests: 2 },
-    { slot: 'h:2026-09-21T09', model: 'm1', requests: 4 },
-    { slot: 'h:2026-09-21T09', model: 'm2', requests: 8 },
+test('U15 usageByDay：混合槽按天合并（小时槽 + 日槽）', () => {
+  const rows = [
+    { slot: 'h:2026-09-21T08', kind: 'hour', at: Date.parse('2026-09-21T08:00:00'), requests: 10, failed: 0, tokens: 100, credit: 1 },
+    { slot: 'h:2026-09-21T09', kind: 'hour', at: Date.parse('2026-09-21T09:00:00'), requests: 5, failed: 0, tokens: 50, credit: 0.5 },
+    { slot: 'd:2026-09-20', kind: 'day', at: Date.parse('2026-09-20T00:00:00'), requests: 20, failed: 0, tokens: 200, credit: 2 },
   ];
-  const data = usageBySlotAndModel(buckets);
-  assert.equal(data.slots.length, 2);
-  assert.equal(data.models.length, 2);
-  assert.equal(data.models[0].key, 'm1', '按总请求降序：m1=14 > m2=10');
-  assert.deepEqual(data.models[0].values, [10, 4]);
-  assert.deepEqual(data.models[1].values, [2, 8]);
-  for (const model of data.models) assert.equal(model.values.length, data.slots.length);
-  const empty = usageBySlotAndModel(undefined);
-  assert.deepEqual(empty.slots, []);
-  assert.deepEqual(empty.models, []);
+  const days = usageByDay(rows);
+  assert.equal(days.length, 2, '同一天的两个小时槽必须合并');
+  const today = days.find((d) => d.date === '2026-09-21');
+  assert.equal(today.requests, 15);
+  assert.equal(today.tokens, 150);
+  assert.equal(today.hours, 2, '小时槽计数');
+  assert.equal(days.find((d) => d.date === '2026-09-20').days, 1, '日槽计数');
+  // 升序
+  assert.deepEqual(days.map((d) => d.date), ['2026-09-20', '2026-09-21']);
+  assert.deepEqual(usageByDay(undefined), []);
+});
+
+test('U16 heatGrid：周为列 × 周一→周日为行，格数 = 周数 × 7', () => {
+  const days = [
+    { date: '2026-09-21', requests: 30 }, // 周一
+    { date: '2026-09-22', requests: 10 },
+    { date: '2026-09-23', requests: 0 },
+  ];
+  const grid = heatGrid(days);
+  assert.equal(grid.cells.length, grid.weeks * 7, '格数必须是周的整数倍');
+  assert.equal(grid.cells[0].date, '2026-09-21', '首格应为窗口第一天');
+  const byDate = Object.fromEntries(grid.cells.map((c) => [c.date, c]));
+  assert.equal(byDate['2026-09-21'].level, 4, '最大值应为最深档');
+  assert.equal(byDate['2026-09-23'].level, 0, '零用量为 0 档');
+  assert.equal(grid.max, 30);
+  assert.deepEqual(heatGrid([]).cells, []);
+});
+
+test('U17 分位色阶：长尾分布下不塌成一片浅色', () => {
+  // 典型长尾：多数很小、个别极大。线性映射会让 90% 格子落最浅档。
+  const values = [1, 1, 2, 2, 3, 4, 5, 900];
+  const q = quartileThresholds(values);
+  const levels = values.map((v) => heatLevel(v, q));
+  assert.ok(levels.filter((l) => l === 4).length >= 1, '最大值必须落在最深档');
+  assert.ok(new Set(levels).size >= 3, `分位应产生多个档位，实际 ${[...new Set(levels)].join(',')}`);
+  assert.equal(heatLevel(0, q), 0);
+  assert.deepEqual(quartileThresholds([]), [0, 0, 0, 0]);
+});
+
+test('U18 modelShares：按 token 占比降序，长尾合并为「其他」', () => {
+  const rows = [
+    { key: 'a', total_tokens: 60 },
+    { key: 'b', total_tokens: 25 },
+    { key: 'c', total_tokens: 10 },
+    { key: 'd', total_tokens: 5 },
+  ];
+  const shares = modelShares(rows, 2);
+  assert.equal(shares.length, 3, '2 个头部 + 1 个其他');
+  assert.equal(shares[0].key, 'a');
+  assert.ok(Math.abs(shares[0].share - 0.6) < 1e-9);
+  assert.match(shares[2].key, /^其他 2 个$/);
+  assert.ok(Math.abs(shares[2].share - 0.15) < 1e-9);
+  // 占比合计为 1
+  const sum = shares.reduce((acc, item) => acc + item.share, 0);
+  assert.ok(Math.abs(sum - 1) < 1e-9, `占比合计应 = 1，实际 ${sum}`);
+  // 零/缺失输入不编造
+  assert.deepEqual(modelShares([], 5), []);
+  assert.deepEqual(modelShares([{ key: 'x', total_tokens: 0 }], 5), []);
 });
 
 test('U16 creditsFreshness：无时间戳不谎报「刚刚更新」', () => {

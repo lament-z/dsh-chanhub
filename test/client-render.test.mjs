@@ -100,11 +100,26 @@ function registeredComponent(rpcCall, windowObject) {
  * @param rpcCall - RPC 桩。
  * @returns `{html, cleanup, document, window}`。
  */
-async function mount(rpcCall) {
+async function mount(rpcCall, options = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>', {
     pretendToBeVisual: true,
   });
   const { window } = dom;
+
+  // 可选：模拟系统「减少动态效果」。jsdom 默认没有 matchMedia，而数字动效的
+  // 可访问性分支与「动效失败兜底」都依赖它 —— 不注入就测不到那两条路径。
+  if (options.reducedMotion === true) {
+    window.matchMedia = (query) => ({
+      matches: String(query).includes('prefers-reduced-motion'),
+      media: String(query),
+      onchange: null,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent() { return false; },
+    });
+  }
 
   // 面板用到 document / window.confirm / setInterval。挂在 global 上让组件可见。
   const saved = captureGlobals(['document', 'window', 'HTMLElement', 'Node', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout']);
@@ -255,13 +270,24 @@ function usageFixture() {
   const rows = [];
   const uids = ['uid-1', 'uid-2', 'uid-3'];
   const models = ['cn:glm-5.2', 'cn:glm-5.2-air'];
-  const slots = ['d:2026-09-19', 'h:2026-09-19T17', 'h:2026-09-19T18'];
+  // 槽覆盖多天且量级递增：热力图的分位色阶需要「有梯度的分布」才测得出
+  // （若全部落在同一天，只会有一个档位，断言就失去意义）。
+  const slots = [
+    'd:2026-09-17',                // 日槽：最早
+    'd:2026-09-18',                // 日槽
+    'h:2026-09-19T17',             // 小时槽（近 48h）
+    'h:2026-09-19T18',
+    'h:2026-09-20T09',
+    'h:2026-09-21T10',
+  ];
+  let step = 0;
   for (const slot of slots) {
+    step += 1;
     for (const uid of uids) {
       for (const model of models) {
         rows.push({
           slot, realm: 'cn', uid, model,
-          requests: 2, failed: uid === 'uid-2' ? 1 : 0, streaming: 1,
+          requests: step, failed: uid === 'uid-2' && step > 1 ? 1 : 0, streaming: 1,
           prompt_tokens: 100, completion_tokens: 50, total_tokens: 150,
           credit: 0.25, avg_latency_ms: 300, last_seen: new Date().toISOString(),
         });
@@ -273,7 +299,8 @@ function usageFixture() {
     window: '72h0m0s',
     degraded: false,
     now: new Date().toISOString(),
-    total: { key: 'total', requests: 24, success: 18, failed: 6, prompt_tokens: 2400, completion_tokens: 1200, total_tokens: 3600, credit: 6, avg_latency_ms: 300 },
+    // 6 槽 × 3 账号 × 2 模型，请求数 1..6 递增 → 合计 126；失败数同步
+    total: { key: 'total', requests: 126, success: 117, failed: 9, prompt_tokens: 12600, completion_tokens: 6300, total_tokens: 18900, credit: 31.5, avg_latency_ms: 300 },
     buckets: rows,
     by_uid: [
       { key: 'uid-1', requests: 12, success: 12, failed: 0, prompt_tokens: 1200, completion_tokens: 600, total_tokens: 1800, credit: 3, avg_latency_ms: 300 },
@@ -1585,12 +1612,12 @@ test('渲染用量：英雄区四联 KPI（每张一个主数字 + 参照）', {
     for (const label of ['请求', '积分消耗', '可用积分', 'Tokens']) {
       assert.ok(html.includes(label), `缺英雄 KPI：${label}`);
     }
-    // 主数字取窗口 total
-    assert.match(html, /请求[\s\S]{0,160}24/, '请求数应取 usage.total.requests');
-    assert.match(html, /成功 18 · 失败 6/, `缺成功/失败参照：${html.match(/成功[^<]*/)?.[0]}`);
-    assert.match(html, /0\.250 \/ 请求/, `缺每请求积分：${html.match(/每请求|\/ 请求[^<]*/)?.[0]}`);
+    // 主数字取窗口 total（fixture：126 请求 / 31.5 积分 / 18.9k tokens）
+    assert.match(html, /请求[\s\S]{0,160}126/, '请求数应取 usage.total.requests');
+    assert.match(html, /成功 117 · 失败 9/, `缺成功/失败参照：${html.match(/成功[^<]*/)?.[0]}`);
+    assert.match(html, /0\.250 \/ 请求/, `缺每请求积分：${html.match(/\/ 请求[^<]*/)?.[0]}`);
     // Token 参照：↑输入 · ↓输出（窗口口径只有这两段）
-    assert.match(html, /↑2\.4k · ↓1\.2k/, `Token 拆分不符：${html.match(/↑[^<]*/)?.[0]}`);
+    assert.match(html, /↑12\.6k · ↓6\.3k/, `Token 拆分不符：${html.match(/↑[^<]*/)?.[0]}`);
     // 存量只看可消耗：2880 + 10 + 500 = 3390
     assert.ok(html.includes('3,390'), '存量应可消耗合计 3390');
     // 不可消耗单列（明细端点优先：3 × 500）
@@ -1624,7 +1651,7 @@ test('渲染用量：英雄区比例条（成功率 / Token 结构可直读）',
     const bars = [...app.querySelectorAll('.dshc-palette')];
     assert.ok(bars.length >= 2, `英雄区应有比例条，实际 ${bars.length}`);
     const tips = bars.map((bar) => bar.getAttribute('title')).join(' | ');
-    assert.match(tips, /成功 18 · 失败 6/, `请求比例条缺成功/失败：${tips}`);
+    assert.match(tips, /成功 117 · 失败 9/, `请求比例条缺成功/失败：${tips}`);
     assert.match(tips, /输入 prompt/, `Token 比例条缺两段数值：${tips}`);
   } finally {
     await cleanup();
@@ -1638,12 +1665,12 @@ test('渲染用量：时序柱数 === 时间槽数（旧实现把行当柱的回
     const html = app.innerHTML;
     // fixture: 3 账号 × 2 模型 × 3 槽 = 18 行 → 必须聚合成 3 个槽
     // 文案已精简为「N 个时间槽」；聚合正确性由下面的折线点数断言保证（那才是真证据）
-    assert.match(html, /3 个时间槽/, `缺时间槽计数：${html.match(/个时间槽[^<]*/)?.[0]}`);
-    // 主图折线点数必须等于槽数（3），而不是行数（18）
+    assert.match(html, /6 个时间槽/, `缺时间槽计数：${html.match(/个时间槽[^<]*/)?.[0]}`);
+    // 主图折线点数必须等于槽数（6），而不是行数（6×3×2=36）
     const path = document.querySelector('.dshc-uchart .line-main');
     assert.ok(path, '缺主图折线');
     const points = path.getAttribute('d').split('L').length;
-    assert.equal(points, 3, `柱/线点数必须等于槽数 3，实际 ${points}（旧实现会给 18）`);
+    assert.equal(points, 6, `柱/线点数必须等于槽数 6，实际 ${points}（旧实现会给 36）`);
     // 日槽必须分区标注（否则日总量被读成某个小时）
     assert.ok(document.querySelector('.dshc-uchart .dayband'), '缺日槽底纹');
     assert.match(app.innerHTML, /日槽（无小时维度）/, '缺日槽分区标注');
@@ -1685,7 +1712,7 @@ test('渲染用量：分析视图四态都可切换且各自出图', { skip }, a
         await React.act(async () => { pick().dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
       }
     };
-    for (const label of ['双轴', '燃尽投影', '模型堆叠', '时段热力']) {
+    for (const label of ['双轴', '燃尽投影', '模型占比', '活跃热力']) {
       await openViews();
       const button = [...app.querySelectorAll('[data-seg="views"] button')].find((b) => b.textContent.trim() === label);
       assert.ok(button, `缺分析视图按钮：${label}`);
@@ -1707,15 +1734,26 @@ test('渲染用量：分析视图四态都可切换且各自出图', { skip }, a
     assert.ok(document.querySelector('.line-proj'), '缺外推虚线');
     assert.ok(document.querySelector('.dot-die'), '缺见底点');
     assert.match(app.innerHTML, /非承诺/, '外推必须带「非承诺」限定词');
-    // 模型堆叠：层数 = 模型数（2）
-    await selectView('模型堆叠');
-    assert.equal(document.querySelectorAll('.dshc-uchart .seg').length, 2, '堆叠层数应等于模型数');
+    // 模型占比：donut 扇区数 = 模型数（fixture 2 个），列表行同数，占比合计 100%
+    await selectView('模型占比');
+    const segs = document.querySelectorAll('.dshc-donut-seg');
+    assert.equal(segs.length, 2, `donut 扇区数应等于模型数，实际 ${segs.length}`);
+    assert.equal(document.querySelectorAll('.dshc-mrow').length, 2, '列表行数应与扇区一致');
+    assert.ok(document.querySelector('.dshc-donut-total'), 'donut 中心应显示合计');
+    assert.match(app.innerHTML, /66\.7%/, `占比应显示到小数位：${app.innerHTML.match(/[\d.]+%/g)?.slice(0, 4).join(',')}`);
     // 时段热力：只有小时槽（2 行 = 2 天），且必须报告被排除的日槽
-    await selectView('时段热力');
-    const cells = document.querySelectorAll('.dshc-uheat i');
+    await selectView('活跃热力');
+    const cells = document.querySelectorAll('.dshc-heat > i');
     assert.ok(cells.length > 0, '热力图无格子');
-    assert.equal(cells.length / 24, Math.round(cells.length / 24), '热力格数应为 24 的整数倍');
-    assert.match(app.innerHTML, /日槽只有当天总量、无小时维度，未上此图/, '必须如实报告被排除的日槽');
+    assert.equal(cells.length % 7, 0, `热力格数应为 7 的整数倍（周×7），实际 ${cells.length}`);
+    // 分位色阶：h0..h4 至少出现两档，且存在实际用量档（h1+）
+    const levels = new Set([...cells].map((c) => (c.className.match(/h[0-4]/) || [''])[0]).filter(Boolean));
+    assert.ok(levels.size >= 2, `应使用分位色阶，实际档位 ${[...levels].join(',')}`);
+    assert.ok([...levels].some((l) => l !== 'h0'), '应有非零用量档位');
+    // 图例（少 → 多）
+    assert.ok(document.querySelector('.dshc-heat-legend'), '缺色阶图例');
+    // 小时槽与日槽必须按天合并说明（不再谎称有小时分布）
+    assert.match(app.innerHTML, /活跃 \d+ 天/, '缺活跃天数汇总');
   } finally {
     await cleanup();
   }
@@ -1952,6 +1990,49 @@ test('渲染用量：分析视图默认收起（探索型控件不占首屏）',
     // 窗口与指标段控仍然常驻（高频，不该藏）
     assert.ok(app.querySelector('[data-seg="window"]'), '窗口切换应常驻');
     assert.ok(app.querySelector('[data-seg="metric"]'), '指标切换应常驻');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：减少动态效果时，数字必须立刻是终值', { skip }, async () => {
+  // 这条替代原先「不许为 0」的弱断言 —— 那个在 jsdom 下会空转（rAF 仍会推进几帧，
+  // 无论有没有兜底都能过，等于没测）。改为断言**确定性的可访问性路径**：
+  // 系统开启 reduced-motion 时不得走动画，必须直接渲染终值。
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()), { reducedMotion: true });
+  try {
+    const app = await openUsage(document);
+    const values = [...app.querySelectorAll('.dshc-kpi')].map((k) => k.children[1].textContent.trim());
+    assert.equal(values.length, 4, '应有 4 张 KPI 卡');
+    // fixture：126 请求 / 31.5 积分 / 3,390 存量 / 18.9k tokens
+    assert.equal(values[0], '126', `请求应为终值 126，实际 ${values[0]}`);
+    assert.equal(values[2], '3,390', `存量应为终值 3,390，实际 ${values[2]}`);
+    assert.equal(values[3], '18.9k', `Tokens 应为终值 18.9k，实际 ${values[3]}`);
+    // 排版：等宽数位（防跳动）
+    assert.ok(app.querySelector('.dshc-num'), '英雄数字应带 .dshc-num（tabular-nums）');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：卡片浮起层级 + 模型占比环形图', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    // 卡片必须用 layer-1（白）——参考实现同款；用 layer-2 会比页面更暗、卡片「后退」
+    const style = app.querySelector('.dshc-kpi').getAttribute('style') || '';
+    const cardStyle = [...app.querySelectorAll('div')]
+      .map((el) => el.getAttribute('style') || '')
+      .find((st) => st.includes('border-radius: 12px')) ?? '';
+    assert.match(cardStyle + style, /bg-layer-1/, '卡片应使用 bg-layer-1（浮起）');
+    // 环形图：扇区数 = 模型数，列表行同数，中心显示模型数（不与英雄区重复 token 合计）
+    assert.ok(document.querySelector('.dshc-donut'), '缺环形图');
+    assert.equal(
+      document.querySelectorAll('.dshc-donut-seg').length,
+      document.querySelectorAll('.dshc-mrow').length,
+      '扇区数与列表行数必须一致',
+    );
+    assert.ok(document.querySelector('.dshc-donut-total'), 'donut 中心应有读数');
   } finally {
     await cleanup();
   }

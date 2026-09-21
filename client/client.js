@@ -45,7 +45,10 @@ module.exports = __toCommonJS(index_exports);
 // client/theme.js
 var s = {
   card: {
-    background: "var(--dsw-alias-bg-layer-2,#f9fafb)",
+    // 参考 dsh-usage-panel / dsh-token-monitor：卡片用 layer-1（白）浮在灰页面上。
+    // 原先用 layer-2（比页面更暗）会让卡片「后退」，整页发闷 —— 这是本轮
+    // 「差点意思」的主要来源之一。
+    background: "var(--dsw-alias-bg-layer-1,#fff)",
     border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
     borderRadius: 12,
     padding: "16px 18px",
@@ -154,7 +157,7 @@ var s = {
   kpi: {
     border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
     borderRadius: 10,
-    background: "var(--dsw-alias-bg-layer-2,#f9fafb)",
+    background: "var(--dsw-alias-bg-layer-1,#fff)",
     padding: "10px 12px",
     minWidth: 0,
     boxSizing: "border-box",
@@ -223,7 +226,7 @@ var FOLD_CSS = `
 .dshc-tblwrap { overflow-x: auto; min-width: 0; }
 .dshc-tblwrap > table { min-width: 600px; border-collapse: collapse; width: 100%; font-size: 12px; }
 .dshc-tblwrap th { text-align: left; font-weight: 500; color: var(--dsw-alias-label-tertiary,#8b93a1); padding: 6px 8px; border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); white-space: nowrap; }
-.dshc-tblwrap td { padding: 6px 8px; border-bottom: 1px solid var(--dsw-alias-border-l2,#f3f4f6); color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-tblwrap td { padding: 6px 8px; border-bottom: 1px solid var(--dsw-alias-border-l2,#f3f4f6); color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
 .dshc-codebar { width: 3px; border-radius: 2px; align-self: stretch; flex-shrink: 0; }
 .dshc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .dshc-palette { display: inline-flex; align-items: center; max-width: 420px; min-width: 80px; height: 12px; border-radius: 3px; overflow: hidden; flex-grow: 1; background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
@@ -267,6 +270,54 @@ var FOLD_CSS = `
    \u2014\u2014 \u5B83\u662F\u5E38\u9A7B\u5165\u53E3\uFF0C\u4E0D\u8BE5\u968F Tab \u6A2A\u5411\u6EDA\u52A8\u800C\u6D88\u5931\u3002 */
 .dshc-tabadd { position: sticky; right: 0; flex-shrink: 0; align-self: center; margin: 0 0 4px 8px; font: inherit; cursor: pointer; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dsw-alias-button-info-fill,#4176e6); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-button-info-fill,#4176e6); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
 .dshc-tabadd:hover { background: var(--dsw-alias-bg-layer-2,#eef2ff); }
+/* \u6570\u5B57\u6392\u7248\uFF1A\u7B49\u5BBD\u6570\u4F4D\uFF08tabular-nums\uFF09\u2014\u2014 \u53C2\u8003\u5B9E\u73B0\u540C\u6B3E\u3002
+   \u4E0D\u505A\u7B49\u5BBD\u65F6\uFF0CKPI \u4E0E\u8868\u683C\u91CC\u7684\u6570\u5B57\u5BBD\u5EA6\u968F\u5185\u5BB9\u8DF3\u52A8\uFF0C\u6A2A\u6392\u6570\u5B57\u5BF9\u4E0D\u9F50\u3002 */
+.dshc-num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; letter-spacing: -.02em; }
+/* \u70ED\u529B\u56FE\uFF08GitHub \u5F0F\uFF09\uFF1A\u5468\u4E3A\u5217\u3001\u5468\u4E00\u2192\u5468\u65E5\u4E3A\u884C\uFF0C\u9876\u90E8\u6708\u4EFD\u3001\u5DE6\u4FA7\u661F\u671F\u3002 */
+.dshc-heat-wrap { display: flex; align-items: flex-start; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.dshc-heat-wrap::-webkit-scrollbar { display: none; }
+.dshc-heat-days { display: grid; grid-template-rows: repeat(7, 1fr); gap: 3px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-heat-main { min-width: 0; flex: 1 1 auto; }
+.dshc-heat-months { display: grid; gap: 3px; height: 13px; margin-bottom: 3px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-heat-months > span { white-space: nowrap; overflow: hidden; }
+.dshc-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; }
+.dshc-heat > i { width: 11px; height: 11px; border-radius: 2.5px; display: block; }
+.dshc-heat > i.blank { background: transparent; }
+.dshc-heat > i:hover { box-shadow: 0 0 0 1px var(--dsw-alias-border-l2,#d5d5d5); }
+/* \u5206\u4F4D\u8272\u9636\uFF08\u53C2\u8003\u5B9E\u73B0\u7684\u84DD ramp\uFF1B\u6DF1\u6D45\u4E3B\u9898\u5404\u4E00\u5957\uFF09 */
+.dshc-heat > i.h0 { background: var(--dsw-alias-bg-layer-2,#f1f4f9); }
+.dshc-heat > i.h1 { background: #dbeafe; }
+.dshc-heat > i.h2 { background: #93c5fd; }
+.dshc-heat > i.h3 { background: #3b82f6; }
+.dshc-heat > i.h4 { background: #1d4ed8; }
+body[data-ds-dark-theme] .dshc-heat > i.h0 { background: #1f2937; }
+body[data-ds-dark-theme] .dshc-heat > i.h1 { background: #1e3a8a; }
+body[data-ds-dark-theme] .dshc-heat > i.h2 { background: #2563eb; }
+body[data-ds-dark-theme] .dshc-heat > i.h3 { background: #3b82f6; }
+body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
+.dshc-heat-legend { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-left: auto; }
+.dshc-heat-legend > i { width: 11px; height: 11px; border-radius: 2.5px; display: inline-block; }
+/* \u5165\u573A\u52A8\u6548\uFF08\u6570\u5B57 count-up \u7531 JS \u9A71\u52A8\uFF1B\u6B64\u6761\u53EA\u4E3A\u70ED\u529B\u56FE\u7684\u9010\u5217\u6DE1\u5165\uFF09 */
+@keyframes dshc-heat-in { from { opacity: 0 } to { opacity: 1 } }
+.dshc-heat > i.anim { animation: dshc-heat-in .45s linear both; }
+/* \u5C0A\u91CD\u7CFB\u7EDF\u300C\u51CF\u5C11\u52A8\u6001\u6548\u679C\u300D\uFF1A\u53C2\u8003\u5B9E\u73B0\u540C\u6B3E\u5904\u7406 */
+@media (prefers-reduced-motion: reduce) {
+  .dshc-heat > i.anim { animation: none; }
+}
+/* \u6A21\u578B\u73AF\u5F62\u56FE + \u6392\u884C\u5217\u8868 */
+.dshc-models { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.dshc-donut { flex-shrink: 0; }
+.dshc-donut-seg { cursor: pointer; transition: stroke-width .15s; }
+.dshc-donut-seg.dim { opacity: .35; }
+.dshc-donut-total { fill: var(--dsw-alias-label-primary,currentColor); font-size: 17px; font-weight: 700; }
+.dshc-donut-cap { fill: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 10px; }
+.dshc-mlist { flex: 1 1 200px; min-width: 180px; }
+.dshc-mrow { display: flex; align-items: center; gap: 9px; padding: 6px 2px; font-size: 12px; min-width: 0; }
+.dshc-mrow + .dshc-mrow { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
+.dshc-mrow > i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.dshc-mname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-mtok { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
+.dshc-mpct { width: 52px; text-align: right; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; }
 /* \u7D27\u51D1\u6BB5\u63A7\uFF08\u7A97\u53E3 / \u6307\u6807 / \u89C6\u56FE / \u7EF4\u5EA6\u5207\u6362\u5171\u7528\uFF09\u3002
    \u4E0E .dshc-viewtoggle \u7684\u5206\u5DE5\uFF1A\u90A3\u4E00\u6B3E\u662F\u300C\u9875\u7EA7\u300D\u89C6\u56FE\u5207\u6362\uFF08\u8F83\u5927\uFF09\uFF0C\u672C\u6B3E\u662F\u9875\u5185\u7684
    \u8F7B\u91CF\u9009\u62E9\u5668 \u2014\u2014 \u8FB9\u6846\u53EA\u6709 1px \u4E14\u65E0\u5916\u53D1\u5149\uFF0C\u8BA9\u5185\u5BB9\u800C\u975E\u63A7\u4EF6\u6210\u4E3A\u89C6\u89C9\u4E3B\u89D2\u3002 */
@@ -284,7 +335,7 @@ var FOLD_CSS = `
 /* KPI \u884C\uFF08\u53EF\u70B9\u51FB\u7684\u7EDF\u8BA1\u683C\uFF09 */
 .dshc-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
 /* \u6E20\u9053\u4E09\u5361 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
@@ -427,7 +478,7 @@ var FOLD_CSS = `
 /* \u73AF\u5F62\u767E\u5206\u6BD4 */
 .dshc-uring { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-uring { grid-template-columns: 1fr; } }
-.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; text-align: center; min-width: 0; }
+.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 12px 14px; text-align: center; min-width: 0; }
 .dshc-uring svg { display: block; margin: 0 auto; }
 .dshc-uring .rv { font-size: 17px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-uring .rl { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-top: 2px; }
@@ -442,7 +493,7 @@ var FOLD_CSS = `
 /* \u82F1\u96C4\u533A */
 .dshc-uhero { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 10px; }
 @media (max-width: 820px) { .dshc-uhero { grid-template-columns: 1fr; } }
-.dshc-ustock { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; min-width: 0; }
+.dshc-ustock { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 12px 14px; min-width: 0; }
 .dshc-ustock .big { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--dsw-alias-state-success-primary,#059669); }
 .dshc-uchans { display: flex; margin-top: 10px; border-top: 1px solid var(--dsw-alias-border-l2,#e5e7eb); padding-top: 8px; }
 .dshc-uchans > div { flex: 1; min-width: 0; text-align: center; border-right: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
@@ -987,25 +1038,6 @@ function usageBySlot(buckets) {
     latencyMS: entry.requests > 0 ? entry.latencySum / entry.requests : 0
   })).sort((a, b) => a.at - b.at);
 }
-function usageBySlotAndModel(buckets) {
-  const bySlot = usageBySlot(buckets);
-  const slots = bySlot.map((row) => row.slot);
-  const index = new Map(slots.map((slot, i) => [slot, i]));
-  const table = /* @__PURE__ */ new Map();
-  for (const row of Array.isArray(buckets) ? buckets : []) {
-    if (!row || typeof row.slot !== "string" || index.has(row.slot) === false) continue;
-    const key = typeof row.model === "string" && row.model !== "" ? row.model : "-";
-    let entry = table.get(key);
-    if (!entry) {
-      entry = { key, total: 0, values: new Array(slots.length).fill(0) };
-      table.set(key, entry);
-    }
-    const requests = Number(row.requests) || 0;
-    entry.values[index.get(row.slot)] += requests;
-    entry.total += requests;
-  }
-  return { slots, models: [...table.values()].sort((a, b) => b.total - a.total) };
-}
 function usageShares(rows, total) {
   const list = Array.isArray(rows) ? rows : [];
   const totalRequests = Number(total?.requests) || list.reduce((sum, row) => sum + (Number(row?.requests) || 0), 0);
@@ -1111,6 +1143,91 @@ function uptimeText(seconds) {
   if (hours > 0) return `${hours} \u5C0F\u65F6 ${minutes} \u5206`;
   if (minutes > 0) return `${minutes} \u5206`;
   return `${Math.floor(value)} \u79D2`;
+}
+function usageByDay(rows) {
+  const table = /* @__PURE__ */ new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const at = Number(row?.at);
+    if (!Number.isFinite(at)) continue;
+    const date = localDayKey(new Date(at));
+    let entry = table.get(date);
+    if (!entry) {
+      entry = { date, requests: 0, tokens: 0, credit: 0, hours: 0, days: 0 };
+      table.set(date, entry);
+    }
+    entry.requests += Number(row.requests) || 0;
+    entry.tokens += Number(row.tokens) || 0;
+    entry.credit += Number(row.credit) || 0;
+    if (row.kind === "hour") entry.hours += 1;
+    else entry.days += 1;
+  }
+  return [...table.values()].sort((a, b) => a.date < b.date ? -1 : 1);
+}
+function localDayKey(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+function quartileThresholds(values) {
+  const list = (Array.isArray(values) ? values : []).map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  if (list.length === 0) return [0, 0, 0, 0];
+  const at = (q) => list[Math.min(list.length - 1, Math.max(0, Math.floor(q * (list.length - 1))))];
+  return [at(0.25), at(0.5), at(0.75), at(1)];
+}
+function heatLevel(value, thresholds) {
+  const v = Number(value) || 0;
+  if (v <= 0) return 0;
+  const [q1, q2, q3] = thresholds;
+  if (v <= q1) return 1;
+  if (v <= q2) return 2;
+  if (v <= q3) return 3;
+  return 4;
+}
+function heatGrid(days) {
+  const list = (Array.isArray(days) ? days : []).filter((d) => d && typeof d.date === "string");
+  if (list.length === 0) return { weeks: 0, cells: [], monthLabels: [], max: 0 };
+  const byDate = new Map(list.map((d) => [d.date, d]));
+  const parsed = list.map((d) => /* @__PURE__ */ new Date(`${d.date}T00:00:00`));
+  const first = parsed[0];
+  const last = parsed[parsed.length - 1];
+  const lead = (first.getDay() + 6) % 7;
+  const totalDays = lead + Math.round((last - first) / 864e5) + 1;
+  const weeks = Math.ceil(totalDays / 7);
+  const nonzero = list.filter((d) => d.requests > 0).map((d) => d.requests);
+  const thresholds = quartileThresholds(nonzero);
+  const cells = [];
+  const monthLabels = [];
+  let prevMonth = -1;
+  for (let w = 0; w < weeks; w++) {
+    const monday = new Date(first.getTime() + (w * 7 - lead) * 864e5);
+    const month = monday.getMonth();
+    monthLabels.push(w === 0 || month !== prevMonth ? `${month + 1}\u6708` : "");
+    prevMonth = month;
+    for (let r = 0; r < 7; r++) {
+      const cur = new Date(monday.getTime() + r * 864e5);
+      const key = localDayKey(cur);
+      const rec = byDate.get(key);
+      cells.push(rec ? { date: key, value: rec.requests, level: heatLevel(rec.requests, thresholds), blank: false, week: w } : { date: key, value: 0, level: 0, blank: true, week: w });
+    }
+  }
+  return {
+    weeks,
+    cells,
+    monthLabels,
+    max: nonzero.length > 0 ? Math.max(...nonzero) : 0
+  };
+}
+function modelShares(rows, limit = 5) {
+  const list = (Array.isArray(rows) ? rows : []).map((row) => ({ key: row?.key || "\u2014", tokens: Number(row?.total_tokens) || 0 })).filter((row) => row.tokens > 0).sort((a, b) => b.tokens - a.tokens);
+  const total = list.reduce((sum, row) => sum + row.tokens, 0);
+  if (total <= 0) return [];
+  const head = list.slice(0, limit);
+  const tail = list.slice(limit);
+  const out = head.map((row) => ({ ...row, share: row.tokens / total }));
+  if (tail.length > 0) {
+    const rest = tail.reduce((sum, row) => sum + row.tokens, 0);
+    out.push({ key: `\u5176\u4ED6 ${tail.length} \u4E2A`, tokens: rest, share: rest / total });
+  }
+  return out;
 }
 
 // client/add-account.js
@@ -3192,10 +3309,10 @@ var USAGE_METRICS = [
   { id: "credit", label: "\u79EF\u5206", unit: "\u79EF\u5206", pick: (row) => row.credit, bad: () => 0, fmt: formatCredit, hasFail: false }
 ];
 var USAGE_VIEWS = [
+  { id: "models", label: "\u6A21\u578B\u5360\u6BD4" },
   { id: "combo", label: "\u53CC\u8F74" },
   { id: "burn", label: "\u71C3\u5C3D\u6295\u5F71" },
-  { id: "stack", label: "\u6A21\u578B\u5806\u53E0" },
-  { id: "heat", label: "\u65F6\u6BB5\u70ED\u529B" }
+  { id: "heat", label: "\u6D3B\u8DC3\u70ED\u529B" }
 ];
 var USAGE_DIMS = [
   { id: "uid", label: "\u6309\u8D26\u53F7" },
@@ -3611,138 +3728,162 @@ function UsageBurnChart({ rows, stock, windowValue }) {
     )
   );
 }
-function UsageStackChart({ buckets }) {
-  const data = usageBySlotAndModel(buckets);
-  return React.createElement(
-    React.Fragment,
-    null,
-    React.createElement(UsageChart, {
-      deps: [data.slots.length, data.models.length],
-      render: (width) => {
-        const H = 180;
-        const PL = 46;
-        const PR = 14;
-        const PT = 12;
-        const PB = 24;
-        const innerW = Math.max(10, width - PL - PR);
-        const innerH = H - PT - PB;
-        const n = data.slots.length;
-        const totals = Array.from({ length: n }, (_, index) => data.models.reduce((sum, model) => sum + model.values[index], 0));
-        const max = niceMax(Math.max(1, ...totals));
-        const x = (index) => PL + (n <= 1 ? innerW / 2 : index / (n - 1) * innerW);
-        const y = (value) => PT + (1 - value / max) * innerH;
-        const layers = data.models.map((model, layer) => {
-          const below = (index) => data.models.slice(0, layer).reduce((sum, item) => sum + item.values[index], 0);
-          const upper = model.values.map((value, index) => [x(index), y(below(index) + value)]);
-          const lower = model.values.map((value, index) => [x(index), y(below(index))]).reverse();
-          const d = `${usageLine(upper)}L${lower.map((point) => `${point[0].toFixed(1)},${point[1].toFixed(1)}`).join("L")}Z`;
-          return React.createElement("path", {
-            key: model.key,
-            className: "seg",
-            d,
-            fill: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length],
-            opacity: 0.82
-          });
-        });
-        const grid = [0, 0.5, 1].map((frac) => {
-          const gy = PT + innerH * frac;
-          return React.createElement(
-            "g",
-            { key: `g${frac}` },
-            React.createElement("line", { className: "grid", x1: PL, x2: width - PR, y1: gy, y2: gy }),
-            React.createElement("text", { className: "axt", x: PL - 6, y: gy + 3.5, textAnchor: "end" }, formatTokens(max * (1 - frac)))
-          );
-        });
-        return React.createElement(
-          "svg",
-          { viewBox: `0 0 ${width} ${H}`, width, height: H },
-          ...grid,
-          ...layers,
-          React.createElement("text", { className: "axt", x: PL, y: H - 8 }, slotLabel(data.slots[0])),
-          React.createElement("text", { className: "axt", x: width - PR, y: H - 8, textAnchor: "end" }, slotLabel(data.slots[n - 1]))
-        );
-      }
-    }),
-    React.createElement(
-      "div",
-      { className: "dshc-row", style: { marginTop: 8 } },
-      ...data.models.slice(0, 8).map(
-        (model, layer) => React.createElement(
-          "span",
-          { key: model.key, style: { ...s.tag, display: "inline-flex", alignItems: "center", gap: 5 } },
-          React.createElement("i", {
-            style: {
-              display: "inline-block",
-              width: 9,
-              height: 9,
-              borderRadius: 2,
-              background: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length]
-            }
-          }),
-          `${model.key} `,
-          React.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, formatNumber(model.total))
-        )
-      )
-    )
-  );
-}
 function UsageHeatmap({ rows }) {
-  const hourRows = rows.filter((row) => row.kind === "hour");
-  const dayRows = rows.filter((row) => row.kind === "day");
-  if (hourRows.length === 0) {
+  const days = React.useMemo(() => usageByDay(rows), [rows]);
+  const grid = React.useMemo(() => heatGrid(days), [days]);
+  if (grid.weeks === 0 || grid.max === 0) {
     return React.createElement(
       "div",
       { style: s.muted },
-      "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u5C0F\u65F6\u69FD\uFF08\u5C0F\u65F6\u69FD\u53EA\u4FDD\u7559\u8FD1 48 \u5C0F\u65F6\uFF1B\u66F4\u65E9\u7684\u6570\u636E\u88AB\u7F51\u5173\u6298\u53E0\u6210\u65E5\u69FD\uFF0C\u65E0\u5C0F\u65F6\u7EF4\u5EA6\uFF09\u3002"
+      "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u53EF\u7EDF\u8BA1\u7684\u7528\u91CF"
     );
   }
-  const days = [...new Set(hourRows.map((row) => slotLabel(row.slot).slice(0, 5)))];
-  const cells = days.map(
-    (day) => Array.from({ length: 24 }, (_, hour) => hourRows.filter((row) => slotLabel(row.slot).slice(0, 5) === day && new Date(row.at).getHours() === hour).reduce((sum, row) => sum + row.requests, 0))
-  );
-  const max = Math.max(1, ...cells.flat());
-  let bestIndex = 0;
-  let bestValue = -1;
-  cells.flat().forEach((value, index) => {
-    if (value > bestValue) {
-      bestValue = value;
-      bestIndex = index;
-    }
-  });
+  const weekdayLabels = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D", "\u65E5"];
+  const hoursCount = days.filter((day) => day.hours > 0).length;
+  const daysCount = days.filter((day) => day.days > 0).length;
   return React.createElement(
     "div",
     null,
     React.createElement(
       "div",
-      {
-        className: "dshc-uheat",
-        style: { gridTemplateColumns: "26px repeat(24, minmax(0, 1fr))" }
-      },
-      React.createElement("div", null),
-      ...Array.from({ length: 24 }, (_, hour) => React.createElement("div", {
-        key: `h${hour}`,
-        className: "hl",
-        style: { textAlign: "center" }
-      }, hour % 3 === 0 ? String(hour) : "")),
-      ...days.flatMap((day, dayIndex) => [
-        React.createElement("div", { key: `d${day}`, className: "hl" }, day),
-        ...cells[dayIndex].map((value, hour) => {
-          const ratio = value / max;
-          return React.createElement("i", {
-            key: `${day}-${hour}`,
-            className: value === 0 ? "zero" : "",
-            style: value === 0 ? void 0 : { opacity: (0.12 + ratio * 0.88).toFixed(2) },
-            title: `${day} ${hour}:00 \xB7 ${formatNumber(value)} \u8BF7\u6C42 \xB7 \u76F8\u5BF9\u5CF0\u503C ${formatPercent(ratio, 0)}`
-          });
-        })
-      ])
+      { className: "dshc-heat-wrap" },
+      // 左侧星期列（只标 一/三/五，和 GitHub 一致，避免 7 行都塞字）
+      React.createElement(
+        "div",
+        { className: "dshc-heat-days" },
+        ...weekdayLabels.map(
+          (label, index) => React.createElement("span", { key: label, style: { visibility: index % 2 === 0 ? "visible" : "hidden" } }, label)
+        )
+      ),
+      React.createElement(
+        "div",
+        { className: "dshc-heat-main" },
+        React.createElement(
+          "div",
+          {
+            className: "dshc-heat-months",
+            style: { gridTemplateColumns: `repeat(${grid.weeks}, 11px)` }
+          },
+          ...grid.monthLabels.map(
+            (label, index) => React.createElement("span", { key: `m${index}` }, label)
+          )
+        ),
+        React.createElement(
+          "div",
+          {
+            className: "dshc-heat",
+            style: { gridTemplateColumns: `repeat(${grid.weeks}, 11px)` }
+          },
+          ...grid.cells.map(
+            (cell) => React.createElement("i", {
+              key: cell.date,
+              className: `${cell.blank ? "blank" : `h${cell.level} anim`}`,
+              style: cell.blank ? void 0 : { animationDelay: `${(cell.week * 0.018).toFixed(3)}s` },
+              title: cell.blank ? `${cell.date}\uFF08\u7A97\u53E3\u5916\uFF09` : `${cell.date} \xB7 ${formatNumber(cell.value)} \u8BF7\u6C42`
+            })
+          )
+        )
+      )
     ),
     React.createElement(
       "div",
-      { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.7 } },
-      `\u5CF0\u503C ${days[Math.floor(bestIndex / 24)]} ${bestIndex % 24}:00 \xB7 ${formatNumber(bestValue)} \u8BF7\u6C42\u3002`,
-      "\u4EC5\u8986\u76D6\u5C0F\u65F6\u69FD\uFF08\u8FD1 48h\uFF09\u3002",
-      dayRows.length > 0 ? `\u53E6\u6709 ${days.length > 0 ? "" : ""}${dayRows.length} \u4E2A\u65E5\u69FD\u53EA\u6709\u5F53\u5929\u603B\u91CF\u3001\u65E0\u5C0F\u65F6\u7EF4\u5EA6\uFF0C\u672A\u4E0A\u6B64\u56FE\uFF08\u4E0D\u662F\u4E22\u5931\u6570\u636E\uFF09\u3002` : ""
+      { className: "dshc-row", style: { marginTop: 8, gap: 12 } },
+      React.createElement(
+        "span",
+        { style: { ...s.muted, fontSize: 10.5 } },
+        `\u6D3B\u8DC3 ${days.filter((day) => day.requests > 0).length} \u5929 \xB7 \u5CF0\u503C ${formatNumber(grid.max)} \u8BF7\u6C42/\u5929`
+      ),
+      React.createElement(
+        "span",
+        {
+          className: "dshc-heat-legend",
+          title: `\u8986\u76D6 ${days.length} \u5929\uFF1B\u5176\u4E2D ${hoursCount} \u5929\u6765\u81EA\u5C0F\u65F6\u69FD\u3001${daysCount} \u5929\u6765\u81EA\u65E5\u69FD\uFF08\u7F51\u5173\u69FD\u7C92\u5EA6\u6DF7\u5408\uFF0C\u6309\u5929\u5408\u5E76\uFF09`
+        },
+        React.createElement("span", null, "\u5C11"),
+        ...["h0", "h1", "h2", "h3", "h4"].map(
+          (cls) => React.createElement("i", { key: cls, className: cls })
+        ),
+        React.createElement("span", null, "\u591A")
+      )
+    )
+  );
+}
+function UsageModelDonut({ rows }) {
+  const shares = React.useMemo(() => modelShares(rows, 5), [rows]);
+  const [active, setActive] = React.useState(null);
+  if (shares.length === 0) {
+    return React.createElement("div", { style: s.muted }, "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u6A21\u578B\u7528\u91CF");
+  }
+  const R = 46;
+  const CIRC = 2 * Math.PI * R;
+  let offset = 0;
+  const arcs = shares.map((item, index) => {
+    const len = item.share * CIRC;
+    const arc = { ...item, index, len, offset, color: USAGE_SEG_COLORS[index % USAGE_SEG_COLORS.length] };
+    offset += len;
+    return arc;
+  });
+  return React.createElement(
+    "div",
+    { className: "dshc-models" },
+    React.createElement(
+      "svg",
+      { className: "dshc-donut", viewBox: "0 0 120 120", width: 132, height: 132 },
+      React.createElement(
+        "g",
+        { transform: "rotate(-90 60 60)" },
+        ...arcs.map(
+          (arc) => React.createElement("circle", {
+            key: arc.key,
+            className: `dshc-donut-seg${active !== null && active !== arc.index ? " dim" : ""}`,
+            cx: 60,
+            cy: 60,
+            r: R,
+            fill: "none",
+            stroke: arc.color,
+            strokeWidth: active === arc.index ? 20 : 15,
+            strokeDasharray: `${arc.len.toFixed(2)} ${(CIRC - arc.len).toFixed(2)}`,
+            strokeDashoffset: (-arc.offset).toFixed(2),
+            onMouseEnter: () => setActive(arc.index),
+            onMouseLeave: () => setActive(null)
+          }, React.createElement(
+            "title",
+            null,
+            `${arc.key} \xB7 ${formatTokens(arc.tokens)}\uFF08${formatPercent(arc.share, 1)}\uFF09`
+          ))
+        )
+      ),
+      // 中心显示「模型数」而不是合计 token —— 合计已经在英雄区的 Tokens 卡上，
+      // 同一屏把同一个数字摆两遍正是上一轮修掉的问题（去重用例会抓这个回归）。
+      React.createElement(
+        "text",
+        { className: "dshc-donut-total", x: 60, y: 57, textAnchor: "middle" },
+        String(shares.length)
+      ),
+      React.createElement(
+        "text",
+        { className: "dshc-donut-cap", x: 60, y: 71, textAnchor: "middle" },
+        "\u4E2A\u6A21\u578B"
+      )
+    ),
+    React.createElement(
+      "div",
+      { className: "dshc-mlist" },
+      ...arcs.map(
+        (arc) => React.createElement(
+          "div",
+          {
+            key: arc.key,
+            className: "dshc-mrow",
+            onMouseEnter: () => setActive(arc.index),
+            onMouseLeave: () => setActive(null)
+          },
+          React.createElement("i", { style: { background: arc.color } }),
+          React.createElement("span", { className: "dshc-mname", title: arc.key }, arc.key),
+          React.createElement("span", { className: "dshc-mtok" }, formatTokens(arc.tokens)),
+          React.createElement("span", { className: "dshc-mpct" }, formatPercent(arc.share, 1))
+        )
+      )
     )
   );
 }
@@ -3767,6 +3908,49 @@ function UsageRatioStrip({ items }) {
       )
     )
   );
+}
+function useCountUp(target, duration = 900) {
+  const value = Number(target) || 0;
+  const [shown, setShown] = React.useState(value);
+  const fromRef = React.useRef(value);
+  React.useEffect(() => {
+    const canAnimate = typeof requestAnimationFrame === "function" && typeof cancelAnimationFrame === "function" && !(typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    if (!canAnimate) {
+      fromRef.current = value;
+      setShown(value);
+      return void 0;
+    }
+    const from = fromRef.current;
+    const start = Date.now();
+    let frame = 0;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      fromRef.current = value;
+      setShown(value);
+    };
+    const tick = () => {
+      if (settled) return;
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(from + (value - from) * eased);
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else settle();
+    };
+    frame = requestAnimationFrame(tick);
+    const guard = setTimeout(settle, duration + 150);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      clearTimeout(guard);
+    };
+  }, [value, duration]);
+  const shownRef = React.useRef(shown);
+  shownRef.current = shown;
+  React.useEffect(() => {
+    fromRef.current = shownRef.current;
+  }, [value]);
+  return shown;
 }
 function UsageRatioBar({ segments, title }) {
   const total = segments.reduce((sum, seg) => sum + (Number(seg.value) || 0), 0);
@@ -3797,11 +3981,15 @@ function UsageHero({ total, stock, windowValue }) {
   const burn = creditBurn(stock.usable, credit, windowValue);
   const successRate = requests > 0 ? (requests - failed) / requests : 0;
   const perRequest = requests > 0 ? credit / requests : null;
+  const animRequests = useCountUp(requests);
+  const animCredit = useCountUp(credit);
+  const animStock = useCountUp(stock.usable);
+  const animTokens = useCountUp(structure.total);
   const tiles = [
     {
       key: "requests",
       label: "\u8BF7\u6C42",
-      value: formatNumber(requests),
+      value: formatNumber(Math.round(animRequests)),
       bar: React.createElement(UsageRatioBar, {
         segments: [
           { value: requests - failed, color: tone.ok.fg },
@@ -3814,14 +4002,14 @@ function UsageHero({ total, stock, windowValue }) {
     {
       key: "credit",
       label: "\u79EF\u5206\u6D88\u8017",
-      value: formatCredit(credit),
+      value: formatCredit(animCredit),
       tone: tone.ok.fg,
       note: perRequest === null ? "\u2014" : `${formatCredit(perRequest)} / \u8BF7\u6C42`
     },
     {
       key: "stock",
       label: "\u53EF\u7528\u79EF\u5206",
-      value: formatNumber(Math.round(stock.usable)),
+      value: formatNumber(Math.round(animStock)),
       tone: tone.ok.fg,
       note: [
         burn === null ? null : `\u8FD8\u53EF \u2248 ${burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`}`,
@@ -3836,7 +4024,7 @@ function UsageHero({ total, stock, windowValue }) {
     {
       key: "tokens",
       label: "Tokens",
-      value: formatTokens(structure.total),
+      value: formatTokens(animTokens),
       bar: React.createElement(UsageRatioBar, {
         segments: [
           { value: structure.prompt, color: "var(--dsw-alias-brand-primary,#4f6ef7)" },
@@ -3864,11 +4052,12 @@ function UsageHero({ total, stock, windowValue }) {
         },
         React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, tile.label),
         React.createElement("div", {
+          // .dshc-num：等宽数位 + 负字距（参考实现同款，防止数字跳动）
+          className: "dshc-num",
           style: {
             fontSize: 26,
-            fontWeight: 600,
+            fontWeight: 700,
             lineHeight: 1.15,
-            letterSpacing: "-.02em",
             color: tile.tone ?? "var(--dsw-alias-label-primary,currentColor)"
           }
         }, tile.value),
@@ -4055,7 +4244,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
   );
   const [metric, setMetric] = React.useState("requests");
   const [dim, setDim] = React.useState("uid");
-  const [view, setView] = React.useState("combo");
+  const [view, setView] = React.useState("models");
   const [viewOpen, setViewOpen] = React.useState(false);
   const total = usageData?.total ?? {};
   const windowText = USAGE_WINDOWS.find((item) => item.value === usageWindow)?.label ?? usageWindow;
@@ -4218,29 +4407,11 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         null,
         React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow })
       ) : null,
-      view === "stack" ? React.createElement(
-        "div",
-        null,
-        React.createElement(
-          "div",
-          { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
-          "\u6BCF\u4E2A\u69FD\u7684\u8BF7\u6C42\u6309\u6A21\u578B\u62C6\u5206\u5806\u53E0\uFF08\u5168\u7A97\u53E3\u7D2F\u8BA1\u7ED3\u6784\uFF09"
-        ),
-        React.createElement(UsageStackChart, { buckets })
-      ) : null,
+      view === "models" ? React.createElement(UsageModelDonut, { rows: usageData?.by_model ?? [] }) : null,
       view === "heat" ? React.createElement(
         "div",
-        null,
-        React.createElement(
-          "div",
-          { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
-          "\u884C = \u65E5\u671F \xB7 \u5217 = \u5C0F\u65F6 \xB7 \u6DF1\u6D45 = \u8BF7\u6C42\u91CF"
-        ),
-        React.createElement(
-          "div",
-          { style: { overflowX: "auto", minWidth: 0 } },
-          React.createElement(UsageHeatmap, { rows })
-        )
+        { style: { overflowX: "auto", minWidth: 0 } },
+        React.createElement(UsageHeatmap, { rows })
       ) : null
     ) : null,
     // ── ⑤ 归因表 ────────────────────────────────────────────────────────
