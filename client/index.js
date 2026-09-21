@@ -2175,9 +2175,9 @@ function UsageAreaChart({ rows, metric }) {
                 ),
               ),
         ),
-        React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
-          def.hasFail ? '红色下段 = 失败请求堆叠' : `单一指标面积（${def.label} 无失败维度）`,
-          ` · 峰值 ${def.fmt(peak)} ${def.unit}/槽`,
+        React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 2 } },
+          `峰值 ${def.fmt(peak)} ${def.unit}/槽`,
+          def.hasFail ? ' · 红 = 失败' : '',
         ),
       );
 
@@ -2360,10 +2360,11 @@ function UsageBurnChart({ rows, stock, windowValue }) {
             );
           },
         }),
-    React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 6, lineHeight: 1.7 } },
-      '实线 = 窗口起点存量按已消耗逐槽回推（**回推值，非逐时实测**）· 虚线 = 按窗口速率线性外推（非承诺）· 圆点 = 预计见底。',
-      '窗口起点存量本身也是推算：当前可用存量 + 窗口内已消耗。存量只算可消耗额度，不含渠道专用池。',
-      '账本只覆盖本网关经手的请求；账号在他处的消耗不在其中，故外推天数偏乐观。',
+    React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
+      React.createElement('span', {
+        style: { cursor: 'help' },
+        title: '实线 = 窗口起点存量按已消耗逐槽回推（回推值，非逐时实测）；虚线 = 按窗口速率线性外推（非承诺，实际偏乐观）。窗口起点存量 = 当前可用存量 + 窗口内已消耗；只算可消耗额度；账本只覆盖经本网关的请求。',
+      }, '实线 = 回推 · 虚线 = 外推（非承诺）· 圆点 = 预计见底'),
     ),
   );
 }
@@ -2596,7 +2597,8 @@ function UsageHero({ total, rows, stock, windowValue }) {
       ),
     ),
     React.createElement('div', { className: 'dshc-ustock' },
-      React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, '可用积分（存量 · 只算可消耗）'),
+      React.createElement('div', { style: { ...s.muted, fontSize: 11 }, title: '只算可消耗额度；不可消耗（渠道专用池）单独列出，不并入' },
+        '可用积分'),
       React.createElement('div', { className: 'dshc-row', style: { alignItems: 'baseline', gap: 8 } },
         React.createElement('span', { className: 'big' }, formatNumber(Math.round(stock.usable))),
         stock.unusable > 0
@@ -2606,7 +2608,7 @@ function UsageHero({ total, rows, stock, windowValue }) {
       React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
         burn === null
           ? '存量趋势：窗口内无消耗或无存量，不做外推'
-          : `按近 ${windowHours(windowValue)} 小时速率（${formatCredit(burn.perDay)} 积分/天）≈ 还可 ${burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`}`,
+          : `≈ 还可 ${burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`} · ${formatCredit(burn.perDay)} 积分/天`,
       ),
       React.createElement('div', { className: 'dshc-uchans' },
         ...stock.byChannel.map((channel) =>
@@ -2616,9 +2618,6 @@ function UsageHero({ total, rows, stock, windowValue }) {
             React.createElement('div', { className: 'n' }, `${channel.count} 号`),
           ),
         ),
-      ),
-      React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
-        '存量与消耗是两个口径：存量是「现在还剩多少」，消耗是「窗口内花了多少」。不可消耗单列，不并入可用。',
       ),
     ),
   );
@@ -2822,8 +2821,11 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
         React.createElement('div', { className: 'dshc-row' },
           React.createElement('div', { style: s.label }, '用量'),
-          React.createElement(Tag, { text: `窗口聚合 · 近 ${windowText}`, tone: 'info' }),
-          React.createElement(Tag, { text: '落盘 data/usage.json', tone: 'idle' }),
+          React.createElement(Tag, {
+            text: `近 ${windowText}`,
+            tone: 'info',
+            title: '窗口聚合口径：数据落盘 data/usage.json，重启不清零',
+          }),
         ),
         React.createElement('div', { className: 'dshc-row' },
           ...USAGE_WINDOWS.map((option) =>
@@ -2843,14 +2845,6 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           }, React.createElement(Icons.refresh, null)),
         ),
       ),
-      React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
-        usageData?.since ? `分桶数据起点 ${usageData.since} · ` : '',
-        '槽粒度：近 48 小时为小时槽，更早折叠为日槽（30 天）。',
-        '账本只统计经本网关的请求（旁路流量不在其中）。',
-        processesUptime
-          ? ` 另有「模型全景」为进程累计口径（已运行 ${processesUptime}，重启清零），两者不可混算。`
-          : ' 本网关未提供进程累计口径（/v1/stats）。',
-      ),
     ),
 
     // ── 分桶不可用时的降级：不冒充「加载失败」 ──────────────────────────
@@ -2858,9 +2852,6 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       ? React.createElement('div', { style: s.card },
           React.createElement('div', { style: s.warn },
             usage?.reason ?? '网关未提供分桶端点，需在网关侧支持 GET /v1/stats/buckets。',
-          ),
-          React.createElement('div', { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } },
-            '下方「模型全景」使用进程累计端点，不依赖分桶，仍可用。',
           ),
         )
       : null,
@@ -2897,7 +2888,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           // Token 结构条（窗口口径：只有 prompt / completion 两段）
           React.createElement('div', { style: { marginTop: 12 } },
             React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-              React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, 'Token 结构（窗口合计）'),
+              React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, 'Token 结构'),
               React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
                 `prompt ${formatTokens(tokenStructure(total).prompt)} · completion ${formatTokens(tokenStructure(total).completion)} · 合计 ${formatTokens(tokenStructure(total).total)}`),
             ),
@@ -2915,8 +2906,11 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
                 title: `输出 completion ${formatNumber(tokenStructure(total).completion)}`,
               }),
             ),
-            React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
-              '仅窗口口径 —— 分桶只有 prompt / completion 两段；缓存命中率属于进程累计口径，见上方环与「模型全景」，不并入此条。',
+            React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
+              React.createElement('span', {
+                style: { cursor: 'help' },
+                title: '窗口口径只有 prompt / completion 两段；缓存命中率属于进程累计口径（见上方环与「模型全景」）。',
+              }, '输入 / 输出两段'),
             ),
           ),
         )
@@ -2928,8 +2922,8 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
             React.createElement('div', { className: 'dshc-row' },
               React.createElement('div', { style: s.label }, '走势'),
-              React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
-                `${rows.length} 个时间槽（按槽聚合，柱数 = 槽数）`),
+              React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+                `${rows.length} 个时间槽`),
             ),
             React.createElement('div', { className: 'dshc-row' },
               ...USAGE_METRICS.map((item) => segmentButton(item.id, item.label, metric, setMetric)),
@@ -2937,7 +2931,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           ),
           rows.length === 0
             ? React.createElement('div', { style: { ...s.muted, marginTop: 10 } },
-                '该窗口内没有请求记录。发起一次对话后即可看到分桶。')
+                '该窗口内没有请求记录')
             : React.createElement('div', { style: { marginTop: 10 } },
                 React.createElement(UsageAreaChart, { rows, metric }),
               ),
@@ -2956,9 +2950,8 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           view === 'combo'
             ? React.createElement('div', null,
                 React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-                  React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
-                    '柱 = 请求（失败占比 > 5% 转红）· 线 = 积分消耗'),
-                  React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, '双轴 · 左=请求 / 右=积分'),
+                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, '柱 = 请求 · 线 = 积分'),
+                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, '左 / 右双轴'),
                 ),
                 React.createElement('div', { style: { marginTop: 10 } },
                   React.createElement(UsageComboChart, { rows }),
@@ -2980,7 +2973,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           view === 'heat'
             ? React.createElement('div', null,
                 React.createElement('div', { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
-                  '行 = 小时槽覆盖的日期 · 列 = 小时 · 深浅 = 请求量'),
+                  '行 = 日期 · 列 = 小时 · 深浅 = 请求量'),
                 React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
                   React.createElement(UsageHeatmap, { rows }),
                 ),
@@ -3006,9 +2999,6 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           React.createElement(UsageTables, {
             rows: dimRows, dim, total, accounts, channelOf,
           }),
-          React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 8, lineHeight: 1.7 } },
-            '占比条 = 该行请求数占窗口总量的比例；点击「请求 / Tokens / 积分」表头可切换排序。',
-          ),
         )
       : null,
 
@@ -3017,23 +3007,18 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       React.createElement(CardHead, {
         title: '模型全景',
         extra: React.createElement('span', { className: 'dshc-row' },
-          React.createElement(Tag, { text: '进程累计 · 重启清零', tone: 'idle' }),
-          stats?.enabled === true && stats.since
-            ? React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, `起点 ${stats.since}`)
-            : null,
+          React.createElement(Tag, {
+            text: processesUptime ? `进程累计 · ${processesUptime}` : '进程累计',
+            tone: 'idle',
+            title: stats?.enabled === true && stats.since
+              ? `自进程启动累计，重启清零。数据起点 ${stats.since}`
+              : '自进程启动累计，重启清零',
+          }),
         ),
       }),
       React.createElement(UsageModelPanel, { stats }),
     ),
 
-    // ── 数据说明（如实呈现） ────────────────────────────────────────────
-    React.createElement('div', { style: { ...s.card, padding: '12px 16px' } },
-      React.createElement('div', { style: { ...s.muted, fontSize: 11, lineHeight: 1.8 } },
-        usageData?.note ?? '',
-        usageData?.note ? React.createElement('br', null) : null,
-        '「窗口聚合」与「进程累计」是两个独立口径，数值不可相加或相减：前者受窗口与落盘约束，后者重启清零。',
-      ),
-    ),
   );
 }
 

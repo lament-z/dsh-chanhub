@@ -3398,9 +3398,9 @@ function UsageAreaChart({ rows, metric }) {
         ),
         React.createElement(
           "div",
-          { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
-          def.hasFail ? "\u7EA2\u8272\u4E0B\u6BB5 = \u5931\u8D25\u8BF7\u6C42\u5806\u53E0" : `\u5355\u4E00\u6307\u6807\u9762\u79EF\uFF08${def.label} \u65E0\u5931\u8D25\u7EF4\u5EA6\uFF09`,
-          ` \xB7 \u5CF0\u503C ${def.fmt(peak)} ${def.unit}/\u69FD`
+          { style: { ...s.muted, fontSize: 10.5, marginTop: 2 } },
+          `\u5CF0\u503C ${def.fmt(peak)} ${def.unit}/\u69FD`,
+          def.hasFail ? " \xB7 \u7EA2 = \u5931\u8D25" : ""
         )
       );
       function handleHover(event, boxWidth, padLeft, innerWidth, count, height, xOf) {
@@ -3576,10 +3576,11 @@ function UsageBurnChart({ rows, stock, windowValue }) {
     }),
     React.createElement(
       "div",
-      { style: { ...s.muted, fontSize: 11, marginTop: 6, lineHeight: 1.7 } },
-      "\u5B9E\u7EBF = \u7A97\u53E3\u8D77\u70B9\u5B58\u91CF\u6309\u5DF2\u6D88\u8017\u9010\u69FD\u56DE\u63A8\uFF08**\u56DE\u63A8\u503C\uFF0C\u975E\u9010\u65F6\u5B9E\u6D4B**\uFF09\xB7 \u865A\u7EBF = \u6309\u7A97\u53E3\u901F\u7387\u7EBF\u6027\u5916\u63A8\uFF08\u975E\u627F\u8BFA\uFF09\xB7 \u5706\u70B9 = \u9884\u8BA1\u89C1\u5E95\u3002",
-      "\u7A97\u53E3\u8D77\u70B9\u5B58\u91CF\u672C\u8EAB\u4E5F\u662F\u63A8\u7B97\uFF1A\u5F53\u524D\u53EF\u7528\u5B58\u91CF + \u7A97\u53E3\u5185\u5DF2\u6D88\u8017\u3002\u5B58\u91CF\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF0C\u4E0D\u542B\u6E20\u9053\u4E13\u7528\u6C60\u3002",
-      "\u8D26\u672C\u53EA\u8986\u76D6\u672C\u7F51\u5173\u7ECF\u624B\u7684\u8BF7\u6C42\uFF1B\u8D26\u53F7\u5728\u4ED6\u5904\u7684\u6D88\u8017\u4E0D\u5728\u5176\u4E2D\uFF0C\u6545\u5916\u63A8\u5929\u6570\u504F\u4E50\u89C2\u3002"
+      { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
+      React.createElement("span", {
+        style: { cursor: "help" },
+        title: "\u5B9E\u7EBF = \u7A97\u53E3\u8D77\u70B9\u5B58\u91CF\u6309\u5DF2\u6D88\u8017\u9010\u69FD\u56DE\u63A8\uFF08\u56DE\u63A8\u503C\uFF0C\u975E\u9010\u65F6\u5B9E\u6D4B\uFF09\uFF1B\u865A\u7EBF = \u6309\u7A97\u53E3\u901F\u7387\u7EBF\u6027\u5916\u63A8\uFF08\u975E\u627F\u8BFA\uFF0C\u5B9E\u9645\u504F\u4E50\u89C2\uFF09\u3002\u7A97\u53E3\u8D77\u70B9\u5B58\u91CF = \u5F53\u524D\u53EF\u7528\u5B58\u91CF + \u7A97\u53E3\u5185\u5DF2\u6D88\u8017\uFF1B\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF1B\u8D26\u672C\u53EA\u8986\u76D6\u7ECF\u672C\u7F51\u5173\u7684\u8BF7\u6C42\u3002"
+      }, "\u5B9E\u7EBF = \u56DE\u63A8 \xB7 \u865A\u7EBF = \u5916\u63A8\uFF08\u975E\u627F\u8BFA\uFF09\xB7 \u5706\u70B9 = \u9884\u8BA1\u89C1\u5E95")
     )
   );
 }
@@ -3807,7 +3808,11 @@ function UsageHero({ total, rows, stock, windowValue }) {
     React.createElement(
       "div",
       { className: "dshc-ustock" },
-      React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, "\u53EF\u7528\u79EF\u5206\uFF08\u5B58\u91CF \xB7 \u53EA\u7B97\u53EF\u6D88\u8017\uFF09"),
+      React.createElement(
+        "div",
+        { style: { ...s.muted, fontSize: 11 }, title: "\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF1B\u4E0D\u53EF\u6D88\u8017\uFF08\u6E20\u9053\u4E13\u7528\u6C60\uFF09\u5355\u72EC\u5217\u51FA\uFF0C\u4E0D\u5E76\u5165" },
+        "\u53EF\u7528\u79EF\u5206"
+      ),
       React.createElement(
         "div",
         { className: "dshc-row", style: { alignItems: "baseline", gap: 8 } },
@@ -3817,7 +3822,7 @@ function UsageHero({ total, rows, stock, windowValue }) {
       React.createElement(
         "div",
         { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
-        burn === null ? "\u5B58\u91CF\u8D8B\u52BF\uFF1A\u7A97\u53E3\u5185\u65E0\u6D88\u8017\u6216\u65E0\u5B58\u91CF\uFF0C\u4E0D\u505A\u5916\u63A8" : `\u6309\u8FD1 ${windowHours(windowValue)} \u5C0F\u65F6\u901F\u7387\uFF08${formatCredit(burn.perDay)} \u79EF\u5206/\u5929\uFF09\u2248 \u8FD8\u53EF ${burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`}`
+        burn === null ? "\u5B58\u91CF\u8D8B\u52BF\uFF1A\u7A97\u53E3\u5185\u65E0\u6D88\u8017\u6216\u65E0\u5B58\u91CF\uFF0C\u4E0D\u505A\u5916\u63A8" : `\u2248 \u8FD8\u53EF ${burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`} \xB7 ${formatCredit(burn.perDay)} \u79EF\u5206/\u5929`
       ),
       React.createElement(
         "div",
@@ -3831,11 +3836,6 @@ function UsageHero({ total, rows, stock, windowValue }) {
             React.createElement("div", { className: "n" }, `${channel.count} \u53F7`)
           )
         )
-      ),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
-        "\u5B58\u91CF\u4E0E\u6D88\u8017\u662F\u4E24\u4E2A\u53E3\u5F84\uFF1A\u5B58\u91CF\u662F\u300C\u73B0\u5728\u8FD8\u5269\u591A\u5C11\u300D\uFF0C\u6D88\u8017\u662F\u300C\u7A97\u53E3\u5185\u82B1\u4E86\u591A\u5C11\u300D\u3002\u4E0D\u53EF\u6D88\u8017\u5355\u5217\uFF0C\u4E0D\u5E76\u5165\u53EF\u7528\u3002"
       )
     )
   );
@@ -4036,8 +4036,11 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           "div",
           { className: "dshc-row" },
           React.createElement("div", { style: s.label }, "\u7528\u91CF"),
-          React.createElement(Tag, { text: `\u7A97\u53E3\u805A\u5408 \xB7 \u8FD1 ${windowText}`, tone: "info" }),
-          React.createElement(Tag, { text: "\u843D\u76D8 data/usage.json", tone: "idle" })
+          React.createElement(Tag, {
+            text: `\u8FD1 ${windowText}`,
+            tone: "info",
+            title: "\u7A97\u53E3\u805A\u5408\u53E3\u5F84\uFF1A\u6570\u636E\u843D\u76D8 data/usage.json\uFF0C\u91CD\u542F\u4E0D\u6E05\u96F6"
+          })
         ),
         React.createElement(
           "div",
@@ -4064,14 +4067,6 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
             title: "\u5237\u65B0"
           }, React.createElement(Icons.refresh, null))
         )
-      ),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
-        usageData?.since ? `\u5206\u6876\u6570\u636E\u8D77\u70B9 ${usageData.since} \xB7 ` : "",
-        "\u69FD\u7C92\u5EA6\uFF1A\u8FD1 48 \u5C0F\u65F6\u4E3A\u5C0F\u65F6\u69FD\uFF0C\u66F4\u65E9\u6298\u53E0\u4E3A\u65E5\u69FD\uFF0830 \u5929\uFF09\u3002",
-        "\u8D26\u672C\u53EA\u7EDF\u8BA1\u7ECF\u672C\u7F51\u5173\u7684\u8BF7\u6C42\uFF08\u65C1\u8DEF\u6D41\u91CF\u4E0D\u5728\u5176\u4E2D\uFF09\u3002",
-        processesUptime ? ` \u53E6\u6709\u300C\u6A21\u578B\u5168\u666F\u300D\u4E3A\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF08\u5DF2\u8FD0\u884C ${processesUptime}\uFF0C\u91CD\u542F\u6E05\u96F6\uFF09\uFF0C\u4E24\u8005\u4E0D\u53EF\u6DF7\u7B97\u3002` : " \u672C\u7F51\u5173\u672A\u63D0\u4F9B\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF08/v1/stats\uFF09\u3002"
       )
     ),
     // ── 分桶不可用时的降级：不冒充「加载失败」 ──────────────────────────
@@ -4082,11 +4077,6 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         "div",
         { style: s.warn },
         usage?.reason ?? "\u7F51\u5173\u672A\u63D0\u4F9B\u5206\u6876\u7AEF\u70B9\uFF0C\u9700\u5728\u7F51\u5173\u4FA7\u652F\u6301 GET /v1/stats/buckets\u3002"
-      ),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } },
-        "\u4E0B\u65B9\u300C\u6A21\u578B\u5168\u666F\u300D\u4F7F\u7528\u8FDB\u7A0B\u7D2F\u8BA1\u7AEF\u70B9\uFF0C\u4E0D\u4F9D\u8D56\u5206\u6876\uFF0C\u4ECD\u53EF\u7528\u3002"
       )
     ) : null,
     // ── ② 英雄总量区 ────────────────────────────────────────────────────
@@ -4122,7 +4112,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         React.createElement(
           "div",
           { className: "dshc-row", style: { justifyContent: "space-between" } },
-          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "Token \u7ED3\u6784\uFF08\u7A97\u53E3\u5408\u8BA1\uFF09"),
+          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "Token \u7ED3\u6784"),
           React.createElement(
             "span",
             { style: { ...s.muted, fontSize: 11 } },
@@ -4147,8 +4137,11 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         ),
         React.createElement(
           "div",
-          { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
-          "\u4EC5\u7A97\u53E3\u53E3\u5F84 \u2014\u2014 \u5206\u6876\u53EA\u6709 prompt / completion \u4E24\u6BB5\uFF1B\u7F13\u5B58\u547D\u4E2D\u7387\u5C5E\u4E8E\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF0C\u89C1\u4E0A\u65B9\u73AF\u4E0E\u300C\u6A21\u578B\u5168\u666F\u300D\uFF0C\u4E0D\u5E76\u5165\u6B64\u6761\u3002"
+          { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
+          React.createElement("span", {
+            style: { cursor: "help" },
+            title: "\u7A97\u53E3\u53E3\u5F84\u53EA\u6709 prompt / completion \u4E24\u6BB5\uFF1B\u7F13\u5B58\u547D\u4E2D\u7387\u5C5E\u4E8E\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF08\u89C1\u4E0A\u65B9\u73AF\u4E0E\u300C\u6A21\u578B\u5168\u666F\u300D\uFF09\u3002"
+          }, "\u8F93\u5165 / \u8F93\u51FA\u4E24\u6BB5")
         )
       )
     ) : null,
@@ -4165,8 +4158,8 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
           React.createElement("div", { style: s.label }, "\u8D70\u52BF"),
           React.createElement(
             "span",
-            { style: { ...s.muted, fontSize: 11 } },
-            `${rows.length} \u4E2A\u65F6\u95F4\u69FD\uFF08\u6309\u69FD\u805A\u5408\uFF0C\u67F1\u6570 = \u69FD\u6570\uFF09`
+            { style: { ...s.muted, fontSize: 10.5 } },
+            `${rows.length} \u4E2A\u65F6\u95F4\u69FD`
           )
         ),
         React.createElement(
@@ -4178,7 +4171,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       rows.length === 0 ? React.createElement(
         "div",
         { style: { ...s.muted, marginTop: 10 } },
-        "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u8BF7\u6C42\u8BB0\u5F55\u3002\u53D1\u8D77\u4E00\u6B21\u5BF9\u8BDD\u540E\u5373\u53EF\u770B\u5230\u5206\u6876\u3002"
+        "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u8BF7\u6C42\u8BB0\u5F55"
       ) : React.createElement(
         "div",
         { style: { marginTop: 10 } },
@@ -4205,12 +4198,8 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         React.createElement(
           "div",
           { className: "dshc-row", style: { justifyContent: "space-between" } },
-          React.createElement(
-            "span",
-            { style: { ...s.muted, fontSize: 11 } },
-            "\u67F1 = \u8BF7\u6C42\uFF08\u5931\u8D25\u5360\u6BD4 > 5% \u8F6C\u7EA2\uFF09\xB7 \u7EBF = \u79EF\u5206\u6D88\u8017"
-          ),
-          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "\u53CC\u8F74 \xB7 \u5DE6=\u8BF7\u6C42 / \u53F3=\u79EF\u5206")
+          React.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, "\u67F1 = \u8BF7\u6C42 \xB7 \u7EBF = \u79EF\u5206"),
+          React.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, "\u5DE6 / \u53F3\u53CC\u8F74")
         ),
         React.createElement(
           "div",
@@ -4239,7 +4228,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         React.createElement(
           "div",
           { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
-          "\u884C = \u5C0F\u65F6\u69FD\u8986\u76D6\u7684\u65E5\u671F \xB7 \u5217 = \u5C0F\u65F6 \xB7 \u6DF1\u6D45 = \u8BF7\u6C42\u91CF"
+          "\u884C = \u65E5\u671F \xB7 \u5217 = \u5C0F\u65F6 \xB7 \u6DF1\u6D45 = \u8BF7\u6C42\u91CF"
         ),
         React.createElement(
           "div",
@@ -4279,12 +4268,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         total,
         accounts,
         channelOf
-      }),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, fontSize: 11, marginTop: 8, lineHeight: 1.7 } },
-        "\u5360\u6BD4\u6761 = \u8BE5\u884C\u8BF7\u6C42\u6570\u5360\u7A97\u53E3\u603B\u91CF\u7684\u6BD4\u4F8B\uFF1B\u70B9\u51FB\u300C\u8BF7\u6C42 / Tokens / \u79EF\u5206\u300D\u8868\u5934\u53EF\u5207\u6362\u6392\u5E8F\u3002"
-      )
+      })
     ) : null,
     // ── ⑥ 模型全景（进程累计；分桶不可用时仍可用） ──────────────────────
     React.createElement(
@@ -4295,23 +4279,14 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         extra: React.createElement(
           "span",
           { className: "dshc-row" },
-          React.createElement(Tag, { text: "\u8FDB\u7A0B\u7D2F\u8BA1 \xB7 \u91CD\u542F\u6E05\u96F6", tone: "idle" }),
-          stats?.enabled === true && stats.since ? React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, `\u8D77\u70B9 ${stats.since}`) : null
+          React.createElement(Tag, {
+            text: processesUptime ? `\u8FDB\u7A0B\u7D2F\u8BA1 \xB7 ${processesUptime}` : "\u8FDB\u7A0B\u7D2F\u8BA1",
+            tone: "idle",
+            title: stats?.enabled === true && stats.since ? `\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6\u3002\u6570\u636E\u8D77\u70B9 ${stats.since}` : "\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6"
+          })
         )
       }),
       React.createElement(UsageModelPanel, { stats })
-    ),
-    // ── 数据说明（如实呈现） ────────────────────────────────────────────
-    React.createElement(
-      "div",
-      { style: { ...s.card, padding: "12px 16px" } },
-      React.createElement(
-        "div",
-        { style: { ...s.muted, fontSize: 11, lineHeight: 1.8 } },
-        usageData?.note ?? "",
-        usageData?.note ? React.createElement("br", null) : null,
-        "\u300C\u7A97\u53E3\u805A\u5408\u300D\u4E0E\u300C\u8FDB\u7A0B\u7D2F\u8BA1\u300D\u662F\u4E24\u4E2A\u72EC\u7ACB\u53E3\u5F84\uFF0C\u6570\u503C\u4E0D\u53EF\u76F8\u52A0\u6216\u76F8\u51CF\uFF1A\u524D\u8005\u53D7\u7A97\u53E3\u4E0E\u843D\u76D8\u7EA6\u675F\uFF0C\u540E\u8005\u91CD\u542F\u6E05\u96F6\u3002"
-      )
     )
   );
 }

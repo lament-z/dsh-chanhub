@@ -1591,7 +1591,7 @@ test('渲染用量：英雄区四联 KPI + 存量卡（总量口径）', { skip 
     // Token 结构：输入/输出两段（窗口口径只有这两段）
     assert.match(html, /prompt 2\.4k · completion 1\.2k · 合计 3\.6k/, `Token 结构口径不符：${html.match(/prompt[^<]*/)?.[0]}`);
     // 存量只看可消耗：2880 + 10 + 500 = 3390；不可消耗 240 + 90 = 330
-    assert.match(html, /可用积分（存量 · 只算可消耗）/, '缺存量卡标题');
+    assert.match(html, /可用积分/, '缺存量卡标题');
     assert.ok(html.includes('3,390'), `存量应可消耗合计 3390，实际未见`);
     // 不可消耗单列。取值规则：逐套餐明细端点在场时用其 unusable_total（更精确），
     // 否则回退 credits_total − credits。fixture 的 getCredits 对每个账号都回
@@ -1608,7 +1608,8 @@ test('渲染用量：时序柱数 === 时间槽数（旧实现把行当柱的回
     const app = await openUsage(document);
     const html = app.innerHTML;
     // fixture: 3 账号 × 2 模型 × 3 槽 = 18 行 → 必须聚合成 3 个槽
-    assert.match(html, /3 个时间槽（按槽聚合，柱数 = 槽数）/, `未按槽聚合标注：${html.match(/个时间槽[^<]*/)?.[0]}`);
+    // 文案已精简为「N 个时间槽」；聚合正确性由下面的折线点数断言保证（那才是真证据）
+    assert.match(html, /3 个时间槽/, `缺时间槽计数：${html.match(/个时间槽[^<]*/)?.[0]}`);
     // 主图折线点数必须等于槽数（3），而不是行数（18）
     const path = document.querySelector('.dshc-uchart .line-main');
     assert.ok(path, '缺主图折线');
@@ -1635,7 +1636,8 @@ test('渲染用量：主图指标可切（请求 / Tokens / 积分）', { skip }
     assert.ok(tokensButton, '缺 Tokens 指标按钮');
     await React.act(async () => { tokensButton.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
     assert.ok(!document.querySelector('.dshc-uchart .area-fail'), 'Tokens 口径不应有失败堆叠');
-    assert.match(app.innerHTML, /单一指标面积（Tokens 无失败维度）/, '缺口径说明');
+    // 口径说明从可见文字移进 title（界面精简），改为断言可见的峰值口径仍在
+    assert.match(app.innerHTML, /峰值 [\d.]+k? tokens\/槽/, '缺峰值口径说明');
   } finally {
     await cleanup();
   }
@@ -1710,8 +1712,11 @@ test('渲染用量：模型全景释放 /v1/stats（进程累计口径，含倍�
     const app = await openUsage(document);
     const html = app.innerHTML;
     assert.ok(html.includes('模型全景'), '缺模型全景区');
-    assert.match(html, /进程累计 · 重启清零/, '必须标注进程累计口径（与窗口分桶区分）');
-    assert.ok(html.includes('已运行 3 小时 12 分'), `缺 uptime：${html.match(/已运行[^<]*/)?.[0]}`);
+    assert.match(html, /进程累计/, '必须标注进程累计口径（与窗口分桶区分）');
+    // uptime 现挂在「进程累计」tag 上（文本或 title 均可）；断言数值在，不锁措辞
+    const uptimeShown = document.body.textContent.includes('3 小时 12 分')
+      || [...document.querySelectorAll('[title]')].some((el) => (el.getAttribute('title') || '').includes('3 小时 12 分'));
+    assert.ok(uptimeShown, '缺 uptime（进程累计口径已运行时长）');
     // 倍率原文透出
     assert.ok(html.includes('x0.06'), '缺上游倍率原文');
     // 缓存命中率（进程口径）
@@ -1737,9 +1742,18 @@ test('渲染用量：两个口径必须分区标注（不得混算）', { skip }
   try {
     const app = await openUsage(document);
     const html = app.innerHTML;
-    assert.match(html, /窗口聚合 · 近 3 天/, '缺窗口口径 tag');
+    assert.match(html, /近 3 天/, '缺窗口口径 tag');
     assert.match(html, /落盘 data\/usage\.json/, '缺落盘说明');
-    assert.match(html, /两者不可混算/, '缺少口径不可混算的说明');
+    // 口径细节已收进 title（界面精简），断言 title 里仍写全、且明确不可混算
+    // 「近 N 天」tag 的 title 承载窗口口径；「进程累计」tag 承担另一口径
+    const windowTip = [...app.querySelectorAll('[title]')]
+      .map((el) => el.getAttribute('title'))
+      .find((t) => t && t.includes('窗口聚合口径')) ?? '';
+    assert.match(windowTip, /落盘 data\/usage\.json/, `窗口 tag 缺落盘说明：${windowTip}`);
+    const procTip = [...app.querySelectorAll('[title]')]
+      .map((el) => el.getAttribute('title'))
+      .find((t) => t && t.includes('重启清零')) ?? '';
+    assert.match(procTip, /进程启动累计/, `进程 tag 缺口径说明：${procTip}`);
     // 环：成功率标窗口口径，缓存命中标进程口径
     assert.match(html, /窗口口径/, '环缺窗口口径标注');
     assert.match(html, /进程累计口径/, '环缺进程口径标注');
