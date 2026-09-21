@@ -476,6 +476,43 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-uchans > div:last-child { border-right: 0; }
 .dshc-uchans .n { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 .dshc-uchans .c { font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+/* 折叠卡头（模型全景）：整行可点，左标题 + 右摘要三数 + 箭头。 */
+.dshc-foldhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; width: 100%; font: inherit; cursor: pointer; border: none; background: none; padding: 0; text-align: left; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-foldhead:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
+/* 统计条：**一个容器 + 内部竖细线**，不是 N 张独立卡片。
+   借自 Javis603/token-monitor 的 .dash-cards —— 一组数字平权并列时，
+   N 张各自浮起的卡会把视觉重量放大 N 倍；一条连续的条则克制得多。
+   尺寸纪律：数值 19px（不是 26px）、标签 10px 全大写 + 字距、全部等宽数位。 */
+.dshc-strip { display: grid; grid-template-columns: repeat(var(--dshc-stat-count, 7), minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-strip-cell { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 11px 14px; border-right: 1px solid var(--dsw-alias-border-l2,#eef0f3); }
+.dshc-strip-cell:last-child { border-right: none; }
+.dshc-strip-v { font-size: 19px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dshc-strip-k { font-size: 10px; letter-spacing: .03em; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 900px) { .dshc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .dshc-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 构成两列并排（按账号 / 按模型）：名字定宽 + 4px 细条 + 右对齐数值。
+   一屏能排 8–10 行还不显挤 —— 借自参考实现的 .dash-breakdown。 */
+.dshc-bd { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; }
+@media (max-width: 760px) { .dshc-bd { grid-template-columns: 1fr; } }
+.dshc-bd-col { min-width: 0; }
+.dshc-bd-cap { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-bottom: 6px; }
+.dshc-bd-row { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 3px 0; min-width: 0; }
+.dshc-bd-name { flex: none; width: 104px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.dshc-bd-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dshc-bd-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--dsw-alias-bg-layer-2,#f1f3f6); overflow: hidden; min-width: 28px; }
+.dshc-bd-bar > i { display: block; height: 100%; border-radius: 2px; }
+.dshc-bd-val { flex: none; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary,#61666b); white-space: nowrap; }
+.dshc-bd-pct { flex: none; width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+/* 图例即明细（趋势页）：色块 + 名称 + 值 + 占比，一行一项。
+   借自参考实现的 .dash-legend（grid 1fr auto auto）—— 比「独立图例 + 独立表格」
+   省一半版面，且值与占比天然对齐。 */
+.dshc-lg-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 4px 6px; border-radius: 6px; font-size: 12px; }
+.dshc-lg-row:hover { background: var(--dsw-alias-bg-layer-2,#f7f8fa); }
+.dshc-lg-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-lg-name > i { width: 10px; height: 10px; border-radius: 3px; flex: none; display: inline-block; }
+.dshc-lg-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dshc-lg-val { font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary,#61666b); white-space: nowrap; }
+.dshc-lg-pct { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
 /* 构成明细行（占比条列表）：名称行 / 占有条 / 读数行 —— 三段纵排，
    比 7 列表格更低密度，窄屏不横滑。 */
 .dshc-srow2 { padding: 7px 0; min-width: 0; }

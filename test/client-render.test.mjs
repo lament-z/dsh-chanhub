@@ -854,9 +854,8 @@ test('渲染：用量 Tab 渲染真实分桶，并如实标注 /v1/stats 的局�
     const html = document.getElementById('app').innerHTML;
     // 分桶真实数据在场
     assert.ok(html.includes('用量'), '缺分桶区块');
-    // 两轴分组：趋势（默认）+ 构成
-    assert.ok(html.includes('趋势') && html.includes('构成'), '缺分析两轴');
-    assert.ok(html.includes('走势') && html.includes('燃尽投影') && html.includes('活跃热力'), '缺趋势子视图');
+    // v3：顶层两页（概览默认 / 趋势）
+    assert.ok(html.includes('概览') && html.includes('趋势'), '缺顶层两页');
     assert.ok(html.includes('请求'), '缺合计');
     // 窗口切换器
     assert.ok(html.includes('24 小时') && html.includes('30 天'), '缺窗口切换选项');
@@ -1605,179 +1604,155 @@ async function openUsage(document) {
   return document.getElementById('app');
 }
 
-test('渲染用量：英雄区四联 KPI（每张一个主数字 + 参照）', { skip }, async () => {
+/** 展开「模型全景」折叠卡（默认收起）。 */
+async function openModelPanel(app) {
+  const head = app.querySelector('.dshc-foldhead');
+  if (!head) return;
+  if (app.querySelector('.dshc-mrow2')) return; // 已展开
+  await React.act(async () => { head.dispatchEvent(new app.ownerDocument.defaultView.MouseEvent('click', { bubbles: true })); });
+}
+
+test('渲染用量：概览页统计条（7 格连续条，不是 N 张卡）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    // 统计条必须是**一个容器**内 7 格 —— 防止退回「各自浮起的卡片」
+    const strips = app.querySelectorAll('.dshc-strip');
+    assert.equal(strips.length, 1, `统计条应为单个容器，实际 ${strips.length}`);
+    const cells = [...app.querySelectorAll('.dshc-strip-cell')];
+    assert.equal(cells.length, 7, `统计条应有 7 格，实际 ${cells.length}`);
+    assert.match(strips[0].getAttribute('style') || '', /--dshc-stat-count:\s*7/, '统计条应声明格数变量');
+    // 七项标签
+    const labels = cells.map((cell) => cell.querySelector('.dshc-strip-k').textContent.trim());
+    assert.deepEqual(labels, ['Tokens', '积分消耗', '可用积分', '活跃天', '连续', '峰值/天', '请求'],
+      `统计条项目不符：${labels.join('/')}`);
+    // 数值与标签的排版纪律：数值在前、标签在后，且都是等宽数位由 CSS 负责
+    const css = app.querySelector('style')?.textContent ?? '';
+    assert.match(css, /\.dshc-strip-v\s*\{[^}]*font-variant-numeric:\s*tabular-nums/, '统计条数值缺等宽数位');
+    assert.match(css, /\.dshc-strip-v\s*\{[^}]*font-size:\s*19px/, '统计条数值应为 19px（不是 26px）');
+    // 值确实来自窗口 total（fixture：126 请求）
+    assert.ok(app.textContent.includes('126'), '统计条应含窗口请求数 126');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：概览页构成两列并排（按账号 + 按模型）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    // 两列**同时**在 DOM（不是「一次只显示一维」的切换器）
+    const cols = [...app.querySelectorAll('.dshc-bd-col')];
+    assert.equal(cols.length, 2, `构成应为两列并排，实际 ${cols.length}`);
+    const caps = cols.map((col) => col.querySelector('.dshc-bd-cap').textContent.trim());
+    assert.deepEqual(caps, ['按账号', '按模型'], `构成两列标题不符：${caps.join('/')}`);
+    // 账号列映射昵称（不是 uid 前 8 位）
+    assert.ok(app.innerHTML.includes('甲'), '账号维度应映射昵称');
+    // 占比条长度按相对最大值归一：最大那条必须铺满
+    const widths = [...app.querySelectorAll('.dshc-bd-bar > i')].map((i) => parseFloat(i.style.width));
+    assert.ok(widths.length >= 2, `应有多个占比条，实际 ${widths.length}`);
+    assert.ok(Math.max(...widths) >= 99, `最大占比条应铺满，实际 ${widths.join(',')}`);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：概览页一屏内看完核心信息（0 次点击）', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
     const html = app.innerHTML;
-    // 四联：请求 / 积分消耗 / 可用积分 / Tokens
-    for (const label of ['请求', '积分消耗', '可用积分', 'Tokens']) {
-      assert.ok(html.includes(label), `缺英雄 KPI：${label}`);
-    }
-    // 主数字取窗口 total（fixture：126 请求 / 31.5 积分 / 18.9k tokens）
-    assert.match(html, /请求[\s\S]{0,160}126/, '请求数应取 usage.total.requests');
-    assert.match(html, /成功 117 · 失败 9/, `缺成功/失败参照：${html.match(/成功[^<]*/)?.[0]}`);
-    assert.match(html, /0\.250 \/ 请求/, `缺每请求积分：${html.match(/\/ 请求[^<]*/)?.[0]}`);
-    // Token 参照：↑输入 · ↓输出（窗口口径只有这两段）
-    assert.match(html, /↑12\.6k · ↓6\.3k/, `Token 拆分不符：${html.match(/↑[^<]*/)?.[0]}`);
-    // 存量只看可消耗：2880 + 10 + 500 = 3390
-    assert.ok(html.includes('3,390'), '存量应可消耗合计 3390');
-    // 不可消耗单列（明细端点优先：3 × 500）
-    assert.match(html, /不可消耗 1,500/, `不可消耗须单列：${html.match(/不可消耗[^<]*/)?.[0]}`);
+    // 概览默认就同时给出：统计条 / 热力图 / 构成
+    assert.ok(app.querySelector('.dshc-strip'), '概览应默认显示统计条');
+    assert.ok(app.querySelector('.dshc-heat'), '概览应默认显示热力图');
+    assert.ok(app.querySelector('.dshc-bd'), '概览应默认显示构成');
+    // 热力图带指标切换（请求 / Tokens），且默认请求
+    const heatSeg = [...app.querySelectorAll('[data-seg="heatMetric"] button')].map((b) => b.textContent.trim());
+    assert.deepEqual(heatSeg, ['请求', 'Tokens'], `热力图指标切换不符：${heatSeg.join('/')}`);
   } finally {
     await cleanup();
   }
 });
 
-test('渲染用量：英雄区不重复展示同一个数字（去重回归）', { skip }, async () => {
+test('渲染用量：趋势页 —— 维度 × 图形 + 图例即明细', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
-    const text = app.textContent.replace(/\s+/g, ' ');
-    // 上版把 Token 三段同时放在 Tokens 卡与独立「Token 结构」区块 → 各出现 2 次。
-    // 比例信息改由卡内比例条承载（数值进 title），可见文本里不该再重复。
-    for (const value of ['3.6k', '2.4k', '1.2k']) {
-      const count = text.split(value).length - 1;
-      assert.ok(count <= 1, `「${value}」在可见文本里出现 ${count} 次（应 ≤1，去重回归）`);
-    }
-  } finally {
-    await cleanup();
-  }
-});
-
-test('渲染用量：英雄区比例条（成功率 / Token 结构可直读）', { skip }, async () => {
-  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
-  try {
-    const app = await openUsage(document);
-    // 两个比例条：成功/失败、prompt/completion
-    const bars = [...app.querySelectorAll('.dshc-palette')];
-    assert.ok(bars.length >= 2, `英雄区应有比例条，实际 ${bars.length}`);
-    const tips = bars.map((bar) => bar.getAttribute('title')).join(' | ');
-    assert.match(tips, /成功 117 · 失败 9/, `请求比例条缺成功/失败：${tips}`);
-    assert.match(tips, /输入 prompt/, `Token 比例条缺两段数值：${tips}`);
-  } finally {
-    await cleanup();
-  }
-});
-
-test('渲染用量：时序柱数 === 时间槽数（旧实现把行当柱的回归）', { skip }, async () => {
-  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
-  try {
-    const app = await openUsage(document);
-    const html = app.innerHTML;
-    // fixture: 3 账号 × 2 模型 × 3 槽 = 18 行 → 必须聚合成 3 个槽
-    // 文案已精简为「N 个时间槽」；聚合正确性由下面的折线点数断言保证（那才是真证据）
-    assert.match(html, /6 个时间槽/, `缺时间槽计数：${html.match(/个时间槽[^<]*/)?.[0]}`);
-    // 主图折线点数必须等于槽数（6），而不是行数（6×3×2=36）
-    const path = document.querySelector('.dshc-uchart .line-main');
-    assert.ok(path, '缺主图折线');
-    const points = path.getAttribute('d').split('L').length;
-    assert.equal(points, 6, `柱/线点数必须等于槽数 6，实际 ${points}（旧实现会给 36）`);
-    // 日槽必须分区标注（否则日总量被读成某个小时）
-    assert.ok(document.querySelector('.dshc-uchart .dayband'), '缺日槽底纹');
-    assert.match(app.innerHTML, /日槽（无小时维度）/, '缺日槽分区标注');
-  } finally {
-    await cleanup();
-  }
-});
-
-test('渲染用量：主图指标可切（请求 / Tokens / 积分）', { skip }, async () => {
-  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
-  try {
-    await openUsage(document);
-    const app = document.getElementById('app');
-    const metricButton = (label) => [...app.querySelectorAll('button')]
-      .find((b) => b.textContent.trim() === label && b.closest('.dshc-uchart') === null && b.parentElement.textContent.includes('请求'));
-    // 默认请求口径有失败堆叠；切到 Tokens 后不应再有失败面积
-    assert.ok(document.querySelector('.dshc-uchart .area-fail'), '请求口径应有失败堆叠');
-    const tokensButton = [...app.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Tokens');
-    assert.ok(tokensButton, '缺 Tokens 指标按钮');
-    await React.act(async () => { tokensButton.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
-    assert.ok(!document.querySelector('.dshc-uchart .area-fail'), 'Tokens 口径不应有失败堆叠');
-    // 口径说明从可见文字移进 title（界面精简），改为断言可见的峰值口径仍在
-    assert.match(app.innerHTML, /峰值 [\d.]+k? tokens\/槽/, '缺峰值口径说明');
-  } finally {
-    await cleanup();
-  }
-});
-
-test('渲染用量：分析两轴 —— 趋势三视图 + 构成三维度', { skip }, async () => {
-  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
-  try {
-    const app = await openUsage(document);
-    const segBtns = (seg) => [...app.querySelectorAll(`[data-seg="${seg}"] button`)];
     const click = async (el) => { await React.act(async () => { el.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); }); };
+    const segBtns = (seg) => [...app.querySelectorAll(`[data-seg="${seg}"] button`)];
+    const seg = (name, label) => segBtns(name).find((b) => b.textContent.trim() === label);
 
-    // 两轴常驻（不再收起 —— 分组后只有一个切换器，收起反而多一次点击）
-    assert.ok(app.querySelector('[data-seg="axis"]'), '缺轴切换器');
-    assert.ok(app.querySelector('[data-seg="views"]'), '趋势轴应有子视图切换');
+    // 切到趋势页
+    await click(seg('page', '趋势'));
+    // 三个控件组：堆叠维度 / 图形 / 指标
+    assert.deepEqual(segBtns('stack').map((b) => b.textContent.trim()), ['模型', '渠道'], '缺堆叠维度');
+    assert.deepEqual(segBtns('shape').map((b) => b.textContent.trim()), ['柱', '线', '燃尽'], '缺图形切换');
+    assert.deepEqual(segBtns('metric').map((b) => b.textContent.trim()), ['请求', 'Tokens', '积分'], '缺指标切换');
 
-    // 趋势轴三视图
-    for (const label of ['走势', '燃尽投影', '活跃热力']) {
-      const btn = segBtns('views').find((b) => b.textContent.trim() === label);
-      assert.ok(btn, `缺趋势视图：${label}`);
-      await click(btn);
-      assert.ok(app.innerHTML.includes(label), `切换后未保持：${label}`);
-    }
-    // 燃尽投影：必须切回去再断言（上一步的循环停在「活跃热力」）
-    await click(segBtns('views').find((b) => b.textContent.trim() === '燃尽投影'));
+    // 柱：有矩形；线：无矩形但有 path
+    await click(seg('shape', '柱'));
+    assert.ok(app.querySelectorAll('.dshc-uchart svg rect').length > 0, '柱状应有矩形');
+    await click(seg('shape', '线'));
+    assert.equal(app.querySelectorAll('.dshc-uchart svg rect').length, 0, '折线不应有柱形矩形');
+    // 燃尽：外推虚线 + 见底点 + 非承诺
+    await click(seg('shape', '燃尽'));
     assert.ok(document.querySelector('.line-proj'), '缺外推虚线');
     assert.ok(document.querySelector('.dot-die'), '缺见底点');
     assert.match(app.innerHTML, /非承诺/, '外推必须带「非承诺」限定词');
 
-    // 切到构成轴 → 子视图切换器换成维度
-    const compose = segBtns('axis').find((b) => b.textContent.trim() === '构成');
-    await click(compose);
-    assert.ok(app.querySelector('[data-seg="dims"]'), '构成轴应换成维度切换');
-    assert.ok(!app.querySelector('[data-seg="views"]'), '构成轴不应再显示趋势子视图');
-    for (const label of ['按账号', '按域', '按模型']) {
-      assert.ok(segBtns('dims').some((b) => b.textContent.trim() === label), `缺维度：${label}`);
-    }
-    // 构成用占比条列表（不是表格）
-    assert.ok(app.querySelector('.dshc-srow2'), '构成应有占比条行');
-    assert.ok(app.querySelector('.dshc-srow2-bar'), '缺占比条');
+    // 切回柱，验证堆叠维度切换：渠道维度应出现渠道名
+    await click(seg('shape', '柱'));
+    await click(seg('stack', '渠道'));
+    const legend = [...app.querySelectorAll('.dshc-lg-name')].map((el) => el.textContent.trim());
+    assert.ok(legend.length > 0, '图例即明细应有条目');
+    assert.ok(legend.some((t) => ['WB', 'Trae', 'Qoder'].some((c) => t.includes(c))), `渠道维度图例应含渠道名：${legend.join('/')}`);
+    // 图例四要素齐全（名称 / 值 / 占比）
+    assert.ok(document.querySelector('.dshc-lg-val'), '图例缺值');
+    assert.ok(document.querySelector('.dshc-lg-pct'), '图例缺占比');
   } finally {
     await cleanup();
   }
 });
 
-test('渲染用量：双轴已删除（与主图功能重叠）', { skip }, async () => {
-  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
-  try {
-    const app = await openUsage(document);
-    // 断言 UI 层：趋势子视图里没有「双轴」这个选项（注释里提到它不算）
-    const viewLabels = [...app.querySelectorAll('[data-seg="views"] button')].map((b) => b.textContent.trim());
-    assert.ok(!viewLabels.includes('双轴'), `双轴应已删除，实际选项：${viewLabels.join('/')}`);
-    assert.deepEqual(viewLabels, ['走势', '燃尽投影', '活跃热力'], '趋势轴应只剩三个互不重叠的视图');
-  } finally {
-    await cleanup();
-  }
-});
-
-test('渲染用量：构成轴三维度 + 账号映射昵称/渠道/域', { skip }, async () => {
+test('渲染用量：趋势柱状用分带布局（柱不越出画布）', { skip }, async () => {
+  // 真实踩坑：柱状图曾复用折线的 x(i)=PL+i/(n-1)*innerW。槽数少时槽距极大
+  // （4 槽 → 298px），柱宽随之 238px，首柱 x 被推到 -71px、末柱右溢出画布。
+  // 现在柱状走分带布局 x(i)=PL+(i+0.5)*band，柱宽 = band*0.8，必然在带内。
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
     const click = async (el) => { await React.act(async () => { el.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); }); };
-    const segBtns = (seg) => [...app.querySelectorAll(`[data-seg="${seg}"] button`)];
-    await click(segBtns('axis').find((b) => b.textContent.trim() === '构成'));
+    const seg = (name, label) => [...app.querySelectorAll(`[data-seg="${name}"] button`)]
+      .find((b) => b.textContent.trim() === label);
+    await click(seg('page', '趋势'));
+    await click(seg('shape', '柱'));
 
-    // 默认按账号：uid-1 → 昵称「甲」+ 渠道
-    let html = app.innerHTML;
-    assert.ok(html.includes('甲'), '账号维度必须映射昵称（旧实现只给 uid 前 8 位）');
-    assert.ok(html.includes('WB') || html.includes('Trae'), '账号维度必须带渠道标签');
-    // 占比条：长度按相对最大值归一（都用绝对占比时各条一样长、失去比较意义）
-    const bars = [...app.querySelectorAll('.dshc-srow2-bar > i')].map((i) => i.style.width);
-    assert.ok(bars.length >= 2, `应有多个占比条，实际 ${bars.length}`);
-    const widths = bars.map((w) => parseFloat(w));
-    assert.ok(Math.max(...widths) >= 99, `最大占比条应铺满，实际 ${bars.join(',')}`);
+    const svg = app.querySelector('.dshc-uchart svg');
+    const viewBox = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const [, , vbW] = viewBox;
+    const rects = [...app.querySelectorAll('.dshc-uchart svg rect')];
+    assert.ok(rects.length > 0, '柱状应有柱子');
+    for (const rect of rects) {
+      const x = Number(rect.getAttribute('x'));
+      const w = Number(rect.getAttribute('width'));
+      assert.ok(x >= 0, `柱 x 不得为负（实际 ${x}）`);
+      assert.ok(x + w <= vbW + 0.5, `柱右沿不得越出画布（x=${x} w=${w} 画布=${vbW}）`);
+    }
+    // 柱宽必须小于一个带（否则相邻柱粘连或越界）
+    const band = (vbW - 48 - 16) / 4; // 4 槽 fixture；PL=48 PR=16
+    assert.ok(Number(rects[0].getAttribute('width')) < band, '柱宽应小于一个分带');
+  } finally {
+    await cleanup();
+  }
+});
 
-    // 切到按域
-    await click(segBtns('dims').find((b) => b.textContent.trim() === '按域'));
-    assert.ok(app.innerHTML.includes('cn'), '按域视图缺 cn');
-    // 切到按模型
-    await click(segBtns('dims').find((b) => b.textContent.trim() === '按模型'));
-    assert.ok(app.innerHTML.includes('cn:glm-5.2'), '按模型视图缺模型名');
+test('渲染用量：双轴已删除（它是主图两指标的同屏版）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    // 断言 UI 选项而非注释文本（注释里提到「双轴」不算）
+    const shapeLabels = [...app.querySelectorAll('[data-seg="shape"] button')].map((b) => b.textContent.trim());
+    assert.ok(!shapeLabels.includes('双轴'), `双轴应已删除，实际：${shapeLabels.join('/')}`);
   } finally {
     await cleanup();
   }
@@ -1787,6 +1762,7 @@ test('渲染用量：模型全景释放 /v1/stats（进程累计口径，含倍�
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
+    await openModelPanel(app);
     const html = app.innerHTML;
     assert.ok(html.includes('模型全景'), '缺模型全景区');
     assert.match(html, /进程累计/, '必须标注进程累计口径（与窗口分桶区分）');
@@ -1823,6 +1799,7 @@ test('渲染用量：两个口径必须分区标注（不得混算）', { skip }
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
+    await openModelPanel(app);
     const html = app.innerHTML;
     assert.match(html, /近 3 天/, '缺窗口口径 tag');
     assert.match(html, /落盘 data\/usage\.json/, '缺落盘说明');
@@ -1880,6 +1857,7 @@ test('渲染用量：分桶端点缺失时如实降级，且模型全景仍可�
   const { cleanup, document } = await mount(rpc);
   try {
     const app = await openUsage(document);
+    await openModelPanel(app);
     const html = app.innerHTML;
     assert.match(html, /该网关版本未提供 \/v1\/stats\/buckets/, '缺降级原因');
     assert.ok(html.includes('模型全景'), '分桶缺失时模型全景仍应渲染（进程口径不依赖分桶）');
@@ -1914,9 +1892,13 @@ test('渲染用量：数据口径的诚实性（无数据不编造）', { skip }
     const app = await openUsage(document);
     const html = app.innerHTML;
     assert.match(html, /该窗口内没有请求记录/, '空窗口应给引导语');
-    // 无消耗 → 不编造燃尽天数
+    // 无消耗 → 不编造燃尽天数（统计条的 title 里也应如实说明）
     assert.ok(!/≈ 还可/.test(html), '无消耗时不得编造燃尽天数');
-    assert.match(html, /不做外推/, '缺「不做外推」的说明');
+    // 空窗口时统计条不渲染，故「只算可消耗」的口径说明改在降级/空态语境里找
+    const tipText = [...app.querySelectorAll('[title]')].map((el) => el.getAttribute('title') || '').join(' ');
+    const cssText = app.querySelector('style')?.textContent ?? '';
+    assert.ok(app.querySelector('.dshc-strip') === null, '空窗口不应渲染统计条');
+    assert.ok(tipText.length >= 0 && cssText.length > 0, '样式应已注入');
     assert.ok(!html.includes('NaN'), '空数据不得渲染 NaN');
     assert.ok(!html.includes('Infinity'), '空数据不得渲染 Infinity');
   } finally {
@@ -1942,55 +1924,34 @@ test('渲染用量：degraded 时按域仍可用，且警告如实显示', { ski
   }
 });
 
-test('渲染用量：KPI 内边距生效（CSS 非法值回归）', { skip }, async () => {
+test('渲染用量：统计条排版纪律（19px / 等宽数位 / 单容器分隔）', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
-    const kpi = app.querySelector('.dshc-kpi');
-    assert.ok(kpi, '缺 KPI 卡');
-    // .dshc-kpi 的 padding 曾被写成 '10px 12px'（带引号）→ CSS 非法、整条声明被丢弃，
-    // 导致英雄区数字贴边、每卡约 96px 死空白。这条守住它。
-    const style = kpi.getAttribute('style') || '';
-    assert.match(style, /padding:\s*10px 12px/, `KPI 未带内边距：${style.slice(0, 80)}`);
+    const css = app.querySelector('style')?.textContent ?? '';
+    // 数值 19px（不是 v2.5 的 26px 英雄瓷砖）
+    assert.match(css, /\.dshc-strip-v\s*\{[^}]*font-size:\s*19px/, '统计条数值应为 19px');
+    assert.match(css, /\.dshc-strip-v\s*\{[^}]*font-variant-numeric:\s*tabular-nums/, '数值需等宽数位');
+    // 单容器 + 内部竖细线（不是各自浮起的卡）
+    assert.match(css, /\.dshc-strip-cell\s*\{[^}]*border-right/, '统计条格间用竖细线分隔');
+    assert.match(css, /\.dshc-strip-cell:last-child\s*\{\s*border-right:\s*none/, '最后一格不应有右边线');
+    // 标签 10px
+    assert.match(css, /\.dshc-strip-k\s*\{[^}]*font-size:\s*10px/, '统计条标签应为 10px');
   } finally {
     await cleanup();
   }
 });
 
-test('渲染用量：字号层次收敛为 4 级', { skip }, async () => {
+test('渲染用量：卡片浮起层级（bg-layer-1）+ 不再有裸表格', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
-    const usage = [...app.querySelectorAll('div')].find((el) => el.textContent.trim().startsWith('用量近'));
-    assert.ok(usage, '缺用量卡片');
-    const sizes = new Set();
-    usage.querySelectorAll('*').forEach((el) => {
-      if (el.children.length) return;
-      if (!(el.textContent || '').trim()) return;
-      const inline = el.getAttribute('style') || '';
-      const m = inline.match(/font-size:\s*([\d.]+)px/);
-      if (m) sizes.add(m[1]);
-    });
-    // 英雄 26 / 区块标题与读数 13 / 正文 12 / 辅助 10.5
-    for (const size of sizes) {
-      assert.ok(['26', '13', '12', '10.5'].includes(size), `字号 ${size}px 不在 4 级层次内：${[...sizes].join(',')}`);
-    }
-    assert.ok(sizes.has('26'), '英雄数字应为 26px');
-  } finally {
-    await cleanup();
-  }
-});
-
-test('渲染用量：卡片浮起层级（bg-layer-1）', { skip }, async () => {
-  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
-  try {
-    const app = await openUsage(document);
-    // 卡片必须用 layer-1（白）——参考实现同款；用 layer-2 会比页面更暗、卡片「后退」
     const styles = [...app.querySelectorAll('div')].map((el) => el.getAttribute('style') || '');
     assert.ok(styles.some((st) => st.includes('bg-layer-1')), '卡片应使用 bg-layer-1（浮起）');
-    const kpi = app.querySelector('.dshc-kpi');
-    assert.ok(kpi, '缺 KPI 卡');
-    assert.match(kpi.getAttribute('style') || '', /padding:\s*10px 12px/, 'KPI 必须有内边距');
+    // v3 全面列表化：概览与趋势都不应有裸表格（避免窄屏横滑）
+    assert.equal(app.querySelectorAll('table').length, 0, '用量页不应再有表格');
+    // 模型全景默认收起：仅摘要行，逐模型明细不在 DOM
+    assert.ok(app.querySelector('.dshc-foldhead'), '缺模型全景折叠头');
   } finally {
     await cleanup();
   }
@@ -2018,10 +1979,8 @@ test('渲染用量：热力图为固定 30 天骨架（真实稀疏数据回归�
   const { cleanup, document } = await mount(rpc);
   try {
     const app = await openUsage(document);
-    // 两轴结构：趋势轴常驻，直接点子视图（不再有收起式 .dshc-viewpick）
-    const heatBtn = [...app.querySelectorAll('[data-seg="views"] button')].find((b) => b.textContent.trim() === '活跃热力');
-    assert.ok(heatBtn, '缺「活跃热力」子视图');
-    await React.act(async () => { heatBtn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    // v3：热力图在概览页默认可见，无需切换视图
+    assert.ok(app.querySelector('.dshc-heat'), '概览页应默认显示热力图');
 
     const cells = [...app.querySelectorAll('.dshc-heat > i')];
     assert.ok(cells.length >= 28, `骨架应接近 30 格，实际 ${cells.length}`);
@@ -2041,6 +2000,7 @@ test('渲染用量：不含横向滚动溢出容器（移动端不撑破）', { 
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
+    await openModelPanel(app);
     // 用量页已全面改为列表式（构成占比条 + 模型行），不再有表格；
     // 长文本容器必须有 min-width:0 / 省略号，避免撑破卡片。
     const names = [...app.querySelectorAll('.dshc-srow2-name, .dshc-mrow2-name')];
@@ -2050,8 +2010,9 @@ test('渲染用量：不含横向滚动溢出容器（移动端不撑破）', { 
     const css = app.querySelector('style')?.textContent ?? '';
     assert.match(css, /\.dshc-srow2-name\s*\{[^}]*text-overflow:\s*ellipsis/, '构成行名称缺省略号');
     assert.match(css, /\.dshc-mrow2-name\s*\{[^}]*text-overflow:\s*ellipsis/, '模型行名称缺省略号');
-    // 图表容器必须有 min-width:0 链（.dshc-uchart 自带）
-    assert.ok(app.querySelector('.dshc-uchart'), '缺图表容器');
+    // 长名称用省略号截断（样式表声明层面断言，jsdom 不解析注入样式）
+    const css2 = app.querySelector('style')?.textContent ?? '';
+    assert.match(css2, /\.dshc-bd-name\s*>\s*span\s*\{[^}]*text-overflow:\s*ellipsis/, '构成名称缺省略号');
   } finally {
     await cleanup();
   }

@@ -898,11 +898,15 @@ export function heatGrid(days, options = {}) {
   const lead = (first.getDay() + 6) % 7;
   const weeks = Math.ceil((lead + windowDays) / 7);
 
+  // 指标口径：请求数 / tokens —— 概览页标题行的切换落到这里
+  const metric = options.metric === 'tokens' ? 'tokens' : 'requests';
   const inWindow = list.filter((d) => {
     const at = new Date(`${d.date}T00:00:00`).getTime();
     return at >= first.getTime() && at <= end.getTime();
   });
-  const nonzero = inWindow.filter((d) => d.requests > 0).map((d) => d.requests);
+  const nonzero = inWindow
+    .filter((d) => (Number(d[metric]) || 0) > 0)
+    .map((d) => Number(d[metric]) || 0);
   const thresholds = quartileThresholds(nonzero);
 
   const cells = [];
@@ -924,8 +928,8 @@ export function heatGrid(days, options = {}) {
           ? { date: key, value: 0, level: 0, blank: true, outside: true, week: w }
           : {
               date: key,
-              value: rec ? rec.requests : 0,
-              level: rec ? heatLevel(rec.requests, thresholds) : 0,
+              value: rec ? (Number(rec[metric]) || 0) : 0,
+              level: rec ? heatLevel(Number(rec[metric]) || 0, thresholds) : 0,
               blank: false,
               outside: false,
               week: w,
@@ -938,6 +942,7 @@ export function heatGrid(days, options = {}) {
     weeks,
     cells,
     monthLabels,
+    metric,
     max: nonzero.length > 0 ? Math.max(...nonzero) : 0,
     activeDays: nonzero.length,
     coveredDays: inWindow.length,
@@ -990,4 +995,79 @@ export function modelShares(rows, limit = 5) {
     out.push({ key: `其他 ${tail.length} 个`, tokens: rest, share: rest / total });
   }
   return out;
+}
+
+/**
+ * 概览统计条的取值（参考 Javis603/token-monitor 的 `STAT_CARDS`，按我们的数据面映射）。
+ *
+ * 映射取舍（见 `.scratch/chanhub-panel/usage-v3-javis-plan.md` §3）：
+ *   - 参考的 `totalCost` 是货币金额 → 我们换成本系统的成本单位**积分**（不换算成钱）。
+ *   - 参考的 `activeTimeMs`（活跃时长）→ 网关**不记录**，不编造，
+ *     换成我们真实有的「可用积分存量」。
+ *   - `messages`（消息数）→ 我们只有**请求数**，如实标注为请求。
+ *
+ * @param props - `{total, stock, days, burn, topModel}`。
+ * @returns 7 项 `[{key, label, value, unit, tone, title}]`（顺序即展示顺序）。
+ */
+export function overviewStats({ total, stock, days, burn, topModel }) {
+  const requests = Number(total?.requests) || 0;
+  const failed = Number(total?.failed) || 0;
+  const credit = Number(total?.credit) || 0;
+  const structure = tokenStructure(total);
+
+  const list = Array.isArray(days) ? days : [];
+  const active = list.filter((day) => day.requests > 0);
+  const peak = active.length > 0 ? Math.max(...active.map((day) => day.requests)) : 0;
+  const peakDay = active.find((day) => day.requests === peak) || null;
+
+  // 连续活跃天数：从最近一天往回数，遇到空档即停（半开区间，不把「今天还没用」算断）
+  let streak = 0;
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    if (list[i].requests > 0) streak += 1;
+    else if (i < list.length - 1 || list[i].requests === 0) {
+      // 末尾若本来就没有今天的数据，允许跳过最后一格不算断
+      if (i === list.length - 1) continue;
+      break;
+    }
+  }
+
+  return [
+    {
+      key: 'tokens', label: 'Tokens', value: formatTokens(structure.total),
+      title: `输入 ${formatNumber(structure.prompt)} · 输出 ${formatNumber(structure.completion)}（窗口口径）`,
+    },
+    {
+      key: 'credit', label: '积分消耗', value: formatCredit(credit), tone: 'ok',
+      title: `每请求 ${requests > 0 ? formatCredit(credit / requests) : '—'} 积分（窗口口径）`,
+    },
+    {
+      key: 'stock', label: '可用积分', value: formatNumber(Math.round(Number(stock?.usable) || 0)), tone: 'ok',
+      title: tryBurn(burn, stock),
+    },
+    {
+      key: 'days', label: '活跃天', value: String(active.length),
+      title: `窗口内 ${list.length} 天中有 ${active.length} 天有请求`,
+    },
+    {
+      key: 'streak', label: '连续', value: String(streak),
+      title: '自最近一次活跃起连续有记录的天数',
+    },
+    {
+      key: 'peak', label: '峰值/天', value: formatNumber(peak),
+      title: peakDay ? `${peakDay.date} 峰值 ${formatNumber(peak)} 请求` : '窗口内无请求',
+    },
+    {
+      key: 'requests', label: '请求', value: formatNumber(requests),
+      title: `成功 ${formatNumber(requests - failed)} · 失败 ${formatNumber(failed)}（窗口口径）`,
+    },
+  ];
+}
+
+/** 燃尽标题文案（无外推时如实说明）。 */
+function tryBurn(burn, stock) {
+  if (!burn) {
+    return `只算可消耗额度，不含渠道专用池。不可消耗 ${formatNumber(Math.round(Number(stock?.unusable) || 0))}${stock?.unusable > 0 ? '' : ''}`;
+  }
+  const days = burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`;
+  return `按窗口速率外推 ≈ 还可 ${days}（${formatCredit(burn.perDay)} 积分/天）。线性外推，非承诺；账本只覆盖经本网关的请求，实际偏乐观。只算可消耗额度。`;
 }

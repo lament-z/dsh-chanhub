@@ -34,6 +34,7 @@ import {
   groupByChannel,
   heatGrid,
   healthSummary,
+  overviewStats,
   hourlyProfile,
   isZeroTime,
   modelShares,
@@ -2328,9 +2329,12 @@ const HEAT_WINDOW_DAYS = 30;
  * @param props - `{rows, end}`。
  * @returns React 元素。
  */
-function UsageHeatmap({ rows }) {
+function UsageHeatmap({ rows, metric = 'requests' }) {
   const days = React.useMemo(() => usageByDay(rows), [rows]);
-  const grid = React.useMemo(() => heatGrid(days, { windowDays: HEAT_WINDOW_DAYS }), [days]);
+  const grid = React.useMemo(
+    () => heatGrid(days, { windowDays: HEAT_WINDOW_DAYS, metric }),
+    [days, metric],
+  );
   const hours = React.useMemo(() => hourlyProfile(rows), [rows]);
 
   const weekdayLabels = ['一', '二', '三', '四', '五', '六', '日'];
@@ -2367,7 +2371,7 @@ function UsageHeatmap({ rows }) {
               title: cell.outside
                 ? `${cell.date}（窗口外）`
                 : cell.value > 0
-                  ? `${cell.date} · ${formatNumber(cell.value)} 请求`
+                  ? `${cell.date} · ${metric === 'tokens' ? formatTokens(cell.value) : `${formatNumber(cell.value)} 请求`}`
                   : `${cell.date} · 无记录`,
             }),
           ),
@@ -2632,6 +2636,233 @@ function UsageRatioBar({ segments, title }) {
           key: 'empty',
           style: { width: '100%', background: 'var(--dsw-alias-border-l2,#e5e7eb)' },
         })]),
+  );
+}
+
+/**
+ * 统计条：一组数字**平权并列**，用「一个容器 + 内部竖细线」承载。
+ *
+ * 为什么不是 N 张卡（v2.5 的 4 张英雄瓷砖）：每张卡各自浮起时，视觉重量随卡片数
+ * 放大；而这组数字本来同级（都是「这段用了多少」），一条连续的条才如实表达同级。
+ * 尺寸也收敛：数值 19px（原 26px）、标签 10px 全大写 + 字距、全部等宽数位。
+ *
+ * 借自 Javis603/token-monitor 的 `.dash-cards`。
+ *
+ * @param props - `{items}`：`overviewStats()` 的输出。
+ * @returns React 元素。
+ */
+function UsageStatStrip({ items }) {
+  const list = Array.isArray(items) ? items : [];
+  if (list.length === 0) return null;
+  return React.createElement('div', {
+    className: 'dshc-strip',
+    style: { '--dshc-stat-count': String(list.length) },
+  },
+    ...list.map((item) =>
+      React.createElement('div', { key: item.key, className: 'dshc-strip-cell', title: item.title },
+        React.createElement('div', {
+          className: 'dshc-strip-v',
+          style: item.tone === 'ok' ? { color: tone.ok.fg } : undefined,
+        }, item.value),
+        React.createElement('div', { className: 'dshc-strip-k' }, item.label),
+      ),
+    ),
+  );
+}
+
+/**
+ * 构成（两列并排）：按账号 / 按模型。
+ *
+ * 每行 = 定宽名（104px）+ 4px 细条 + 数值 + 占比。条长按**相对最大值**归一 ——
+ * 各项接近时（33/33/33）用绝对占比会让所有条一样长、失去比较意义。
+ * 两列并排是因为账号与模型是同一份数据的两条正交切法，读者常要对照看。
+ *
+ * @param props - `{groups}`：`[{id, caption, rows, nameOf}]`。
+ * @returns React 元素。
+ */
+function UsageBreakdown({ groups }) {
+  const cols = (groups ?? []).filter((group) => (group.rows ?? []).length > 0);
+  if (cols.length === 0) return null;
+  return React.createElement('div', { className: 'dshc-bd' },
+    ...cols.map((group) => {
+      const maxShare = Math.max(...group.rows.map((row) => row.share), 0.0001);
+      return React.createElement('div', { key: group.id, className: 'dshc-bd-col' },
+        React.createElement('div', { className: 'dshc-bd-cap' }, group.caption),
+        ...group.rows.slice(0, 6).map((row, index) => {
+          const meta = group.nameOf ? group.nameOf(row.key) : null;
+          const label = meta ? meta.name : (row.key || '—');
+          const color = USAGE_SEG_COLORS[index % USAGE_SEG_COLORS.length];
+          return React.createElement('div', { key: row.key ?? index, className: 'dshc-bd-row' },
+            React.createElement('div', { className: 'dshc-bd-name' },
+              React.createElement('i', { style: { width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 } }),
+              React.createElement('span', { title: row.key }, label),
+              meta && meta.channel ? React.createElement(Tag, { text: meta.channel, tone: 'info' }) : null,
+            ),
+            React.createElement('div', { className: 'dshc-bd-bar' },
+              React.createElement('i', {
+                style: { width: `${Math.max(2, Math.round((row.share / maxShare) * 100))}%`, background: color },
+              }),
+            ),
+            React.createElement('div', {
+              className: 'dshc-bd-val',
+              title: `${formatNumber(row.requests ?? 0)} 请求 · 成功率 ${formatPercent(row.successRate, 2)} · ${formatCredit(Number(row.credit) || 0)} 积分`,
+            }, formatTokens(Number(row.total_tokens) || 0)),
+            React.createElement('div', { className: 'dshc-bd-pct' }, formatPercent(row.share, 0)),
+          );
+        }),
+      );
+    }),
+  );
+}
+
+/**
+ * 趋势图：堆叠柱 / 折线，按「模型」或「渠道」分色。
+ *
+ * 图例即明细（色块 + 名称 + 值 + 占比）—— 借自参考实现的 `.dash-legend`
+ * （`grid-template-columns: 1fr auto auto`），比「图例 + 单独表格」省一半版面。
+ *
+ * @param props - `{rows, buckets, metric, stackBy, shape, channelOf, accounts}`。
+ * @returns React 元素。
+ */
+function UsageTrendChart({ rows, buckets, metric, stackBy, shape, channelOf, accounts }) {
+  // 渠道归属：bucket 只带 uid，渠道需由 accounts + channelOf 反查
+  const channelOfUid = React.useCallback((uid) => {
+    const account = (accounts ?? []).find((item) => item.uid === uid);
+    return account ? (channelOf?.(account) ?? 'workbuddy') : '';
+  }, [accounts, channelOf]);
+
+  const model = React.useMemo(() => {
+    const pick = USAGE_METRICS.find((item) => item.id === metric) ?? USAGE_METRICS[0];
+    const slots = rows.map((row) => row.slot);
+    const index = new Map(slots.map((slot, i) => [slot, i]));
+    const table = new Map();
+    for (const bucket of Array.isArray(buckets) ? buckets : []) {
+      const slotIndex = index.get(bucket?.slot);
+      if (slotIndex === undefined) continue;
+      const key = stackBy === 'model'
+        ? (bucket.model || '-')
+        : (CHANNEL_LABEL[channelOfUid(bucket.uid)] ?? '其他');
+      if (!key) continue;
+      if (!table.has(key)) table.set(key, { key, total: 0, values: new Array(slots.length).fill(0) });
+      const entry = table.get(key);
+      const value = Number(pick.pick(bucket)) || 0;
+      entry.values[slotIndex] += value;
+      entry.total += value;
+    }
+    const list = [...table.values()].sort((a, b) => b.total - a.total);
+    // 长尾合并：只画前 6 条，其余归「其他」
+    if (list.length > 6) {
+      const head = list.slice(0, 6);
+      const tail = list.slice(6);
+      head.push({
+        key: `其他 ${tail.length} 项`,
+        total: tail.reduce((sum, item) => sum + item.total, 0),
+        values: tail.reduce((acc, item) => acc.map((v, i) => v + item.values[i]), new Array(slots.length).fill(0)),
+      });
+      return { slots, series: head, pick };
+    }
+    return { slots, series: list, pick };
+  }, [rows, buckets, metric, stackBy, channelOfUid]);
+
+  if (model.series.length === 0) {
+    return React.createElement('div', { style: s.muted }, '该窗口内没有可归因的记录');
+  }
+  const grand = model.series.reduce((sum, item) => sum + item.total, 0);
+  const stacked = shape === 'bars';
+
+  return React.createElement('div', null,
+    React.createElement('div', { style: { marginTop: 6 } },
+      React.createElement(UsageChart, {
+        deps: [model.slots.length, model.series.length, shape, metric],
+        render: (width) => {
+          const H = 190;
+          const PL = 48;
+          const PR = 16;
+          const PT = 12;
+          const PB = 26;
+          const innerW = Math.max(10, width - PL - PR);
+          const innerH = H - PT - PB;
+          const n = model.slots.length;
+          const fmt = model.pick.fmt;
+          // 堆叠时 y 上限 = 每槽各系列之和；折线时 = 每槽各系列最大值
+          const perSlot = Array.from({ length: n }, (_, i) =>
+            stacked
+              ? model.series.reduce((sum, item) => sum + item.values[i], 0)
+              : Math.max(0, ...model.series.map((item) => item.values[i])));
+          const max = niceMax(Math.max(1, ...perSlot));
+          // 两种图各自用**正确的横轴布局**（这是先前柱状溢出的真正原因）：
+          //   柱状 = 分带（band）：每槽占 innerW/n，柱居中在带内 → 永不越界；
+          //   折线 = 取点（point）：首尾点贴画布两端，符合折线读法。
+          // 教训：先前柱状复用了折线的 x(i)=PL+i/(n-1)*innerW，n 小时槽距极大
+          // （4 槽时 298px），柱宽随之 238px，首柱 x 被推到 -71px 溢出画布。
+          const band = innerW / Math.max(1, n);
+          const xBand = (i) => PL + (i + 0.5) * band;
+          const xPoint = (i) => PL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+          const x = stacked ? xBand : xPoint;
+          const y = (v) => PT + (1 - v / max) * innerH;
+          const barW = Math.max(2, band * 0.8);
+
+          const grid = [0, 0.5, 1].map((frac) => {
+            const gy = PT + innerH * frac;
+            return React.createElement('g', { key: `g${frac}` },
+              React.createElement('line', { className: 'grid', x1: PL, x2: width - PR, y1: gy, y2: gy }),
+              React.createElement('text', { className: 'axt', x: PL - 6, y: gy + 3.5, textAnchor: 'end' },
+                fmt(max * (1 - frac))),
+            );
+          });
+
+          const marks = stacked
+            ? model.series.flatMap((item, layer) =>
+                item.values.map((value, i) => {
+                  if (value <= 0) return null;
+                  const below = model.series.slice(0, layer)
+                    .reduce((sum, prev) => sum + prev.values[i], 0);
+                  const yTop = y(below + value);
+                  return React.createElement('rect', {
+                    key: `${item.key}-${i}`,
+                    x: (x(i) - barW / 2).toFixed(1),
+                    y: yTop.toFixed(1),
+                    width: barW.toFixed(1),
+                    height: Math.max(0, PT + innerH - yTop).toFixed(1),
+                    fill: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length],
+                    opacity: 0.9,
+                  });
+                }),
+              )
+            : model.series.map((item, layer) =>
+                React.createElement('path', {
+                  key: item.key,
+                  d: usageLine(item.values.map((value, i) => [x(i), y(value)])),
+                  fill: 'none',
+                  stroke: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length],
+                  strokeWidth: 2,
+                  strokeLinejoin: 'round',
+                }),
+              );
+
+          return React.createElement('svg', { viewBox: `0 0 ${width} ${H}`, width, height: H },
+            ...grid,
+            ...marks,
+            React.createElement('text', { className: 'axt', x: PL, y: H - 8 }, slotLabel(model.slots[0])),
+            React.createElement('text', { className: 'axt', x: width - PR, y: H - 8, textAnchor: 'end' },
+              slotLabel(model.slots[n - 1])),
+          );
+        },
+      }),
+    ),
+    React.createElement('div', { style: { marginTop: 10 } },
+      ...model.series.map((item, index) =>
+        React.createElement('div', { key: item.key, className: 'dshc-lg-row' },
+          React.createElement('span', { className: 'dshc-lg-name' },
+            React.createElement('i', { style: { background: USAGE_SEG_COLORS[index % USAGE_SEG_COLORS.length] } }),
+            React.createElement('span', { title: item.key }, item.key),
+          ),
+          React.createElement('span', { className: 'dshc-lg-val' }, model.pick.fmt(item.total)),
+          React.createElement('span', { className: 'dshc-lg-pct' },
+            formatPercent(grand > 0 ? item.total / grand : 0, 1)),
+        ),
+      ),
+    ),
   );
 }
 
@@ -2954,32 +3185,68 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
     [accounts, creditsByUid, channelOf],
   );
 
+  // 顶层两页：概览（一屏看完）/ 趋势（随时间）
+  const [page, setPage] = React.useState('overview');
+  // 概览页：热力图指标口径
+  const [heatMetric, setHeatMetric] = React.useState('requests');
+  // 趋势页：堆叠维度（模型/渠道）× 图形（柱/线/燃尽）× 指标
+  const [stackBy, setStackBy] = React.useState('model');
+  const [shape, setShape] = React.useState('bars');
+  // 模型全景默认收起（排查型信息，不与日常概览抢注意力）
+  const [modelOpen, setModelOpen] = React.useState(false);
   const [metric, setMetric] = React.useState('requests');
-  const [dim, setDim] = React.useState('uid');
-  const [axis, setAxis] = React.useState('trend');
-  const [view, setView] = React.useState('area');
 
   const total = usageData?.total ?? {};
   const windowText = USAGE_WINDOWS.find((item) => item.value === usageWindow)?.label ?? usageWindow;
   const processesUptime = stats?.enabled === true ? uptimeText(stats.uptime_sec) : null;
 
-  // 窗口切换后：如果停在时长相关的视图，保持不炸（数据换了，图会因 deps 变化重画）
-  const dimRows = usageData?.[`by_${dim}`] ?? [];
+  // 概览页的三块取值（都在同一份窗口分桶上派生，不新增请求）
+  const days = React.useMemo(() => usageByDay(rows), [rows]);
+  const burn = React.useMemo(
+    () => creditBurn(stock.usable, Number(total?.credit) || 0, usageWindow),
+    [stock.usable, total?.credit, usageWindow],
+  );
+  const statItems = React.useMemo(
+    () => overviewStats({ total, stock, days, burn }),
+    [total, stock, days, burn],
+  );
+  const breakdownGroups = React.useMemo(() => {
+    const nameOf = (key) => {
+      const account = (accounts ?? []).find((item) => item.uid === key);
+      if (!account) return null;
+      return {
+        name: account.nickname || `${key.slice(0, 8)}…`,
+        channel: CHANNEL_LABEL[channelOf?.(account)] ?? '',
+      };
+    };
+    return [
+      { id: 'uid', caption: '按账号', rows: usageShares(usageData?.by_uid ?? [], total), nameOf },
+      { id: 'model', caption: '按模型', rows: usageShares(usageData?.by_model ?? [], total), nameOf: null },
+    ];
+  }, [accounts, channelOf, usageData, total]);
 
   return React.createElement('div', null,
-    // ── ① 口径条 ────────────────────────────────────────────────────────
+    // ── 顶部：页签 + 窗口 + 刷新（一行解决，取代 v2.5 的 5 段纵向堆叠） ──
     React.createElement('div', { style: s.card },
       React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
         React.createElement('div', { className: 'dshc-row' },
-          React.createElement('div', { style: s.label }, '用量'),
+          React.createElement('div', { className: 'dshc-seg', 'data-seg': 'page' },
+            ...[['overview', '概览'], ['trends', '趋势']].map(([id, label]) =>
+              React.createElement('button', {
+                key: id,
+                type: 'button',
+                className: page === id ? 'on' : '',
+                onClick: () => setPage(id),
+              }, label),
+            ),
+          ),
           React.createElement(Tag, {
             text: `近 ${windowText}`,
             tone: 'info',
-            title: '窗口聚合口径：数据落盘 data/usage.json，重启不清零',
+            title: '窗口聚合口径：数据落盘 data/usage.json，重启不清零；与「进程口径」不可混算',
           }),
         ),
         React.createElement('div', { className: 'dshc-row' },
-          // 页级选择（窗口）：紧凑段控，不与图级控件抢权重
           React.createElement('div', { className: 'dshc-seg', 'data-seg': 'window' },
             ...USAGE_WINDOWS.map((option) =>
               React.createElement('button', {
@@ -2997,27 +3264,82 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       ),
     ),
 
-    // ── 分桶不可用时的降级：不冒充「加载失败」 ──────────────────────────
     !bucketsAvailable
       ? React.createElement('div', { style: s.card },
           React.createElement('div', { style: s.warn },
-            usage?.reason ?? '网关未提供分桶端点，需在网关侧支持 GET /v1/stats/buckets。',
+            usage?.reason ?? '网关未提供分桶端点，需在网关侧支持 GET /v1/stats/buckets。'),
+        )
+      : null,
+
+    // 容量降级：网关把四维分桶降成两维时必须如实说明（否则读者会把
+    // 「按账号/按模型只有一行」误读成「只有一个账号/模型」）
+    usageData?.degraded
+      ? React.createElement('div', { style: { ...s.card, padding: '12px 16px' } },
+          React.createElement('div', { style: s.warn },
+            '⚠️ 分桶键已超出容量上限，网关已降级为「槽 × 域」两维 —— 按账号 / 按模型两个维度将不再细分。'),
+        )
+      : null,
+
+    // ── 概览页：统计条 → 热力图 → 构成（一屏内看完） ────────────────────
+    bucketsAvailable && page === 'overview' && rows.length > 0
+      ? React.createElement('div', { style: s.card },
+          React.createElement(UsageStatStrip, { items: statItems }),
+          React.createElement('div', { style: { marginTop: 16 } },
+            React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between', marginBottom: 8 } },
+              React.createElement('span', { style: s.label }, '活跃热力'),
+              React.createElement('div', { className: 'dshc-seg', 'data-seg': 'heatMetric' },
+                ...[['requests', '请求'], ['tokens', 'Tokens']].map(([id, label]) =>
+                  React.createElement('button', {
+                    key: id,
+                    type: 'button',
+                    className: heatMetric === id ? 'on' : '',
+                    onClick: () => setHeatMetric(id),
+                  }, label),
+                ),
+              ),
+            ),
+            React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
+              React.createElement(UsageHeatmap, { rows, metric: heatMetric }),
+            ),
+          ),
+          React.createElement('div', { style: { marginTop: 16 } },
+            React.createElement(UsageBreakdown, { groups: breakdownGroups }),
           ),
         )
       : null,
 
-    // ── ② 英雄总量区：4 张同权瓷砖（每张一个主数字 + 一个参照） ──────────
-    bucketsAvailable
+    bucketsAvailable && page === 'overview' && rows.length === 0
       ? React.createElement('div', { style: s.card },
-          React.createElement(UsageHero, { total, stock, windowValue: usageWindow }),
+          React.createElement('div', { style: s.muted }, '该窗口内没有请求记录'),
         )
       : null,
 
-    // ── ③ 主图（走势） ──────────────────────────────────────────────────
-    bucketsAvailable
+    // ── 趋势页：维度 × 图形 + 图表；图例即明细 ──────────────────────────
+    bucketsAvailable && page === 'trends' && rows.length > 0
       ? React.createElement('div', { style: s.card },
-          React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-            React.createElement('div', { style: s.label }, '走势'),
+          React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between', marginBottom: 10 } },
+            React.createElement('div', { className: 'dshc-row' },
+              React.createElement('div', { className: 'dshc-seg', 'data-seg': 'stack' },
+                ...[['model', '模型'], ['channel', '渠道']].map(([id, label]) =>
+                  React.createElement('button', {
+                    key: id,
+                    type: 'button',
+                    className: stackBy === id ? 'on' : '',
+                    onClick: () => setStackBy(id),
+                  }, label),
+                ),
+              ),
+              React.createElement('div', { className: 'dshc-seg', 'data-seg': 'shape' },
+                ...[['bars', '柱'], ['line', '线'], ['burn', '燃尽']].map(([id, label]) =>
+                  React.createElement('button', {
+                    key: id,
+                    type: 'button',
+                    className: shape === id ? 'on' : '',
+                    onClick: () => setShape(id),
+                  }, label),
+                ),
+              ),
+            ),
             React.createElement('div', { className: 'dshc-seg', 'data-seg': 'metric' },
               ...USAGE_METRICS.map((item) =>
                 React.createElement('button', {
@@ -3029,92 +3351,26 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
               ),
             ),
           ),
-          rows.length === 0
-            ? React.createElement('div', { style: { ...s.muted, marginTop: 10 } },
-                '该窗口内没有请求记录')
-            : React.createElement('div', { style: { marginTop: 10 } },
-                React.createElement(UsageAreaChart, { rows, metric }),
-                React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 4 } },
-                  `${rows.length} 个时间槽`),
-              ),
-        )
-      : null,
-
-    // ── ④+⑤ 分析（两轴：趋势 / 构成） ──────────────────────────────────
-    // 合并原「分析视图」与「归因表」。为什么两组：切换器里原来把「随时间变化」
-    // 与「什么占比」混在一起（4 个选项里 3 个是时间轴），读者切换时没有可依的
-    // 心理模型。现在按正交维度分组：
-    //   趋势 = 怎么变（走势 / 燃尽投影 / 活跃热力）
-    //   构成 = 是什么（模型 / 账号 / 域，用占比条列表）
-    // 另：删掉原「双轴」—— 它只是主图两个指标的同屏版，功能重叠。
-    bucketsAvailable && rows.length > 0
-      ? React.createElement('div', { style: s.card },
-          // 第一级：趋势 / 构成
-          React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between', marginBottom: 10 } },
-            React.createElement('div', { className: 'dshc-seg', 'data-seg': 'axis' },
-              ...[['trend', '趋势'], ['compose', '构成']].map(([id, label]) =>
-                React.createElement('button', {
-                  key: id,
-                  type: 'button',
-                  className: axis === id ? 'on' : '',
-                  onClick: () => setAxis(id),
-                }, label),
-              ),
-            ),
-            // 第二级：随第一级变化的子选项
-            axis === 'trend'
-              ? React.createElement('div', { className: 'dshc-seg', 'data-seg': 'views' },
-                  ...TREND_VIEWS.map((item) =>
-                    React.createElement('button', {
-                      key: item.id,
-                      type: 'button',
-                      className: view === item.id ? 'on' : '',
-                      onClick: () => setView(item.id),
-                    }, item.label),
-                  ),
-                )
-              : React.createElement('div', { className: 'dshc-seg', 'data-seg': 'dims' },
-                  ...USAGE_DIMS.map((item) =>
-                    React.createElement('button', {
-                      key: item.id,
-                      type: 'button',
-                      className: dim === item.id ? 'on' : '',
-                      onClick: () => setDim(item.id),
-                    }, item.label),
-                  ),
-                ),
-          ),
-
-          usageData?.degraded
-            ? React.createElement('div', { style: { ...s.warn, marginBottom: 8 } },
-                '⚠️ 分桶键已超出容量上限，网关已降级为「槽 × 域」两维 —— 按账号 / 按模型两个维度将不再细分。')
-            : null,
-
-          axis === 'trend'
-            ? React.createElement('div', null,
-                view === 'burn'
-                  ? React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow })
-                  : null,
-                view === 'heat'
-                  ? React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
-                      React.createElement(UsageHeatmap, { rows }),
-                    )
-                  : null,
-                view === 'area'
-                  ? React.createElement(UsageAreaChart, { rows, metric })
-                  : null,
-              )
-            : React.createElement(UsageShareList, {
-                rows: dimRows, dim, total, accounts, channelOf,
+          shape === 'burn'
+            ? React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow })
+            : React.createElement(UsageTrendChart, {
+                rows, buckets, metric, stackBy, shape, channelOf, accounts,
               }),
         )
       : null,
 
-    // ── ⑥ 模型全景（进程累计；分桶不可用时仍可用） ──────────────────────
+    // ── ⑥ 模型全景（进程累计；默认收起） ────────────────────────────────
+    // 摘要行给出三个关键数（缓存命中率 / TTFB / 吞吐），展开才看逐模型明细。
+    // 它属于**排查型**信息（为什么贵），不该与日常概览抢同一层注意力。
     React.createElement('div', { style: s.card },
-      React.createElement(CardHead, {
-        title: '模型全景',
-        extra: React.createElement('span', { className: 'dshc-row' },
+      React.createElement('button', {
+        type: 'button',
+        className: 'dshc-foldhead',
+        'aria-expanded': modelOpen,
+        onClick: () => setModelOpen((prev) => !prev),
+      },
+        React.createElement('span', { className: 'dshc-row' },
+          React.createElement('span', { style: s.label }, '模型全景'),
           React.createElement(Tag, {
             text: processesUptime ? `进程累计 · ${processesUptime}` : '进程累计',
             tone: 'idle',
@@ -3123,7 +3379,21 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
               : '自进程启动累计，重启清零',
           }),
         ),
-      }),
+        React.createElement('span', { className: 'dshc-row', style: { gap: 12 } },
+          stats?.enabled === true
+            ? React.createElement(React.Fragment, null,
+                React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+                  `缓存 ${formatPercent(Number(stats.total?.cache_hit_rate) || 0, 0)}`),
+                React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+                  `TTFB ${(Number(stats.total?.avg_ttfb_ms) || 0) > 0 ? `${Math.round(Number(stats.total.avg_ttfb_ms))} ms` : '—'}`),
+                React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+                  `吞吐 ${(Number(stats.total?.tokens_per_sec) || 0) > 0 ? `${Number(stats.total.tokens_per_sec).toFixed(1)} tok/s` : '—'}`),
+              )
+            : React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, '网关未提供'),
+          React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, modelOpen ? '▴' : '▾'),
+        ),
+      ),
+      modelOpen ? React.createElement('div', { style: { marginTop: 4 } },
       // 进程口径的比率指标：与表格同源（/v1/stats），放在一起口径自洽
       React.createElement(UsageRatioStrip, {
         items: stats?.enabled === true
@@ -3153,7 +3423,8 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
             ]
           : null,
       }),
-      React.createElement(UsageModelPanel, { stats }),
+        React.createElement(UsageModelPanel, { stats }),
+      ) : null,
     ),
 
   );
