@@ -1567,6 +1567,8 @@ async function mountQuick(options = {}) {
       store,
       prefs,
       openSettings: () => {},
+      // 便利入口的能力探针：默认可用；用例可传 false 验证「取不到就隐藏按钮」
+      hasOpenSettings: options.hasOpenSettings ?? (() => true),
       now: Date.now,
     }));
   });
@@ -1637,10 +1639,28 @@ test('渲染：入口 popover 显示汇总与账号卡（可用积分/渠道/在
     assert.ok(body.includes('近 24h'), '要有近 24h 统计块（滚动窗口）');
     assert.ok(body.includes('甲'), '账号昵称应出现在账号卡里');
     assert.ok(body.includes('在途占满') || body.includes('在途'), '在途维度要有呈现');
+    assert.ok(body.includes('渠道中心'), '有能力时才渲染「打开渠道中心」入口');
     assert.equal(ctx.document.querySelectorAll('[role="dialog"]').length, 1, 'popover 必须 portal 到 body 且是 dialog');
     // 免横向滚动：根节点不得出现横向 overflow
     const dialog = ctx.document.querySelector('[role="dialog"]');
     assert.equal(dialog.style.overflowX, '', '浮层不做横向滚动');
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('渲染：宿主没有 remote.settings 时隐藏「渠道中心」按钮，其余功能不受影响', { skip }, async () => {
+  const ctx = await mountQuick({
+    wide: true,
+    status: realStatusFixture(),
+    usage: usageFixture(),
+    hasOpenSettings: () => false,
+  });
+  try {
+    await clickEntry(ctx.document, ctx.container);
+    const body = ctx.document.body.innerHTML;
+    assert.ok(body.includes('可用积分'), '入口本身照常工作');
+    assert.ok(!body.includes('渠道中心'), '能力缺失时不渲染该按钮（不是渲染成死按钮）');
   } finally {
     await ctx.cleanup();
   }

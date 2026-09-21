@@ -273,7 +273,7 @@ function FreshnessPill({ phase, error, fetchedAt, now }) {
  * @param props - `{wide, store, prefs, openSettings, now}`。
  * @returns React 元素。
  */
-export function QuickEntry({ wide, store, prefs, openSettings, now = Date.now() }) {
+export function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
   const [snapshot, setSnapshot] = React.useState(() => store?.getSnapshot?.());
   const [enabled, setEnabled] = React.useState(() => (prefs ? prefs.value : true));
   const [open, setOpen] = React.useState(false);
@@ -437,7 +437,8 @@ export function QuickEntry({ wide, store, prefs, openSettings, now = Date.now() 
             buttonRef.current?.focus?.();
           },
           onRefresh: () => void store?.refreshUpstream?.(),
-          openSettings,
+          // 便利入口：宿主没有 remote.settings 时不渲染「渠道中心」按钮（其余功能照常）
+          openSettings: hasOpenSettings?.() === true ? openSettings : undefined,
         }),
         document.body,
       )

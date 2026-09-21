@@ -82,9 +82,13 @@ import { createQuickStore, createSidebarPrefs } from './quick-store.js';
 const name = 'dsh-chanhub';
 /** 插件 settings 命名空间（与宿主 lib/index.js 的 SETTINGS_NAMESPACE 同值）。 */
 const SETTINGS_NAMESPACE = 'dsh-chanhub';
-// settingsScope：读写插件偏好（侧边栏入口开关）；remote/remote.settings：
-// 打开设置面板（openSettingsDocument）。旧宿主缺这些服务时各自降级，不硬失败。
-const inject = ['slots', 'connection', 'remote', 'remote.settings', 'settingsScope'];
+// inject 只放**必需**服务：客户端运行时会把缺依赖的插件 park 在 waitingFor
+// （`Object.keys(fiber.inject).filter(name => ctx.get(name) === undefined)`）
+// —— 也就是说，为「打开设置面板」这种便利功能声明依赖，一旦该服务不存在，
+// 整个插件（连「渠道中心」面板）都不会激活。所以 remote / remote.settings
+// 不进 inject，改为点击时惰性取（取不到就隐藏按钮，不影响其它功能）。
+// settingsScope 有第三方插件先例（dsh-context / dsh-restart / dsh-univer-office）。
+const inject = ['slots', 'connection', 'settingsScope'];
 
 /** RPC 端点（与宿主 lib/index.js 的 ENDPOINTS 保持一致）。 */
 
@@ -3202,6 +3206,17 @@ function apply(ctx) {
   effect(() => () => store.dispose(), 'dsh-chanhub: sidebar quick store');
   effect(() => () => prefs.dispose?.(), 'dsh-chanhub: sidebar entry prefs');
 
+  // 「打开设置面板」是便利入口，不是硬依赖（见文件顶 inject 注释）：
+  // 惰性取 remote.settings；取不到就让组件隐藏按钮（hasOpenSettings=false）。
+  const remoteSettings = () => {
+    try {
+      const remote = typeof ctx.get === 'function' ? ctx.get('remote') : undefined;
+      return remote?.settings;
+    } catch {
+      return undefined;
+    }
+  };
+
   // foot 区入口（list 槽；cordis 面板按默认 order=0 排在前，我们取 100 排其后）。
   ctx.slots.inject('sidebar.footer.action', () =>
     ctx.slots.register(
@@ -3213,8 +3228,8 @@ function apply(ctx) {
         inject: () => ({
           store,
           prefs,
-          // 宿主只提供「打开设置面板」；按 section 深链不存在，故不做假设。
-          openSettings: () => ctx.remote?.settings?.openSettingsDocument?.(),
+          hasOpenSettings: () => typeof remoteSettings()?.openSettingsDocument === 'function',
+          openSettings: () => remoteSettings()?.openSettingsDocument?.(),
         }),
       },
       QuickEntry,

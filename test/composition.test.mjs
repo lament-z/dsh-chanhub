@@ -387,4 +387,6 @@ test('组合：客户端 bundle 的 slots 注册元信息正确（Loader 消费�
   assert.equal(typeof quickInjected.store?.refreshUpstream, 'function', '手动刷新入口');
   assert.equal(typeof quickInjected.prefs?.set, 'function', '偏好要能读写');
   assert.equal(typeof quickInjected.openSettings, 'function', '要能打开渠道中心');
+  // 便利入口必须带能力探针：宿主没有 remote.settings 时组件据此隐藏按钮
+  assert.equal(typeof quickInjected.hasOpenSettings, 'function');
 });

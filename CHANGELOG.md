@@ -37,6 +37,9 @@ rail（56px）态只留图标 + 异常角标；点开是一个自带 popover，�
   `dsh-chanhub.sidebarEntry`（宿主 `settings.yaml`，跨浏览器一致），客户端用现成的 `ctx.settingsScope`
   读写，**不新增任何 RPC 端点**；改完即时生效，不需要重启。
 - 这一组**渲染在「网关配置不可读」错误分支之前**：远程部署 / config.json 读不到时，用户仍然关得掉入口。
+- 客户端 `inject` 只加 `settingsScope`（有第三方先例）：`remote` / `remote.settings` 改为**惰性取** ——
+  客户端 runner 把「注入了但尚未就绪的服务」记为 `waitingFor` 并**不激活插件**，为「打开设置面板」
+  这种便利功能声明依赖，风险是把「渠道中心」面板一起拖下线；现在取不到只隐藏那一个按钮。
 - 宿主没有 `settingsScope`（旧版本）时自动降级为「默认开启、开关禁用并说明原因」。
 
 **顺手修掉的口径缺陷**

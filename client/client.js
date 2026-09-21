@@ -4144,7 +4144,7 @@ function FreshnessPill({ phase, error, fetchedAt, now }) {
     item.text
   );
 }
-function QuickEntry({ wide, store, prefs, openSettings, now = Date.now() }) {
+function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
   const [snapshot, setSnapshot] = import_react6.default.useState(() => store?.getSnapshot?.());
   const [enabled, setEnabled] = import_react6.default.useState(() => prefs ? prefs.value : true);
   const [open, setOpen] = import_react6.default.useState(false);
@@ -4302,7 +4302,8 @@ function QuickEntry({ wide, store, prefs, openSettings, now = Date.now() }) {
         buttonRef.current?.focus?.();
       },
       onRefresh: () => void store?.refreshUpstream?.(),
-      openSettings
+      // 便利入口：宿主没有 remote.settings 时不渲染「渠道中心」按钮（其余功能照常）
+      openSettings: hasOpenSettings?.() === true ? openSettings : void 0
     }),
     document.body
   ) : null;
@@ -4832,7 +4833,7 @@ function createSidebarPrefs(settingsScope, options = {}) {
 // client/index.js
 var name = "dsh-chanhub";
 var SETTINGS_NAMESPACE = "dsh-chanhub";
-var inject = ["slots", "connection", "remote", "remote.settings", "settingsScope"];
+var inject = ["slots", "connection", "settingsScope"];
 var TASK_DEFS = [
   { name: "checkin", label: "\u7B7E\u5230", icon: "\u{1F4C5}", key: "checkin" },
   // balance 第七类任务（网关 balance.go）：逐号查余额不签到，签到后余额才解冻的
@@ -7617,6 +7618,14 @@ function apply(ctx) {
   const store = createQuickStore(rpcCall);
   effect(() => () => store.dispose(), "dsh-chanhub: sidebar quick store");
   effect(() => () => prefs.dispose?.(), "dsh-chanhub: sidebar entry prefs");
+  const remoteSettings = () => {
+    try {
+      const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
+      return remote?.settings;
+    } catch {
+      return void 0;
+    }
+  };
   ctx.slots.inject(
     "sidebar.footer.action",
     () => ctx.slots.register(
@@ -7628,8 +7637,8 @@ function apply(ctx) {
         inject: () => ({
           store,
           prefs,
-          // 宿主只提供「打开设置面板」；按 section 深链不存在，故不做假设。
-          openSettings: () => ctx.remote?.settings?.openSettingsDocument?.()
+          hasOpenSettings: () => typeof remoteSettings()?.openSettingsDocument === "function",
+          openSettings: () => remoteSettings()?.openSettingsDocument?.()
         })
       },
       QuickEntry
