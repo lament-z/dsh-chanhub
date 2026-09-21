@@ -418,111 +418,163 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 /* 等待授权的小转圈 */
 @keyframes dshc-spin { to { transform: rotate(360deg); } }
 .dshc-spinner { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--dsw-alias-border-l2,#e5e7eb); border-top-color: var(--dsw-alias-button-info-fill,#4176e6); animation: dshc-spin .8s linear infinite; }
-/* ══════════ 用量图表（纯内联 SVG + CSS 变量） ══════════════════════════════
-   关键约束（原型实测）：**SVG 的 fill/stroke 不写 var()**。
-   presentation attribute 里写 var() 在部分浏览器不解析 → 一律挂 class，
-   颜色由这里决定。切主题只换变量，SVG 无需重渲染。 */
-.dshc-uchart { position: relative; min-width: 0; }
-.dshc-uchart > svg { display: block; width: 100%; overflow: visible; }
-.dshc-uchart .grid { stroke: var(--dsw-alias-border-l2,#e5e7eb); stroke-dasharray: 2 3; stroke-width: 1; }
-.dshc-uchart .axt { fill: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 10.5px; }
-.dshc-uchart .axt.warn { fill: var(--dsw-alias-state-warn-primary,#b45309); }
-.dshc-uchart .axt.err { fill: var(--dsw-alias-state-error-primary,#dc2626); }
-/* 面积 + 折线（主图） */
-.dshc-uchart .area-main { fill: url(#dshcAreaMain); }
-.dshc-uchart .area-fail { fill: url(#dshcAreaFail); }
-.dshc-uchart .line-main { fill: none; stroke: var(--dsw-alias-brand-primary,#4f6ef7); stroke-width: 2; stroke-linejoin: round; }
-/* 柱 + 折线（双轴） */
-.dshc-uchart .bar-main { fill: url(#dshcBarMain); }
-.dshc-uchart .bar-main.bad { fill: url(#dshcBarBad); }
-.dshc-uchart .line-credit { fill: none; stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; }
-.dshc-uchart .dot-credit { fill: var(--dsw-alias-bg-layer-1,#fff); stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; }
-/* 燃尽投影 */
-.dshc-uchart .area-burn { fill: url(#dshcAreaBurn); }
-.dshc-uchart .line-burn { fill: none; stroke: var(--dsw-alias-label-secondary,#61666b); stroke-width: 2; stroke-linejoin: round; }
-.dshc-uchart .line-proj { fill: none; stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; stroke-dasharray: 5 4; }
-.dshc-uchart .dot-die { fill: var(--dsw-alias-bg-layer-1,#fff); stroke: var(--dsw-alias-state-error-primary,#dc2626); stroke-width: 2.5; }
-/* 日槽区底纹（无小时维度，必须视觉上区分） */
-.dshc-uchart .dayband { fill: var(--dsw-alias-label-tertiary,#8b93a1); opacity: .07; }
-.dshc-uchart .slotdiv { stroke: var(--dsw-alias-border-l2,#e5e7eb); stroke-dasharray: 3 3; stroke-width: 1; }
-/* 堆叠面积 */
-.dshc-uchart .seg { stroke: var(--dsw-alias-bg-layer-1,#fff); stroke-width: .6; }
-/* hover 十字线 / 圆点 / 提示 */
-.dshc-ucross { position: absolute; top: 0; width: 1px; background: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .45; pointer-events: none; display: none; }
-.dshc-udot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--dsw-alias-bg-layer-1,#fff); border: 2px solid var(--dsw-alias-brand-primary,#4f6ef7); transform: translate(-50%,-50%); pointer-events: none; display: none; }
-.dshc-utip { position: absolute; z-index: 6; pointer-events: none; background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 8px; padding: 7px 9px; box-shadow: 0 6px 20px rgba(0,0,0,.16); font-size: 11.5px; white-space: nowrap; line-height: 1.65; color: var(--dsw-alias-label-primary,currentColor); }
-/* 环形百分比 */
-.dshc-uring { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
-@media (max-width: 560px) { .dshc-uring { grid-template-columns: 1fr; } }
-.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 12px 14px; text-align: center; min-width: 0; }
-.dshc-uring svg { display: block; margin: 0 auto; }
-.dshc-uring .rv { font-size: 17px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
-.dshc-uring .rl { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-top: 2px; }
-.dshc-uring .track { fill: none; stroke: var(--dsw-alias-bg-layer-2,#f3f4f6); stroke-width: 7; }
-.dshc-uring .arc { fill: none; stroke-width: 7; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
-.dshc-uring .arc.ok { stroke: var(--dsw-alias-state-success-primary,#22c55e); }
-.dshc-uring .arc.brand { stroke: var(--dsw-alias-brand-primary,#4f6ef7); }
-.dshc-uring .arc.warn { stroke: var(--dsw-alias-state-warn-primary,#f59e0b); }
-/* Token 结构条 */
-.dshc-ustack { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
-.dshc-ustack > i { display: block; height: 100%; }
-/* 英雄区 */
-.dshc-uhero { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 10px; }
-@media (max-width: 820px) { .dshc-uhero { grid-template-columns: 1fr; } }
-.dshc-ustock { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 12px 14px; min-width: 0; }
-.dshc-ustock .big { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--dsw-alias-state-success-primary,#059669); }
-.dshc-uchans { display: flex; margin-top: 10px; border-top: 1px solid var(--dsw-alias-border-l2,#e5e7eb); padding-top: 8px; }
-.dshc-uchans > div { flex: 1; min-width: 0; text-align: center; border-right: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
-.dshc-uchans > div:last-child { border-right: 0; }
-.dshc-uchans .n { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
-.dshc-uchans .c { font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
-/* 折叠卡头（模型全景）：整行可点，左标题 + 右摘要三数 + 箭头。 */
-.dshc-foldhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; width: 100%; font: inherit; cursor: pointer; border: none; background: none; padding: 0; text-align: left; color: var(--dsw-alias-label-primary,currentColor); }
-.dshc-foldhead:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
-/* 统计条：**一个容器 + 内部竖细线**，不是 N 张独立卡片。
-   借自 Javis603/token-monitor 的 .dash-cards —— 一组数字平权并列时，
-   N 张各自浮起的卡会把视觉重量放大 N 倍；一条连续的条则克制得多。
-   尺寸纪律：数值 19px（不是 26px）、标签 10px 全大写 + 字距、全部等宽数位。 */
-.dshc-strip { display: grid; grid-template-columns: repeat(var(--dshc-stat-count, 7), minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); }
-.dshc-strip-cell { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 11px 14px; border-right: 1px solid var(--dsw-alias-border-l2,#eef0f3); }
-.dshc-strip-cell:last-child { border-right: none; }
-.dshc-strip-v { font-size: 19px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dshc-strip-k { font-size: 10px; letter-spacing: .03em; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 900px) { .dshc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .dshc-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-/* 构成两列并排（按账号 / 按模型）：名字定宽 + 4px 细条 + 右对齐数值。
-   一屏能排 8–10 行还不显挤 —— 借自参考实现的 .dash-breakdown。 */
-.dshc-bd { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; }
-@media (max-width: 760px) { .dshc-bd { grid-template-columns: 1fr; } }
-.dshc-bd-col { min-width: 0; }
-.dshc-bd-cap { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-bottom: 6px; }
-.dshc-bd-row { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 3px 0; min-width: 0; }
-.dshc-bd-name { flex: none; width: 104px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-.dshc-bd-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dshc-bd-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--dsw-alias-bg-layer-2,#f1f3f6); overflow: hidden; min-width: 28px; }
-.dshc-bd-bar > i { display: block; height: 100%; border-radius: 2px; }
-.dshc-bd-val { flex: none; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary,#61666b); white-space: nowrap; }
-.dshc-bd-pct { flex: none; width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
-/* 图例即明细（趋势页）：色块 + 名称 + 值 + 占比，一行一项。
-   借自参考实现的 .dash-legend（grid 1fr auto auto）—— 比「独立图例 + 独立表格」
-   省一半版面，且值与占比天然对齐。 */
-.dshc-lg-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 4px 6px; border-radius: 6px; font-size: 12px; }
-.dshc-lg-row:hover { background: var(--dsw-alias-bg-layer-2,#f7f8fa); }
-.dshc-lg-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--dsw-alias-label-primary,currentColor); }
-.dshc-lg-name > i { width: 10px; height: 10px; border-radius: 3px; flex: none; display: inline-block; }
-.dshc-lg-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dshc-lg-val { font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary,#61666b); white-space: nowrap; }
-.dshc-lg-pct { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
-/* 构成明细行（占比条列表）：名称行 / 占有条 / 读数行 —— 三段纵排，
-   比 7 列表格更低密度，窄屏不横滑。 */
-.dshc-srow2 { padding: 7px 0; min-width: 0; }
-.dshc-srow2 + .dshc-srow2 { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
-.dshc-srow2-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-.dshc-srow2-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--dsw-alias-label-primary,currentColor); font-size: 12.5px; }
-.dshc-srow2-bar { margin: 5px 0 4px; height: 6px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); overflow: hidden; }
-.dshc-srow2-bar > i { display: block; height: 100%; border-radius: 999px; opacity: .85; }
-.dshc-srow2-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; }
-/* 模型全景行（成本优先）：名称行 + 详情行 —— 两段一行，替代 9 列表格。 */
+/* ══════════ 用量页 v4（单页卡片流，参考 AlfredChaos/dsh-usage-panel） ══════════
+   两条硬约束（都是原型/真机上踩出来的，别回退）：
+
+   1. **SVG 的 fill/stroke 不写 var()**。presentation attribute 里的 var()
+      在部分浏览器不解析 → 静态色一律挂 class（下面 .dshc-ust-svg 子树），
+      动态色（模型分色）走 'style'（CSS 属性，var() 可解析）。
+
+   2. **卡片用 bg-layer-1（白）浮在灰页面上**。参考实现同款；用 layer-2
+      （比页面更暗）会让卡片「后退」，整页发闷。 */
+.dshc-ust-root { position: relative; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+/* ── 页头：标题 + 四态副标题 + 导出 + 刷新 ── */
+.dshc-ust-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.dshc-ust-headtitle { min-width: 0; }
+.dshc-ust-head h2 { margin: 0; font-size: 16px; font-weight: 650; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ust-sub { margin-top: 3px; font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+/* 失败态用警示色 —— 「显示的是旧数据」必须一眼可见，不能只靠一行小字 */
+.dshc-ust-sub[data-freshness="fallback"], .dshc-ust-sub[data-freshness="error"] { color: var(--dsw-alias-state-warn-primary,#b45309); }
+.dshc-ust-headactions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.dshc-ust-refresh { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-label-primary,currentColor); border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+.dshc-ust-refresh:hover { border-color: var(--dsw-alias-border-l2,#d1d5db); }
+.dshc-ust-refresh:disabled { opacity: .55; cursor: default; }
+
+/* ── 导出菜单（纯客户端构建，不新增端点） ── */
+.dshc-ust-export { position: relative; }
+.dshc-ust-exportbtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-label-primary,currentColor); border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+.dshc-ust-exportmenu { position: absolute; right: 0; top: calc(100% + 4px); min-width: 150px; background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 8px; padding: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 9000; }
+.dshc-ust-exportmenu button { display: block; width: 100%; text-align: left; border: none; background: transparent; color: var(--dsw-alias-label-primary,currentColor); font: inherit; font-size: 12px; padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+.dshc-ust-exportmenu button:hover { background: var(--dsw-alias-bg-layer-2,#f7f8fa); }
+
+/* ── 卡片外壳 ── */
+.dshc-ust-card { background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.dshc-ust-cardhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.dshc-ust-cardtitle { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.dshc-ust-cardtitle h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ust-cardsub { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ust-cardactions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dshc-ust-cardfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.dshc-ust-hint { font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); cursor: help; }
+.dshc-ust-subblock { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-ust-empty { padding: 26px 8px; text-align: center; color: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 12px; line-height: 1.8; }
+.dshc-ust-empty-title { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); margin-bottom: 4px; }
+
+/* ── 口径标注行（窗口 / 进程两个口径各自留痕） ── */
+.dshc-ust-kpihead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dshc-ust-scope { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.dshc-ust-scope-tag { font-size: 10px; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); color: var(--dsw-alias-label-secondary,#6b7280); flex-shrink: 0; }
+
+/* ── ① KPI 4 卡：主数字 + 一行次级文字 ──
+   参考实现的 kpi 卡：数值 19px/700/负字距/等宽数位，次级文字 11px。
+   栅格 auto-fit 让窄屏自动换行，而不是硬压 4 列。 */
+.dshc-ust-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.dshc-ust-kpi { background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; padding: 13px 15px; min-width: 0; }
+.dshc-ust-kpi-k { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dshc-ust-kpi-v { margin-top: 7px; font-size: 19px; font-weight: 700; line-height: 1.2; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dshc-ust-kpi-d { margin-top: 4px; font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── ② 活跃热力图（GitHub 布局：周为列、周一→周日为行） ── */
+.dshc-heat-wrap { display: flex; align-items: flex-start; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.dshc-heat-wrap::-webkit-scrollbar { display: none; }
+.dshc-heat-days { display: grid; grid-template-rows: repeat(7, 1fr); gap: 3px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-heat-main { min-width: 0; flex: 1 1 auto; }
+.dshc-heat-months { display: grid; gap: 3px; height: 13px; margin-bottom: 3px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-heat-months > span { white-space: nowrap; overflow: hidden; }
+.dshc-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; }
+.dshc-heat > i { width: 11px; height: 11px; border-radius: 2.5px; display: block; }
+.dshc-heat > i.blank { background: transparent; }
+.dshc-heat > i:hover { box-shadow: 0 0 0 1px var(--dsw-alias-border-l2,#d5d5d5); }
+/* 分位色阶（参考实现的蓝 ramp；深浅主题各一套） */
+.dshc-heat > i.h0 { background: var(--dsw-alias-bg-layer-2,#f1f4f9); }
+.dshc-heat > i.h1 { background: #dbeafe; }
+.dshc-heat > i.h2 { background: #93c5fd; }
+.dshc-heat > i.h3 { background: #3b82f6; }
+.dshc-heat > i.h4 { background: #1d4ed8; }
+body[data-ds-dark-theme] .dshc-heat > i.h0 { background: #1f2937; }
+body[data-ds-dark-theme] .dshc-heat > i.h1 { background: #1e3a8a; }
+body[data-ds-dark-theme] .dshc-heat > i.h2 { background: #2563eb; }
+body[data-ds-dark-theme] .dshc-heat > i.h3 { background: #3b82f6; }
+body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
+.dshc-ust-heat-legend { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ust-heat-legend > i { width: 11px; height: 11px; border-radius: 2.5px; display: inline-block; }
+.dshc-ust-heat-legend > i.h0 { background: var(--dsw-alias-bg-layer-2,#f1f4f9); }
+.dshc-ust-heat-legend > i.h1 { background: #dbeafe; }
+.dshc-ust-heat-legend > i.h2 { background: #93c5fd; }
+.dshc-ust-heat-legend > i.h3 { background: #3b82f6; }
+.dshc-ust-heat-legend > i.h4 { background: #1d4ed8; }
+body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h0 { background: #1f2937; }
+body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h1 { background: #1e3a8a; }
+body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h2 { background: #2563eb; }
+body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h3 { background: #3b82f6; }
+body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
+/* 入场动效（逐列延迟的淡入） */
+@keyframes dshc-heat-in { from { opacity: 0 } to { opacity: 1 } }
+.dshc-heat > i.anim { animation: dshc-heat-in .45s linear both; }
+@media (prefers-reduced-motion: reduce) {
+  .dshc-heat > i.anim { animation: none; }
+}
+
+/* ── ③ 每日用量 SVG（柱状堆叠 + 燃尽） ──
+   静态色全在这里：见本段开头的约束 1。 */
+.dshc-ust-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.dshc-ust-svg .grid { stroke: var(--dsw-alias-border-l2,#e5e7eb); stroke-dasharray: 3 3; stroke-width: 1; }
+.dshc-ust-svg .grid.base { stroke-dasharray: none; }
+.dshc-ust-svg .axt { fill: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 10.5px; }
+.dshc-ust-svg .axt.err { fill: var(--dsw-alias-state-error-primary,#dc2626); }
+.dshc-ust-svg .floor { stroke: var(--dsw-alias-state-error-primary,#dc2626); stroke-width: 1; opacity: .5; }
+.dshc-ust-svg .nowline { stroke: var(--dsw-alias-label-secondary,#6b7280); stroke-width: 1; opacity: .4; }
+.dshc-ust-svg .area-burn { fill: var(--dsw-alias-state-error-primary,#dc2626); opacity: .14; }
+.dshc-ust-svg .line-burn { fill: none; stroke: var(--dsw-alias-label-secondary,#61666b); stroke-width: 2; stroke-linejoin: round; }
+.dshc-ust-svg .line-proj { fill: none; stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; stroke-dasharray: 5 4; }
+.dshc-ust-svg .dot-die { fill: var(--dsw-alias-bg-layer-1,#fff); stroke: var(--dsw-alias-state-error-primary,#dc2626); stroke-width: 2.5; }
+.dshc-ust-svg .zero { fill: var(--dsw-alias-border-l2,#e5e7eb); }
+/* 柱状入场：从底部长起（transform-origin 必须配 transform-box，否则以视口原点缩放） */
+.dshc-ust-bar-seg { transform-box: fill-box; transform-origin: bottom; animation: dshc-ust-bar-grow .7s cubic-bezier(.16,1,.3,1) both; }
+@keyframes dshc-ust-bar-grow { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+@media (prefers-reduced-motion: reduce) { .dshc-ust-bar-seg { animation: none; } }
+/* 图例即明细：色块 + 名称 + 值 + 占比（借参考实现的 grid 1fr auto auto） */
+.dshc-ust-legend { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.dshc-ust-legend-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 4px 6px; border-radius: 6px; font-size: 12px; }
+.dshc-ust-legend-row:hover { background: var(--dsw-alias-bg-layer-2,#f7f8fa); }
+.dshc-ust-legend-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ust-legend-name > i { width: 10px; height: 10px; border-radius: 3px; flex: none; display: inline-block; }
+.dshc-ust-legend-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dshc-ust-legend-val { font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary,#61666b); white-space: nowrap; }
+.dshc-ust-legend-pct { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
+
+/* ── ④ 账号排行 / ⑤ 渠道用量（两列并排） ──
+   名字定宽 + 4px 细条 + 右对齐占比 —— 一屏能排 8 行还不显挤。
+   条长按**相对最大值**归一：各项接近时用绝对占比会让所有条一样长。 */
+.dshc-ust-rank { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .dshc-ust-rank { grid-template-columns: 1fr; } }
+.dshc-ust-rank-row { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 4px 0; min-width: 0; }
+.dshc-ust-rank-row + .dshc-ust-rank-row { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
+.dshc-ust-rank-no { flex: none; width: 16px; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; font-size: 11px; }
+.dshc-ust-rank-name { flex: none; width: 104px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ust-rank-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dshc-ust-rank-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--dsw-alias-bg-layer-2,#f1f3f6); overflow: hidden; min-width: 28px; }
+.dshc-ust-rank-bar > i { display: block; height: 100%; border-radius: 2px; background: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-ust-rank-val { flex: none; width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+@media (max-width: 560px) { .dshc-ust-rank-name { width: 84px; } }
+
+/* ── ⑥ 模型占比环形图 + 列表 ── */
+.dshc-models { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.dshc-donut { flex-shrink: 0; }
+.dshc-donut-seg { cursor: pointer; transition: stroke-width .15s; }
+.dshc-donut-seg.dim { opacity: .35; }
+.dshc-donut-total { fill: var(--dsw-alias-label-primary,currentColor); font-size: 17px; font-weight: 700; }
+.dshc-donut-cap { fill: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 10px; }
+.dshc-mlist { flex: 1 1 200px; min-width: 180px; }
+.dshc-mrow { display: flex; align-items: center; gap: 9px; padding: 6px 2px; font-size: 12px; min-width: 0; }
+.dshc-mrow + .dshc-mrow { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
+.dshc-mrow > i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.dshc-mname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-mtok { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
+.dshc-mpct { width: 52px; text-align: right; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; }
+
+/* ── 进程口径折叠区：逐模型行（成本优先） ── */
 .dshc-mrow2 { padding: 8px 0; min-width: 0; }
 .dshc-mrow2 + .dshc-mrow2 { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
 .dshc-mrow2-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -530,11 +582,13 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-mrow-detail { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; }
 .dshc-more { font: inherit; cursor: pointer; border: none; background: none; color: var(--dsw-alias-brand-primary,#4f6ef7); font-size: 11.5px; padding: 6px 0 0; }
 .dshc-more:hover { text-decoration: underline; }
-/* 占比条 */
-.dshc-ushare { display: inline-block; height: 6px; border-radius: 999px; background: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .85; vertical-align: middle; }
-/* 时段热力 */
-.dshc-uheat { display: grid; gap: 2px; min-width: 0; }
-.dshc-uheat .hl { font-size: 10px; color: var(--dsw-alias-label-tertiary,#8b93a1); line-height: 14px; white-space: nowrap; }
-.dshc-uheat i { height: 14px; border-radius: 2px; background: var(--dsw-alias-brand-primary,#4f6ef7); display: block; }
-.dshc-uheat i.zero { background: var(--dsw-alias-bg-layer-2,#f3f4f6); opacity: 1 !important; }
+
+/* ── 结构化 tooltip（fixed 定位；参考实现的 tooltip 样式） ── */
+.dshc-ust-tooltip { position: fixed; left: 0; top: 0; transform: translate(-50%, -110%); background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); color: var(--dsw-alias-label-primary,currentColor); padding: 5px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); opacity: 0; transition: opacity .1s; z-index: 9999; }
+.dshc-ust-tooltip.show { opacity: 1; }
+.dshc-ust-tooltip-title { font-size: 11px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; }
+.dshc-ust-tooltip-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dsw-alias-label-secondary,#6b7280); white-space: nowrap; line-height: 1.6; }
+.dshc-ust-tooltip-row i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
 `;

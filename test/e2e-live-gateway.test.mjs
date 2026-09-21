@@ -363,14 +363,26 @@ test('真机：用量 Tab 渲染真实分桶数据', { skip: finalSkip }, async 
   const { document, cleanup } = await mountReal();
   try {
     await clickTab(document, '用量');
-    // 用量分桶数据异步到达（首屏刷新含 /admin/refresh + 逐号补拉），
-    // 固定读 DOM 会踩竞态 —— 轮询等维度切换入口出现。
-    const html = await waitForText(document, /按账号[\s\S]*按域[\s\S]*按模型/);
-    // v2 重设计把「时序分桶」标题去掉、三维度改为单表 tab 切换：
-    // 默认渲染「按账号」，另两维只在点击后出现 —— 故三维度改查 tab 标签。
-    assert.ok(html.includes('用量'), '缺用量区块');
-    assert.ok(html.includes('按账号'), '缺默认维度表');
-    assert.ok(html.includes('按域') && html.includes('按模型'), '缺其余两个维度切换入口');
+    // 用量页自管数据（SWR + 一次拉 720h）：等 KPI 卡出现即认为首轮数据落地。
+    // 用真实数据断言（不绑定具体数值 —— 网关实时在变）。
+    const html = await waitForText(document, /用量统计[\s\S]*窗口口径/);
+    assert.ok(html.includes('窗口口径'), '缺窗口口径标注');
+    assert.ok(html.includes('data/usage.json'), '缺落盘路径标注');
+    // KPI 4 卡
+    assert.equal(
+      document.querySelectorAll('.dshc-ust-kpi').length,
+      4,
+      'KPI 应为 4 卡',
+    );
+    // 六张卡 + 两个折叠区
+    for (const id of ['heat', 'daily', 'accounts', 'channels', 'models']) {
+      assert.ok(document.querySelector(`[data-card="${id}"]`), `缺卡片 ${id}`);
+    }
+    for (const id of ['burn', 'process']) {
+      assert.ok(document.querySelector(`details[data-fold="${id}"]`), `缺折叠区 ${id}`);
+    }
+    // 真实分桶必然产生「请求」这个指标词
+    assert.ok(html.includes('请求'), '缺请求数据');
   } finally {
     await cleanup();
   }

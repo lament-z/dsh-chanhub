@@ -1063,11 +1063,237 @@ export function overviewStats({ total, stock, days, burn, topModel }) {
   ];
 }
 
+/** 燃尽天数的展示封顶：外推超过 3 年已无阅读意义，如实标注「>3 年」而不是甩一个六位数。 */
+const BURN_DAYS_CAP = 365 * 3;
+
+/** 天数文本（>3 年显示「>3 年」，<1 天换算成小时）。 */
+function burnDaysText(days) {
+  if (days > BURN_DAYS_CAP) return '>3 年';
+  return days >= 1 ? `${days.toFixed(1)} 天` : `${(days * 24).toFixed(1)} 小时`;
+}
+
 /** 燃尽标题文案（无外推时如实说明）。 */
 function tryBurn(burn, stock) {
   if (!burn) {
-    return `只算可消耗额度，不含渠道专用池。不可消耗 ${formatNumber(Math.round(Number(stock?.unusable) || 0))}${stock?.unusable > 0 ? '' : ''}`;
+    return `只算可消耗额度，不含渠道专用池。不可消耗 ${formatNumber(Math.round(Number(stock?.unusable) || 0))}`;
   }
-  const days = burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`;
-  return `按窗口速率外推 ≈ 还可 ${days}（${formatCredit(burn.perDay)} 积分/天）。线性外推，非承诺；账本只覆盖经本网关的请求，实际偏乐观。只算可消耗额度。`;
+  return `按窗口速率外推 ≈ 还可 ${burnDaysText(burn.days)}（${formatCredit(burn.perDay)} 积分/天）。线性外推，非承诺；账本只覆盖经本网关的请求，实际偏乐观。只算可消耗额度。`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   用量页 v4 派生（单页卡片流：范围切片 / 账号与渠道归因 / KPI）
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 每日用量的可选范围（天）—— 与参考实现的 7/14/30 切换一致。 */
+export const DAY_RANGES = [7, 14, 30];
+
+/**
+ * 按天切片：取最后 N 天（纯前端，不再发请求）。
+ *
+ * 为什么要前端切片：原先每次切窗口都要重拉 7 个端点（含逐账号的
+ * credits / growth / school），只为改一个时间范围。而网关分桶一次就能
+ * 给到 30 天上限，范围切换只是「看多少」的问题 —— 本地切片即可。
+ *
+ * 边界：天数不足时返回全部（不是补零）—— 补零会画出并不存在的「安静日」。
+ *
+ * @param days - `usageByDay()` 的输出（按日期升序）。
+ * @param range - 天数（7 / 14 / 30）。
+ * @returns 末尾 `range` 条（不足则全部）。
+ */
+export function daySeries(days, range) {
+  const list = Array.isArray(days) ? days : [];
+  const n = Math.max(1, Number(range) || 30);
+  return list.slice(-n);
+}
+
+/**
+ * 按天 × 模型的堆叠序列（每日柱状图用）。
+ *
+ * 与 `usageSeriesByKey` 的分工：后者按**槽**（小时/日混合）保留时间轴，
+ * 用于趋势图；本函数按**日历日**折叠并保留模型维度，用于堆叠柱状图 ——
+ * 混合槽在「天」这一层相加是合法的（同属窗口分桶）。
+ *
+ * @param rows - `usageBySlot()` 的输出。
+ * @param buckets - 原始 buckets（带 model 维度）。
+ * @param days - 已切片的 `usageByDay()` 输出（决定横轴）。
+ * @param metric - `'tokens'` | `'requests'` | `'credit'`。
+ * @returns `{dates, series}`，`series = [{key, values[], total}]` 按总量降序。
+ */
+export function dailyByModel(rows, buckets, days, metric = 'tokens') {
+  const dates = (Array.isArray(days) ? days : []).map((d) => d.date);
+  const index = new Map(dates.map((date, i) => [date, i]));
+  const field = metric === 'requests' ? 'requests' : metric === 'credit' ? 'credit' : 'total_tokens';
+
+  const table = new Map();
+  for (const bucket of Array.isArray(buckets) ? buckets : []) {
+    if (!bucket || typeof bucket.slot !== 'string') continue;
+    const at = parseSlot(bucket.slot);
+    if (!Number.isFinite(at)) continue;
+    const date = localDayKey(new Date(at));
+    const slotIndex = index.get(date);
+    if (slotIndex === undefined) continue;
+    const key = typeof bucket.model === 'string' && bucket.model !== '' ? bucket.model : '（未标注模型）';
+    if (!table.has(key)) table.set(key, { key, values: new Array(dates.length).fill(0), total: 0 });
+    const value = Number(bucket[field]) || 0;
+    table.get(key).values[slotIndex] += value;
+    table.get(key).total += value;
+  }
+
+  const series = [...table.values()].sort((a, b) => b.total - a.total);
+  return { dates, series, field };
+}
+
+/**
+ * 按账号归因（账号排行用）：`by_uid` + 昵称/渠道解析 + 相对最大值归一。
+ *
+ * 相对最大值归一的理由：各项接近时（33/33/33）用绝对占比会让所有条一样长、
+ * 失去比较意义（沿用 `.dshc-bd-bar` 的既有纪律）。
+ *
+ * @param rows - `by_uid`。
+ * @param total - 同响应里的 `total`。
+ * @param accounts - `/status` 的 accounts（用于映射昵称）。
+ * @param channelOf - `channelResolver()` 的产物。
+ * @returns `[{key, name, channel, requests, tokens, credit, share, successRate, barShare}]`。
+ */
+export function accountShares(rows, total, accounts = [], channelOf = () => 'workbuddy') {
+  const shares = usageShares(rows, total);
+  const byUid = new Map((Array.isArray(accounts) ? accounts : []).map((a) => [a?.uid, a]));
+  const decorated = shares.map((row) => {
+    const account = byUid.get(row.key);
+    return {
+      ...row,
+      name: account?.nickname || (row.key ? `${String(row.key).slice(0, 8)}…` : '（未选号）'),
+      channel: account ? (channelOf(account) ?? 'workbuddy') : '',
+      tokens: Number(row.total_tokens) || 0,
+      credit: Number(row.credit) || 0,
+    };
+  });
+  const max = Math.max(...decorated.map((row) => Number(row.requests) || 0), 1);
+  return decorated.map((row) => ({ ...row, barShare: (Number(row.requests) || 0) / max }));
+}
+
+/**
+ * 按渠道归因：把 `by_uid` 折成渠道（WB / Trae / Qoder）。
+ *
+ * 为什么从账号再折一层：网关的 `by_realm` 只有 cn/global 两域，
+ * 而「哪个渠道在烧钱」是面板用户真正要问的问题（三个渠道余额互相独立）。
+ * 渠道归属由 `/status` 的 channel + `channelResolver()` 决定，与账号池同源。
+ *
+ * @param rows - `by_uid`。
+ * @param total - 同响应里的 `total`。
+ * @param accounts - `/status` 的 accounts。
+ * @param channelOf - `channelResolver()` 的产物。
+ * @returns 按请求数降序的渠道行（含 `share` / `barShare`）。
+ */
+export function channelShares(rows, total, accounts = [], channelOf = () => 'workbuddy') {
+  const accountsRows = accountShares(rows, total, accounts, channelOf);
+  const table = new Map();
+  for (const row of accountsRows) {
+    const key = row.channel || 'unknown';
+    if (!table.has(key)) {
+      table.set(key, {
+        key, requests: 0, tokens: 0, credit: 0, failed: 0, success: 0, accounts: 0,
+      });
+    }
+    const entry = table.get(key);
+    entry.requests += Number(row.requests) || 0;
+    entry.tokens += row.tokens;
+    entry.credit += row.credit;
+    entry.failed += Number(row.failed) || 0;
+    entry.success += Number(row.success) || 0;
+    entry.accounts += 1;
+  }
+  const grand = Number(total?.requests) || [...table.values()].reduce((s, e) => s + e.requests, 0);
+  const list = [...table.values()].map((entry) => ({
+    ...entry,
+    share: grand > 0 ? entry.requests / grand : 0,
+  })).sort((a, b) => b.requests - a.requests);
+  const max = Math.max(...list.map((entry) => entry.requests), 1);
+  return list.map((entry) => ({ ...entry, barMax: entry.requests / max }));
+}
+
+/**
+ * 概览 KPI 卡（参考实现的 4 卡布局：主数字 + 次级文字）。
+ *
+ * 映射取舍（详见 `.scratch/chanhub-panel/usage-v4-plan.md` §4）：
+ *   - 参考的「会话数」→ 我们只有**请求数**（网关无会话概念，不编造）。
+ *   - 参考的「缓存命中率」卡 → 我们放**可用积分**（存量），因为窗口分桶
+ *     与进程口径的命中率口径不同，混在一排会误导；命中率归入折叠区。
+ *
+ * @param props - `{total, stock, days, burn}`。
+ * @returns 4 项 `[{key, label, value, detail, tone, title}]`。
+ */
+export function kpiCards({ total, stock, days, burn }) {
+  const requests = Number(total?.requests) || 0;
+  const failed = Number(total?.failed) || 0;
+  const credit = Number(total?.credit) || 0;
+  const structure = tokenStructure(total);
+  const usable = Math.round(Number(stock?.usable) || 0);
+  const list = Array.isArray(days) ? days : [];
+  const active = list.filter((day) => (Number(day.requests) || 0) > 0);
+
+  return [
+    {
+      key: 'tokens',
+      label: 'Tokens',
+      value: formatTokens(structure.total),
+      // raw + kind：KPI 卡对**原始数**做入场动效、再按同一格式化器回写。
+      // 对已格式化字符串反解（"18.9k" → 18.9）会把单位当数量级，动效会显示 0k。
+      raw: structure.total,
+      kind: 'tokens',
+      detail: `输入 ${formatTokens(structure.prompt)} · 输出 ${formatTokens(structure.completion)}`,
+      title: '窗口内 prompt + completion 合计（两段互斥，相加不重复计）',
+    },
+    {
+      key: 'credit',
+      label: '积分消耗',
+      value: formatCredit(credit),
+      raw: credit,
+      kind: 'credit',
+      detail: requests > 0 ? `每请求 ${formatCredit(credit / requests)}` : '窗口内无请求',
+      tone: 'ok',
+      title: '窗口内真实扣费合计（网关账本口径）',
+    },
+    {
+      key: 'requests',
+      label: '请求数',
+      value: formatNumber(requests),
+      raw: requests,
+      kind: 'count',
+      detail: `成功 ${formatNumber(requests - failed)} · 失败 ${formatNumber(failed)}`,
+      title: '网关无会话概念，故这里如实给请求数（不编造「会话数」）',
+    },
+    {
+      key: 'stock',
+      label: '可用积分',
+      value: formatNumber(usable),
+      raw: usable,
+      kind: 'count',
+      detail: burn
+        ? `≈ 还可 ${burnDaysText(burn.days)}`
+        : `活跃 ${active.length} 天`,
+      tone: 'ok',
+      title: burn
+        ? tryBurn(burn, stock)
+        : `只算可消耗额度，不含渠道专用池。窗口内 ${list.length} 天中有 ${active.length} 天有请求`,
+    },
+  ];
+}
+
+/**
+ * 命中率：命中 /（命中 + 未命中）。
+ *
+ * 写入不进分母 —— 与网关 `finalizeGroup()` 同公式（写入是「为后续命中付的费」，
+ * 计入会压低首次请求的命中率）。分母为 0 返回 **null**（前端显示「—」，
+ * 而不是显示 0% —— 0% 意味着「命中率为零」，与「没有观测」是两件事）。
+ *
+ * @param row - 带 `cache_hit_tokens` / `cache_miss_tokens` 的行。
+ * @returns 0–1 或 null。
+ */
+export function hitRate(row) {
+  const hit = Number(row?.cache_hit_tokens) || 0;
+  const miss = Number(row?.cache_miss_tokens) || 0;
+  const denom = hit + miss;
+  if (denom <= 0) return null;
+  return hit / denom;
 }

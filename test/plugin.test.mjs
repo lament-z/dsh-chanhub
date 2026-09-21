@@ -108,15 +108,17 @@ test('宿主入口导出 RPC 通道与全部端点', async () => {
 });
 
 test('客户端与宿主共享同一通道名（构建期内联，改一边就会断）', () => {
-  const clientSource = readFileSync(resolve(root, 'client/index.js'), 'utf8');
+  // 通道名/端点常量下沉到 client/endpoints.js：用量页拆到 client/usage/ 后要共用，
+  // 留在入口文件会让 usage/* 反向 import 入口 —— 成环，打包后拿 undefined。
+  const clientSource = readFileSync(resolve(root, 'client/endpoints.js'), 'utf8');
   const hostSource = readFileSync(resolve(root, 'lib/index.js'), 'utf8');
-  assert.ok(clientSource.includes("const CHANNEL = '/dsh-chanhub'"), '客户端通道名必须与宿主一致');
+  assert.ok(clientSource.includes("export const CHANNEL = '/dsh-chanhub'"), '客户端通道名必须与宿主一致');
   assert.ok(hostSource.includes("export const CHANNEL = '/dsh-chanhub'"));
 });
 
 test('客户端端点常量与宿主导出逐一对应', async () => {
   const mod = await import('../lib/index.js');
-  const clientSource = readFileSync(resolve(root, 'client/index.js'), 'utf8');
+  const clientSource = readFileSync(resolve(root, 'client/endpoints.js'), 'utf8');
   for (const value of Object.values(mod.ENDPOINTS)) {
     assert.ok(
       clientSource.includes(`${value}: '${value}'`) || clientSource.includes(`'${value}'`),

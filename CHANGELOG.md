@@ -1,5 +1,66 @@
 # Changelog
 
+### 「用量」Tab v4 —— 单页卡片流重构（参考 AlfredChaos/dsh-usage-panel）
+
+读了参考实现源码（`src/client/*` 全部组件、`styles.ts`、`api.ts`、`export.ts`、
+`DECISIONS.md`/`docs/P2-decisions.md`），借它的**信息架构与交互纪律**，
+落到网关分桶的数据面上。参考项目的数据源是 DSH 会话日志投影（装完即有半年
+历史 + 每会话明细）；我们的数据源是网关请求分桶（48 小时槽 + 30 天日槽，
+从落盘那刻开始积累）—— 能借的是结构，不是面板清单。
+
+**信息架构：2 Tab 嵌套 → 单页卡片流**
+- 删掉「概览/趋势」第二层页签与全局窗口选择器（`USAGE_WINDOWS` 整体删除）。
+- 一次拉 `720h`（网关保留上限），范围切换**纯前端切片**（`daySeries`）——
+  原先每切一次窗口就重拉 7 个端点，现在 0 次额外 RPC（回归用例锁定）。
+- 页头对齐参考实现：标题 + 四态副标题（loading/fresh/stale/fallback/error，
+  `data-freshness` 属性驱动样式）+ 导出菜单 + 带 loading 文案的刷新按钮。
+- 正文六卡：① KPI 4 卡（Tokens/积分消耗/请求数/可用积分，主数字 + 次级文字，
+  count-up 跑在**原始数**上）② 活跃热力（卡内指标切换 + 分位色阶图例移进卡头）
+  ③ 每日用量（按模型堆叠，卡内 7/14/30 范围 + 请求/Tokens/积分切换，图例即明细）
+  ④ 账号排行 + ⑤ 渠道用量（两列并排，昵称/渠道标签来自账号池同源口径）
+  ⑥ 模型占比 donut（中心显示**模型数**，不重复合计）。
+- 两个折叠区默认收起且**惰性渲染**（`LazyFold`：展开过才挂 children）——
+  隐藏容器里画 0 宽 SVG 是 `UsageChart` 时代修过的坑，收起的折叠区还会白付
+  燃尽外推的重派生。
+
+**新增能力（参考有而我们没有的）**
+- **结构化 tooltip**（`usage/tooltip.js`）：fixed 定位 + 标题行 + 色点明细行 +
+  右对齐等宽数值；热力格子/堆叠柱/donut 扇区共用。测试用 `mouseover/mouseout`
+  （React 的 onMouseEnter 由 mouseover 合成，发 mouseenter 测出的是假阴性）。
+- **SWR 缓存**（`usage/api.js`）：载荷带版本号写 localStorage，结构校验拒绝
+  坏缓存；刷新失败**保留旧数据**并如实标注「显示上次成功的数据，不是最新」
+  —— 修掉了旧实现把瞬时 RPC 失败渲染成「网关未提供分桶端点」的口径错误。
+- **导出**（`usage/export.js`）：完整 JSON / 每日 CSV / 模型 CSV / 账号 CSV，
+  防公式注入（`=+-@` 前缀转义）+ RFC 4180 + UTF-8 BOM，纯客户端构建零新端点。
+
+**诚实性（不模仿参考实现做不到的）**
+- 不做会话排行/主子代理拆分（网关无会话概念）、不做半年热力图（日槽上限 30 天，
+  卡头如实标注「本地时区」）、KPI 的「会话数」换成请求数、窗口与进程两个口径
+  分区展示不相加（进程口径只在折叠区并标注「重启清零」）。
+- 空窗口说明「数据从落盘那刻开始积累」—— 是数据边界不是缺陷。
+
+**顺带修复**
+- `creditsBurn` 外推天数封顶：真机实测 0.002 积分/天 × 存量 10033 显示
+  「还可 6019800.0 天」—— 超 3 年如实显示「>3 年」，曲线照常画（截 60 点）。
+- 燃尽投影点数封顶 60（存量高/速率低时 hoursLeft 可达数万，一条 SVG path
+  拖垮整页渲染，真机 e2e 1.3s → 13s）。
+- React 重复 key：每日图的柱体与 x 轴标签同处一个 SVG，key 都用裸日期会撞。
+
+**结构性拆分（修一次「反向 import 成环」的隐患）**
+- 共享基元下沉：`client/ui.js`（Tag/CardHead/Fold/Unavailable/Icons/useCountUp）、
+  `client/endpoints.js`（CHANNEL/ENDPOINTS）。用量段拆到 `client/usage/`
+  （api/export/tooltip/cards/index），`index.js` 从 4721 行瘦身约 1500 行；
+  v2 遗留的死代码（UsageHero/UsageAreaChart/UsageModelDonut/UsageShareList/
+  USAGE_AXES/TREND_VIEWS/USAGE_DIMS 及配套 CSS ≈600 行）一并删除。
+- 面板首轮不再代拉 getStats/getUsage（用量页自管数据）。
+
+**测试**：166 例 160 通过 / 0 失败（21→6 跳过，真机 e2e 全跑）。用量渲染用例
+全部重写为 v4 结构（KPI 4 卡、无页签残留、切片零 RPC、失败保留旧数据、
+tooltip、导出防注入、reduced-motion 直接给终值、几何无横向溢出）；
+新增纯函数用例 daySeries/accountShares/channelShares/kpiCards/hitRate。
+无头 Chrome 390/760/1040 × 浅色 × 收起/展开态：横向溢出 0、无越界元素、
+无 0 宽 SVG（截图见 `.scratch/chanhub-panel/usage-v4/`）。
+
 ### 「用量」Tab 参考 dsh-usage-panel / dsh-token-monitor 重做
 
 读了两个参考实现的源码（`AlfredChaos/dsh-usage-panel` 的 `styles.ts`/`KpiCards`/
