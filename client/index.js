@@ -140,7 +140,7 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
   const earnValue = earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : '—';
   const earnSub = earned
     ? (earned.covered > 0
-        ? `已消耗 ${formatCompact(Math.round(earned.used))} · 覆盖 ${earned.covered}/${earned.count} 个账号`
+        ? `已消耗 ${formatCompact(Math.round(earned.used))}`
         : `${earned.count} 个账号均未取到套餐明细`)
     : '加载中…';
   const earnCounter = {

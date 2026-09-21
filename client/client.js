@@ -3736,7 +3736,7 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
   const maxRealm = Math.max(1, ...realms.map((realm) => realm.total));
   const earnTitle = earned ? `\u8D5A\u5F97\u79EF\u5206 = \u5404\u8D26\u53F7\u9010\u5957\u9910\u660E\u7EC6\u7684\u989D\u5EA6\u603B\u91CF\u4E4B\u548C\uFF08\u542B\u5DF2\u6D88\u8017\u6389\u7684\uFF09\uFF0C\u6DB5\u76D6\u7B7E\u5230 / \u6D3B\u52A8 / \u62C9\u65B0\u7B49\u6765\u6E90\u3002\u5DF2\u6D88\u8017 ${formatNumber(Math.round(earned.used))} \xB7 \u5269\u4F59 ${formatNumber(Math.round(earned.remain))}\u3002\u5DF2\u8FC7\u671F\u4E14\u4E0A\u6E38\u4E0D\u518D\u4E0B\u53D1\u7684\u5957\u9910\u4E0D\u8BA1\u5165 \u2014\u2014 \u56E0\u6B64\u662F\u4E0B\u754C\u3002` + (earned.missing > 0 ? `\u53E6\u6709 ${earned.missing} \u4E2A\u8D26\u53F7\u672A\u53D6\u5230\u660E\u7EC6\uFF0C\u672A\u8BA1\u5165\u3002` : "") : "";
   const earnValue = earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : "\u2014";
-  const earnSub = earned ? earned.covered > 0 ? `\u5DF2\u6D88\u8017 ${formatCompact(Math.round(earned.used))} \xB7 \u8986\u76D6 ${earned.covered}/${earned.count} \u4E2A\u8D26\u53F7` : `${earned.count} \u4E2A\u8D26\u53F7\u5747\u672A\u53D6\u5230\u5957\u9910\u660E\u7EC6` : "\u52A0\u8F7D\u4E2D\u2026";
+  const earnSub = earned ? earned.covered > 0 ? `\u5DF2\u6D88\u8017 ${formatCompact(Math.round(earned.used))}` : `${earned.count} \u4E2A\u8D26\u53F7\u5747\u672A\u53D6\u5230\u5957\u9910\u660E\u7EC6` : "\u52A0\u8F7D\u4E2D\u2026";
   const earnCounter = {
     key: "earned",
     label: "\u8D5A\u5F97\u79EF\u5206",

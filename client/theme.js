@@ -312,11 +312,8 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
-/* 渠道三卡 */
+/* 渠道三卡（当前可用积分：WB / Trae / Qoder） */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-/* 独占一行的卡（赚得积分）：它是累计口径，与下面三个「当前可用」不是同一类数，
-   不给它并排是为了避免被读成「三项之和」。 */
-.dshc-chancards.one { grid-template-columns: 1fr; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
 .dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
 .dshc-chancard.dim { opacity: 0.55; }

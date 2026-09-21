@@ -592,14 +592,16 @@ test('渲染：概览 KPI 行 + 三渠道积分卡', { skip }, async () => {
   }
 });
 
-test('渲染账号池：赚得积分卡（累计口径，覆盖度如实标注）+ 渠道卡写「N 个账号」', { skip }, async () => {
+test('渲染账号池：赚得积分格（累计口径，紧贴粘性会话同行）+ 渠道卡写「N 个账号」', { skip }, async () => {
   const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
   try {
-    // 赚得积分：fixture 每个账号给 2 个套餐（100 + 500），3 个账号 → 1800
-    assert.ok(html.includes('赚得积分'), '缺「赚得积分」卡');
+    // 赚得积分：fixture 每个账号给 2 个套餐（100 + 500），3 个账号 → 1800。
+    // 现已从独占一行的卡改为 KPI 格，紧跟「粘性会话」右侧、同处一行。
+    // 次级说明只保留「已消耗 X」（覆盖度文案已按需求去掉）。
+    assert.ok(html.includes('赚得积分'), '缺「赚得积分」KPI 格');
     assert.ok(html.includes('1,800'), `赚得积分应为 1800，实际未渲染`);
-    // 覆盖度必须写出来：拿不到明细的账号不计入，不能只报一个总数
-    assert.match(html, /覆盖 3\/3 个账号/, '缺覆盖度标注（会让用户以为这个数覆盖全部账号）');
+    assert.ok(html.includes('已消耗'), '缺「已消耗」次级说明');
+    assert.ok(!/覆盖\s*\d+\/\d+\s*个账号/.test(html), '不应再出现「覆盖 N/M 个账号」文案');
     // 「3 号」是内部黑话，改为带量词的「N 个账号」
     assert.match(html, /1 个账号/, '渠道卡仍在使用「N 号」写法');
     assert.ok(!/>\s*\d+\s*号\s*</.test(html), '仍有「N 号」黑话残留');
