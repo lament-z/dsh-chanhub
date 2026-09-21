@@ -23,6 +23,9 @@ test('package.json 基本字段完整', () => {
   assert.deepEqual(pkg.dsh.client.inject, [
     '@deepseek-ai/dsh-client-connection',
     '@deepseek-ai/dsh-client-ui-slots',
+    // 侧边栏入口要读插件偏好（settingsScope）并打开设置面板（remote.settings）
+    '@deepseek-ai/dsh-client-ui-settings',
+    '@deepseek-ai/dsh-api-remotes',
   ]);
   assert.equal(pkg.publishConfig.access, 'public');
   assert.ok(pkg.engines.node.includes('22'), 'engines 必须声明 Node 版本');

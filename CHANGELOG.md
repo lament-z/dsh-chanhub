@@ -1,5 +1,56 @@
 # Changelog
 
+### 新增：侧边栏「渠道」入口（foot 区按钮 + 账号池 popover）+ 配置 Tab 的界面开关
+
+左侧栏 foot 区（设置按钮同区、在其上方）新增一个入口：平时只显示「渠道」+ `健康/总数 · 可用积分`，
+rail（56px）态只留图标 + 异常角标；点开是一个自带 popover，直接看账号池，不用再进设置面板。
+
+**设计（有颜色也有图，不靠文字堆）**
+
+- 汇总三块：可用积分（大字 + **健康环**）、近 24h（**迷你走势 sparkline**，滚动窗口不是自然日）、
+  **渠道分布堆叠条**（workbuddy/traework/qoder 三段识别色 + 图例）。
+- 逐账号紧凑卡：渠道色竖条 + 昵称 + 状态胶囊 + **余额相对条**（相对池内最高，渐变）+ 该号 24h 走势 +
+  「占用中/刚用过」活跃徽标（带脉冲点）。状态胶囊含在途 `n/limit`、到期（凭证 `expiresAt` 优先）、
+  将过期积分。
+- 全部为内联 SVG / CSS 渐变实现，**不引入任何图表依赖**；颜色一律走 `theme.js` 的令牌与渠道识别色，
+  亮/暗两套主题都过（无头 Chrome 实测：`dialog-bg`、`ring` 随令牌变化）。
+
+**数据纪律（与面板同一口径）**
+
+- 自动路径只打只读端点：`getStatus`（60s 轮询）、`getUsage?window=24h`（展开时，TTL 60s）、
+  `getConfig` / `getAccounts`（10min TTL，只为在途分母与到期口径）。
+- **只有用户点「刷新」** 才打 `refreshStatus`（真上一次上游）；页面隐藏暂停轮询；连续失败 3 次退避 5 分钟。
+- 口径复用 `derive.js` 纯函数：可用积分 = Σ `accounts[].credits`（不可消耗不并入）、健康取 `/status` 顶层计数。
+- 网关不可达时如实说「网关不可达 + 地址」，**不显示 0 假数据**。
+- 活跃只给证据：`in_flight>0` → 「占用中」，`last_success<90s` → 「刚用过」，否则不显示（「本会话在用哪个
+  账号」需要会话粘性键，浏览器侧拿不到，本轮不做）。
+
+**浮层实现**
+
+- `createPortal` 到 `body`（侧边栏 grid track 会裁剪子内容）；锚点用按钮 rect，**按上下可用空间收敛
+  maxHeight**，上方不够时翻到下方开（体检时发现矮窗口会裁顶）；`Esc`/外部点击/切 rail/偏好关闭都会收起；
+  宽度 `min(344, 100vw-24)`，窄屏降级为底部 sheet；任何一行都不横向滚动。
+
+**配置 Tab 新增「界面」组**
+
+- `☑ 在侧边栏左下角显示渠道入口`（pill 开关，`role="switch"`），持久化在插件 settings 命名空间
+  `dsh-chanhub.sidebarEntry`（宿主 `settings.yaml`，跨浏览器一致），客户端用现成的 `ctx.settingsScope`
+  读写，**不新增任何 RPC 端点**；改完即时生效，不需要重启。
+- 这一组**渲染在「网关配置不可读」错误分支之前**：远程部署 / config.json 读不到时，用户仍然关得掉入口。
+- 宿主没有 `settingsScope`（旧版本）时自动降级为「默认开启、开关禁用并说明原因」。
+
+**顺手修掉的口径缺陷**
+
+- 在途分母现在按 realm 分档：`pool.max_in_flight_global`（global 号）优先，否则 `pool.max_in_flight`，
+  与网关 `pool.inFlightLimit()` 同规则。此前面板把同一分母套给所有账号，global 档生效时会把
+  「在途 n/2」显示成「n/3」并误判「在途占满」。
+
+**测试**：新增 `test/quick-entry.test.mjs`（16 例：口径/store/偏好降级）；`client-render` 补 5 例
+（rail/wide 摘要、popover 内容、错误态不显示 0、偏好关闭后不渲染、配置 Tab 错误分支仍有开关）。
+全量 **210 例：189 通过 / 0 失败 / 21 跳过**；渲染层用真实 jsdom + 真实 React 跑打包产物（此前 21 例因缺
+依赖被 skip，本轮补齐 `/tmp/dshc-render` 后转为实跑）。
+设计预览与实施方案见 `.scratch/sidebar-quick-entry/`（spec.md + 亮/暗两张截图）。
+
 ### 修复：面板保存恒 400「cannot unmarshal string into []int」—— 送网关前没做类型收敛
 
 上一版修好挂载/写盘后，真机第一次保存就撞到第二个 bug：

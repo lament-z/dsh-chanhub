@@ -26,10 +26,12 @@ const require = createRequire(`${REACT_DIR}/index.js`);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 let React;
+let ReactDOM;
 let ReactDOMClient;
 let JSDOM;
 try {
   React = require('react');
+  ReactDOM = require('react-dom');
   ReactDOMClient = require('react-dom/client');
   ({ JSDOM } = require('jsdom'));
 } catch (error) {
@@ -61,6 +63,9 @@ function loadBundle(windowObject) {
   const fn = new Function('window', 'module', 'exports', 'require', `${source}\nreturn module.exports;`);
   fn(windowObject, { exports: {} }, {}, (id) => {
     if (id === 'react') return React;
+    // 侧边栏 popover 必须 createPortal 到 body（侧边栏会裁剪子内容）——
+    // 宿主 loader 本来就提供 react-dom（外部插件 dsh-better-sidebar 同样 require 它）。
+    if (id === 'react-dom') return ReactDOM;
     throw new Error(`unexpected require(${JSON.stringify(id)})`);
   });
   return { registration };
@@ -72,27 +77,59 @@ function loadBundle(windowObject) {
  * @param windowObject - jsdom window。
  * @returns 组件函数。
  */
-function registeredComponent(rpcCall, windowObject) {
+function applyBundle(rpcCall, windowObject, ctxExtra = {}) {
   const { registration } = loadBundle(windowObject);
   assert.equal(registration.id, 'dsh-chanhub', 'bundle 的 loaderId 必须与包名一致');
   const mod = registration.factory((id) => {
     if (id === 'react') return React;
+    if (id === 'react-dom') return ReactDOM;
     throw new Error(`unexpected require(${JSON.stringify(id)})`);
   });
   assert.equal(typeof mod.apply, 'function');
 
-  let Registered;
+  // 按槽名收集注册：同一插件现在注册两个槽（settings.section + sidebar.footer.action）。
+  const registrations = new Map();
+  const metas = [];
   mod.apply({
     connection: { rpc: { call: rpcCall } },
     slots: {
       inject: (_name, fn) => fn(),
-      register: (_meta, component) => {
-        Registered = component;
+      register: (meta, component) => {
+        registrations.set(meta.name, { meta, component });
+        metas.push(meta);
       },
     },
+    ...ctxExtra,
   });
-  assert.equal(typeof Registered, 'function', 'apply 必须注册面板组件');
-  return Registered;
+  return { mod, registrations, metas };
+}
+
+/**
+ * 取到 apply() 注册的面板组件（settings.section）。
+ * @param rpcCall - RPC 桩。
+ * @param windowObject - jsdom window。
+ * @param ctxExtra - 额外注入的宿主服务（settingsScope 等）。
+ * @returns 组件函数。
+ */
+function registeredComponent(rpcCall, windowObject, ctxExtra) {
+  const { registrations } = applyBundle(rpcCall, windowObject, ctxExtra);
+  const panel = registrations.get('settings.section')?.component;
+  assert.equal(typeof panel, 'function', 'apply 必须注册面板组件');
+  return panel;
+}
+
+/**
+ * 取到 apply() 注册的侧边栏入口组件（sidebar.footer.action）。
+ * @param rpcCall - RPC 桩。
+ * @param windowObject - jsdom window。
+ * @returns `{component, meta}`。
+ */
+function registeredQuickEntry(rpcCall, windowObject) {
+  const { registrations } = applyBundle(rpcCall, windowObject);
+  const entry = registrations.get('sidebar.footer.action');
+  assert.ok(entry, 'apply 必须注册 sidebar.footer.action');
+  assert.equal(entry.meta.id, 'chanhub-quick', '槽 id 必须有（list 槽靠它去重）');
+  return entry;
 }
 
 /**
@@ -1436,6 +1473,216 @@ test('渲染用量：不含横向滚动溢出容器（移动端不撑破）', { 
     // KPI 栅格固定 3 列（两行 × 三列），窄屏降级而不是让卡片被压扁
     assert.match(css, /\.dshc-ust-kpis\s*\{[^}]*repeat\(3/, 'KPI 栅格应为 3 列');
     assert.match(css, /@media \(max-width: 640px\) \{ \.dshc-ust-kpis \{[^}]*repeat\(2/, '窄屏应降为 2 列');
+  } finally {
+    await cleanup();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 侧边栏快捷入口（sidebar.footer.action）：rail/wide、四态、popover 账号卡
+// ---------------------------------------------------------------------------
+
+/** 侧边栏用的 store 桩：直接给快照，不回 RPC（状态机本身在 quick-entry.test.mjs 里测）。 */
+function quickStoreStub({ status, usage, config, phase = 'fresh' } = {}) {
+  const listeners = new Set();
+  const snapshot = {
+    phase,
+    status,
+    usage,
+    config,
+    baseURL: 'http://127.0.0.1:7866',
+    error: phase === 'error' ? { message: '网关不可达' } : undefined,
+    fetchedAt: phase === 'loading' ? 0 : Date.now(),
+    failures: phase === 'error' ? 3 : 0,
+    degraded: false,
+    usageAvailable: usage !== undefined,
+    usageAt: usage === undefined ? 0 : Date.now(),
+    refreshing: false,
+    lastRefreshAt: 0,
+  };
+  return {
+    getSnapshot: () => snapshot,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    start: () => {},
+    loadUsage: () => {},
+    loadAux: () => {},
+    refreshUpstream: async () => true,
+    dispose: () => listeners.clear(),
+  };
+}
+
+/** 偏好桩（宿主 settingsScope 的等价物）。 */
+function prefsStub(value = true, writable = true) {
+  return {
+    available: true,
+    writable,
+    mode: 'host',
+    value,
+    set: async () => true,
+    subscribe: () => () => {},
+    dispose: () => {},
+  };
+}
+
+/**
+ * 挂载侧边栏入口（真实 jsdom + 真实 React）。
+ * @param options - `{wide, status, usage, config, phase, prefs}`。
+ * @returns 挂载上下文。
+ */
+async function mountQuick(options = {}) {
+  const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>', {
+    pretendToBeVisual: true,
+    url: 'http://127.0.0.1:7866/',
+  });
+  const { window } = dom;
+  const saved = captureGlobals([
+    'document', 'window', 'HTMLElement', 'Node', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout',
+  ]);
+  globalThis.document = window.document;
+  globalThis.window = window;
+  globalThis.HTMLElement = window.HTMLElement;
+  globalThis.Node = window.Node;
+  window.matchMedia = (query) => ({
+    matches: false, media: String(query), onchange: null,
+    addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent() { return false; },
+  });
+
+  const { component, meta } = registeredQuickEntry(async () => ({ ok: false }), window);
+  const store = quickStoreStub({
+    status: options.status,
+    usage: options.usage,
+    config: options.config ?? { pool: { max_in_flight: 3 } },
+    phase: options.phase,
+  });
+  const prefs = options.prefs ?? prefsStub(true);
+  const container = window.document.getElementById('app');
+  let root;
+  await React.act(async () => {
+    root = ReactDOMClient.createRoot(container);
+    root.render(React.createElement(component, {
+      wide: options.wide !== false,
+      store,
+      prefs,
+      openSettings: () => {},
+      now: Date.now,
+    }));
+  });
+  await React.act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  return {
+    window,
+    document: window.document,
+    container,
+    meta,
+    store,
+    cleanup: async () => {
+      try {
+        await React.act(async () => root.unmount());
+      } catch {}
+      restoreGlobals(saved);
+      dom.window.close();
+    },
+  };
+}
+
+/** 点一次 footer 按钮（打开/收起 popover）。 */
+async function clickEntry(document, container) {
+  const button = container.querySelector('button[aria-haspopup="dialog"]');
+  assert.ok(button, '侧边栏入口必须是带 aria-haspopup 的按钮');
+  await React.act(async () => {
+    button.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+  });
+  await React.act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  return button;
+}
+
+test('渲染：侧边栏入口 wide 态给出「健康/总数 · 可用积分」，rail 态只剩图标', { skip }, async () => {
+  const status = realStatusFixture();
+  const wide = await mountQuick({ wide: true, status });
+  const rail = await mountQuick({ wide: false, status });
+  try {
+    const wideHtml = wide.container.innerHTML;
+    assert.ok(wideHtml.includes('渠道'), 'wide 态应带标签');
+    assert.match(wideHtml, /\d+\/\d+ · /, 'wide 态应显示「健康/总数 · 可用积分」摘要');
+    assert.ok(wideHtml.includes('<svg'), '应画出入口图标（不依赖 emoji）');
+
+    const railHtml = rail.container.innerHTML;
+    assert.ok(railHtml.includes('<svg'), 'rail 态保留图标');
+    assert.ok(!/\d+\/\d+ · /.test(railHtml), 'rail 态（56px）不放摘要数字，避免溢出');
+    assert.equal(rail.container.querySelectorAll('button').length, 1, 'rail 态只有一个按钮');
+  } finally {
+    await wide.cleanup();
+    await rail.cleanup();
+  }
+});
+
+test('渲染：入口 popover 显示汇总与账号卡（可用积分/渠道/在途/到期）', { skip }, async () => {
+  const ctx = await mountQuick({
+    wide: true,
+    status: realStatusFixture(),
+    usage: usageFixture(),
+    config: { pool: { max_in_flight: 3, max_in_flight_global: 1 } },
+  });
+  try {
+    await clickEntry(ctx.document, ctx.container);
+    const body = ctx.document.body.innerHTML;
+    assert.ok(body.includes('渠道账号'), 'popover 头部标题');
+    assert.ok(body.includes('可用积分'), '要有可用积分统计块');
+    assert.ok(body.includes('近 24h'), '要有近 24h 统计块（滚动窗口）');
+    assert.ok(body.includes('甲'), '账号昵称应出现在账号卡里');
+    assert.ok(body.includes('在途占满') || body.includes('在途'), '在途维度要有呈现');
+    assert.equal(ctx.document.querySelectorAll('[role="dialog"]').length, 1, 'popover 必须 portal 到 body 且是 dialog');
+    // 免横向滚动：根节点不得出现横向 overflow
+    const dialog = ctx.document.querySelector('[role="dialog"]');
+    assert.equal(dialog.style.overflowX, '', '浮层不做横向滚动');
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('渲染：网关不可达时如实说「不可达」，不显示 0 假数据', { skip }, async () => {
+  const ctx = await mountQuick({ wide: true, phase: 'error' });
+  try {
+    await clickEntry(ctx.document, ctx.container);
+    const body = ctx.document.body.innerHTML;
+    assert.ok(body.includes('网关不可达'), '错误态文案');
+    assert.ok(body.includes('127.0.0.1:7866'), '带上地址便于排查');
+    assert.ok(!body.includes('可用积分'), '错误态不显示积分块（避免 0 冒充数据）');
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('渲染：偏好关闭 → 按钮不渲染（配置 Tab 的开关直接生效，不需重启）', { skip }, async () => {
+  const ctx = await mountQuick({ wide: true, status: realStatusFixture(), prefs: prefsStub(false) });
+  try {
+    assert.equal(ctx.container.innerHTML, '', '偏好关闭时入口必须整体消失');
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('渲染：配置 Tab 出现「界面」开关，且网关配置不可读时依然在', { skip }, async () => {
+  // 复用面板挂载，但让 getConfig 失败（configInfo.ok === false 的错误分支）
+  const rpc = fakeRpc(realStatusFixture());
+  const original = rpc;
+  const failing = async (endpoint, payload) => {
+    if (endpoint === 'getConfig') return { ok: true, value: { ok: false, code: 'config-not-found', message: '未找到网关 config.json', candidates: ['/a', '/b'] } };
+    return original(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(failing);
+  try {
+    await clickTab(document, '配置');
+    const html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('界面'), '配置 Tab 要有「界面」分组');
+    assert.ok(html.includes('在侧边栏左下角显示渠道入口'), '开关文案');
+    assert.ok(html.includes('未找到网关 config.json'), '错误分支仍然渲染（否则用户无法关掉入口）');
   } finally {
     await cleanup();
   }

@@ -59,11 +59,15 @@ function loadDialogFromBundle(windowObject) {
   const fn = new Function('window', 'module', 'exports', 'require', `${source}\nreturn module.exports;`);
   fn(windowObject, { exports: {} }, {}, (id) => {
     if (id === 'react') return React;
+    // 打包产物现在也 require react-dom（侧边栏 popover 走 createPortal）
+    if (id === 'react-dom') return require_('react-dom');
     throw new Error(`unexpected require(${JSON.stringify(id)})`);
   });
   assert.equal(registration.id, 'dsh-chanhub', 'bundle 的 loaderId 必须与包名一致');
   const mod = registration.factory((id) => {
     if (id === 'react') return React;
+    // 打包产物现在也 require react-dom（侧边栏 popover 走 createPortal）
+    if (id === 'react-dom') return require_('react-dom');
     throw new Error(`unexpected require(${JSON.stringify(id)})`);
   });
   return mod.AddAccountDialog;

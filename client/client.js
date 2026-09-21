@@ -1357,6 +1357,133 @@ function maxInFlightOf(gatewayConfig) {
   const value = getPath(gatewayConfig ?? {}, "pool.max_in_flight");
   return typeof value === "number" ? value : void 0;
 }
+function realmLimitOf(gatewayConfig, realm) {
+  if (realm === "global") {
+    const globalTier = getPath(gatewayConfig ?? {}, "pool.max_in_flight_global");
+    if (typeof globalTier === "number" && globalTier > 0) return globalTier;
+  }
+  return maxInFlightOf(gatewayConfig);
+}
+var CHANNEL_COLOR = {
+  workbuddy: "#4f6ef7",
+  traework: "#a855f7",
+  qoder: "#06b6d4"
+};
+function channelColor(channel) {
+  return CHANNEL_COLOR[channel] ?? "#94a3b8";
+}
+function activityOf(account, now = Date.now()) {
+  const inFlight = Number(account?.in_flight) || 0;
+  if (inFlight > 0) return { key: "busy", label: "\u5360\u7528\u4E2D", tone: "info" };
+  const last = Date.parse(account?.last_success ?? "");
+  if (Number.isFinite(last) && now - last < 9e4) return { key: "recent", label: "\u521A\u7528\u8FC7", tone: "ok" };
+  return void 0;
+}
+function quickSummaryVM({ status, usage, config, now = Date.now() } = {}) {
+  const accounts = Array.isArray(status?.accounts) ? status.accounts : [];
+  const usableCredits = accounts.reduce((sum, account) => sum + (Number(account?.credits) || 0), 0);
+  const channels = CHANNEL_ORDER.map((id) => ({ id, label: CHANNEL_LABEL[id] ?? id, count: 0, credits: 0 }));
+  const byChannel = new Map(channels.map((row) => [row.id, row]));
+  for (const account of accounts) {
+    const raw = typeof account?.channel === "string" && account.channel !== "" ? account.channel : "workbuddy";
+    const row = byChannel.get(raw) ?? byChannel.get("workbuddy");
+    if (!row) continue;
+    row.count += 1;
+    row.credits += Number(account?.credits) || 0;
+  }
+  const inFlight = accounts.reduce((sum, account) => sum + (Number(account?.in_flight) || 0), 0);
+  const total = Number(status?.total) || 0;
+  const healthy = Number(status?.healthy) || 0;
+  const window24h = usage?.total ?? void 0;
+  return {
+    accounts,
+    total,
+    healthy,
+    cooling: Number(status?.cooling) || 0,
+    disabled: Number(status?.disabled) || 0,
+    inFlightFull: Number(status?.in_flight_full) || 0,
+    inFlight,
+    sticky: typeof status?.sticky_sessions === "number" ? status.sticky_sessions : void 0,
+    usableCredits,
+    channels: channels.filter((row) => row.count > 0 || row.id === "workbuddy"),
+    healthRatio: total > 0 ? healthy / total : 0,
+    /** 近 24h（**滚动窗口**，不是自然日）：请求/成功/失败/tokens。 */
+    usage24h: window24h ? {
+      requests: Number(window24h.requests) || 0,
+      success: Number(window24h.success) || 0,
+      failed: Number(window24h.failed) || 0,
+      tokens: Number(window24h.total_tokens) || 0,
+      credit: Number(window24h.credit) || 0
+    } : void 0,
+    uptimeSec: Number(status?.uptime_sec) || 0,
+    version: status?.version,
+    realmTotals: status?.realm_totals,
+    creditsFreshness: creditsFreshness(accounts, now)
+  };
+}
+function accountCardVM(account, params = {}) {
+  const { config, maxCredits, channelOf, authAccounts, creditsByUid, now = Date.now() } = params;
+  const limit = realmLimitOf(config, account?.realm);
+  const state = accountState(account, limit);
+  const credits = Number(account?.credits) || 0;
+  const inFlight = Number(account?.in_flight) || 0;
+  const target = typeof limit === "number" && limit > 0 ? limit : void 0;
+  const channel = typeof account?.channel === "string" && account.channel !== "" ? account.channel : channelOf?.(account) ?? "workbuddy";
+  const expiry = accountExpiry({
+    account,
+    authAccounts,
+    creditsDetail: creditsByUid?.[account?.uid],
+    now
+  });
+  const creditsAt = isZeroTime(account?.credits_at) ? void 0 : account?.credits_at;
+  const lastSuccess = isZeroTime(account?.last_success) ? void 0 : account?.last_success;
+  return {
+    uid: String(account?.uid ?? ""),
+    name: account?.nickname || String(account?.uid ?? "").slice(0, 8),
+    realm: account?.realm,
+    channel,
+    channelLabel: CHANNEL_LABEL[channel] ?? channel,
+    color: channelColor(channel),
+    credits,
+    creditsText: formatCompact(credits),
+    creditsExact: formatNumber(credits),
+    /** 相对池内最高余额的占比（卡片里那根横条用；0–1）。 */
+    creditsRatio: maxCredits > 0 ? Math.min(1, credits / (maxCredits || 1)) : 0,
+    expiring: Number(account?.credits_expiring) || 0,
+    state,
+    inFlight,
+    target,
+    inFlightRatio: target ? Math.min(1, inFlight / target) : 0,
+    inFlightFull: Boolean(target && inFlight >= target),
+    activity: activityOf(account, now),
+    expiry,
+    creditsAt,
+    creditsAtText: creditsAt ? relativeTime(creditsAt, now) : void 0,
+    lastSuccessText: lastSuccess ? relativeTime(lastSuccess, now) : void 0,
+    successCount: Number(account?.success_count) || 0,
+    errTotal: Number(account?.err_total) || 0
+  };
+}
+function sparkPath(values, options = {}) {
+  const { width = 96, height = 22, padding = 2 } = options;
+  const list = (Array.isArray(values) ? values : []).map((value) => Number(value) || 0);
+  if (list.length === 0) return { points: "", area: "", max: 0, flat: true };
+  const max = Math.max(...list);
+  const min = Math.min(...list);
+  const span = max - min || 1;
+  const flat = max === min;
+  const stepX = list.length > 1 ? (width - padding * 2) / (list.length - 1) : 0;
+  const pointAt = (value, index) => {
+    const x = padding + index * stepX;
+    const y = flat ? height / 2 : height - padding - (value - min) / span * (height - padding * 2);
+    return [Number(x.toFixed(2)), Number(y.toFixed(2))];
+  };
+  const points = list.map((value, index) => pointAt(value, index).join(",")).join(" ");
+  const first = pointAt(list[0], 0);
+  const last = pointAt(list[list.length - 1], list.length - 1);
+  const area = `${first[0]},${height - padding} ${points} ${last[0]},${height - padding}`;
+  return { points, area, max, flat };
+}
 function channelResolver(authFiles) {
   const byUid = /* @__PURE__ */ new Map();
   for (const entry of authFiles ?? []) {
@@ -1506,6 +1633,12 @@ function windowHours(value) {
   const map = { "24h": 24, "72h": 72, "168h": 168, "720h": 720, "7d": 168, "30d": 720 };
   return map[value] ?? null;
 }
+function creditsFreshness(accounts, now = Date.now()) {
+  const times = (Array.isArray(accounts) ? accounts : []).map((account) => Date.parse(account?.credits_at)).filter((value) => Number.isFinite(value) && value > 0);
+  if (times.length === 0) return { oldestISO: null, stale: false };
+  const oldest = Math.min(...times);
+  return { oldestISO: new Date(oldest).toISOString(), stale: now - oldest > 36e5 };
+}
 function formatTokens(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
   const abs = Math.abs(value);
@@ -1540,6 +1673,23 @@ function uptimeText(seconds) {
   if (hours > 0) return `${hours} \u5C0F\u65F6 ${minutes} \u5206`;
   if (minutes > 0) return `${minutes} \u5206`;
   return `${Math.floor(value)} \u79D2`;
+}
+function usageSeriesByKey(buckets, field) {
+  const slots = usageBySlot(buckets).map((row) => row.slot);
+  const index = new Map(slots.map((slot, i) => [slot, i]));
+  const series = /* @__PURE__ */ new Map();
+  for (const row of Array.isArray(buckets) ? buckets : []) {
+    if (!row || typeof row.slot !== "string") continue;
+    const slotIndex = index.get(row.slot);
+    if (slotIndex === void 0) continue;
+    const raw = row[field];
+    const key = typeof raw === "string" && raw !== "" ? raw : "";
+    if (key === "" && field !== "realm") continue;
+    const useKey = key === "" ? "total" : key;
+    if (!series.has(useKey)) series.set(useKey, new Array(slots.length).fill(0));
+    series.get(useKey)[slotIndex] += Number(row.requests) || 0;
+  }
+  return { slots, series };
 }
 function usageByDay(rows) {
   const table = /* @__PURE__ */ new Map();
@@ -3008,7 +3158,7 @@ function BurnPanel({ rows, stock, windowValue, burn }) {
   ]);
   let dieIndex = proj.findIndex((point) => point[1] >= PT + innerH - 0.5);
   if (dieIndex < 0) dieIndex = proj.length - 1;
-  const daysText = burn.days > 1095 ? ">3 \u5E74" : burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`;
+  const daysText2 = burn.days > 1095 ? ">3 \u5E74" : burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`;
   const grid = [0, 0.5, 1].map((frac) => {
     const gy = PT + innerH * frac;
     return import_react4.default.createElement(
@@ -3036,7 +3186,7 @@ function BurnPanel({ rows, stock, windowValue, burn }) {
     import_react4.default.createElement(
       "div",
       { style: { ...s.muted, marginBottom: 8 } },
-      `\u7A97\u53E3\u901F\u7387 ${formatCredit(burn.perDay)} \u79EF\u5206/\u5929 \xB7 \u5B58\u91CF ${formatNumber(Math.round(stock.usable))} \xB7 \u9884\u8BA1 ${daysText}\u540E\u89C1\u5E95`
+      `\u7A97\u53E3\u901F\u7387 ${formatCredit(burn.perDay)} \u79EF\u5206/\u5929 \xB7 \u5B58\u91CF ${formatNumber(Math.round(stock.usable))} \xB7 \u9884\u8BA1 ${daysText2}\u540E\u89C1\u5E95`
     ),
     import_react4.default.createElement(
       "svg",
@@ -3069,7 +3219,7 @@ function BurnPanel({ rows, stock, windowValue, burn }) {
         className: "axt err",
         x: Math.min(proj[dieIndex][0] + 8, W - PR - 66),
         y: PT + innerH - 7
-      }, `\u2248 ${daysText}\u540E\u89C1\u5E95`),
+      }, `\u2248 ${daysText2}\u540E\u89C1\u5E95`),
       import_react4.default.createElement("line", {
         className: "nowline",
         x1: x(rows.length - 1).toFixed(1),
@@ -3706,9 +3856,978 @@ function ExportMenu({ open, onToggle, payload, days, byModelDaily, modelRows, ac
   );
 }
 
+// client/quick-entry.js
+var import_react6 = __toESM(require("react"), 1);
+var import_react_dom = require("react-dom");
+var QUICK_CSS = `
+@keyframes dshc-quick-pulse { 0%{transform:scale(1);opacity:.9} 70%{transform:scale(1.9);opacity:0} 100%{opacity:0} }
+.dshc-quick-dot { position:relative; }
+.dshc-quick-dot::after { content:''; position:absolute; inset:0; border-radius:999px; background:currentColor; animation:dshc-quick-pulse 1.8s ease-out infinite; }
+.dshc-quick-pop { animation:dshc-quick-in .16s cubic-bezier(.2,.8,.2,1); }
+@keyframes dshc-quick-in { from{opacity:0; transform:translateY(6px) scale(.985)} to{opacity:1; transform:none} }
+.dshc-quick-scroll { scrollbar-width:thin; }
+.dshc-quick-scroll::-webkit-scrollbar { width:6px; }
+.dshc-quick-scroll::-webkit-scrollbar-thumb { background:var(--dsw-alias-border-l3,#d1d5db); border-radius:999px; }
+.dshc-quick-row:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.04)); }
+@media (prefers-reduced-motion:reduce){ .dshc-quick-pop{animation:none} .dshc-quick-dot::after{animation:none} }
+`;
+var POP_WIDTH = 344;
+var POP_MAX_HEIGHT = 520;
+function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "var(--dsw-alias-border-l3,#e5e7eb)" }) {
+  const clamped = Math.max(0, Math.min(1, Number(ratio) || 0));
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  return import_react6.default.createElement(
+    "svg",
+    { width: size, height: size, viewBox: `0 0 ${size} ${size}`, "aria-hidden": "true" },
+    import_react6.default.createElement("circle", {
+      cx: size / 2,
+      cy: size / 2,
+      r: radius,
+      fill: "none",
+      stroke: track,
+      strokeWidth: stroke
+    }),
+    import_react6.default.createElement("circle", {
+      cx: size / 2,
+      cy: size / 2,
+      r: radius,
+      fill: "none",
+      stroke: color,
+      strokeWidth: stroke,
+      strokeLinecap: "round",
+      strokeDasharray: `${circumference * clamped} ${circumference}`,
+      transform: `rotate(-90 ${size / 2} ${size / 2})`,
+      style: { transition: "stroke-dasharray .35s" }
+    })
+  );
+}
+function Sparkline({ values, color = tone.info.fg, width = 96, height = 22 }) {
+  const { points, area, flat } = sparkPath(values, { width, height });
+  if (points === "") {
+    return import_react6.default.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, "\u65E0\u89C2\u6D4B");
+  }
+  const id = `dshc-spark-${Math.abs(hashString(points)).toString(36)}`;
+  return import_react6.default.createElement(
+    "svg",
+    { width, height, viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true" },
+    import_react6.default.createElement(
+      "defs",
+      null,
+      import_react6.default.createElement(
+        "linearGradient",
+        { id, x1: 0, y1: 0, x2: 0, y2: 1 },
+        import_react6.default.createElement("stop", { offset: "0%", stopColor: color, stopOpacity: flat ? 0.08 : 0.28 }),
+        import_react6.default.createElement("stop", { offset: "100%", stopColor: color, stopOpacity: 0 })
+      )
+    ),
+    flat ? null : import_react6.default.createElement("polygon", { points: area, fill: `url(#${id})`, stroke: "none" }),
+    import_react6.default.createElement("polyline", {
+      points,
+      fill: "none",
+      stroke: color,
+      strokeWidth: flat ? 1 : 1.5,
+      strokeLinejoin: "round",
+      strokeLinecap: "round",
+      opacity: flat ? 0.5 : 1
+    })
+  );
+}
+function ChannelBar({ channels, total }) {
+  const rows = (channels ?? []).filter((row) => row.count > 0);
+  const sum = rows.reduce((acc, row) => acc + row.count, 0) || total || 1;
+  return import_react6.default.createElement(
+    "div",
+    { style: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 } },
+    import_react6.default.createElement(
+      "div",
+      {
+        style: { display: "flex", height: 6, borderRadius: 999, overflow: "hidden", background: "var(--dsw-alias-bg-layer-2,#f3f4f6)" }
+      },
+      ...rows.map(
+        (row) => import_react6.default.createElement("span", {
+          key: row.id,
+          title: `${row.label} \xB7 ${row.count} \u4E2A\u8D26\u53F7`,
+          style: { width: `${row.count / sum * 100}%`, background: row.color ?? "var(--dsw-alias-button-info-fill,#4176f7)" }
+        })
+      )
+    ),
+    import_react6.default.createElement(
+      "div",
+      { style: { display: "flex", flexWrap: "wrap", gap: 8, minWidth: 0 } },
+      ...rows.map(
+        (row) => import_react6.default.createElement(
+          "span",
+          { key: row.id, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } },
+          import_react6.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: row.color } }),
+          `${row.label} ${row.count}`
+        )
+      )
+    )
+  );
+}
+function Chip({ text, fg, bg, title }) {
+  return import_react6.default.createElement("span", {
+    title,
+    style: {
+      fontSize: 10.5,
+      lineHeight: "16px",
+      padding: "0 7px",
+      borderRadius: 999,
+      background: bg ?? "var(--dsw-alias-bg-layer-2,#f3f4f6)",
+      color: fg ?? "var(--dsw-alias-label-secondary,#6b7280)",
+      whiteSpace: "nowrap",
+      maxWidth: "100%",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, text);
+}
+function Tile({ label, value, hint, accent, children }) {
+  return import_react6.default.createElement(
+    "div",
+    {
+      style: {
+        flex: "1 1 0",
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        padding: "9px 10px",
+        borderRadius: 10,
+        background: "var(--dsw-alias-bg-layer-2,#f8fafc)",
+        border: "1px solid var(--dsw-alias-border-l2,#eef1f5)"
+      }
+    },
+    import_react6.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, label),
+    import_react6.default.createElement(
+      "span",
+      { style: { display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 } },
+      import_react6.default.createElement("span", { style: { fontSize: 17, fontWeight: 650, letterSpacing: "-0.01em", color: accent ?? "var(--dsw-alias-label-primary,currentColor)" } }, value),
+      hint ? import_react6.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, hint) : null
+    ),
+    children
+  );
+}
+function AccountQuickRow({ vm, series, usageTotal }) {
+  const statusTone = tone[vm.state?.tone] ?? tone.idle;
+  const dayCount = Number(usageTotal?.requests) || (Array.isArray(series) ? series.reduce((a, b) => a + b, 0) : 0);
+  return import_react6.default.createElement(
+    "div",
+    {
+      className: "dshc-quick-row",
+      style: { display: "flex", gap: 9, padding: "8px 10px", borderRadius: 10, minWidth: 0, alignItems: "stretch" }
+    },
+    // 渠道色条：一眼分辨是哪个渠道的号
+    import_react6.default.createElement("span", { style: { width: 3, borderRadius: 999, background: vm.color, flex: "0 0 3px" } }),
+    import_react6.default.createElement(
+      "div",
+      { style: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0, flex: 1 } },
+      // 行 1：名称 + 活跃/short 状态
+      import_react6.default.createElement(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } },
+        import_react6.default.createElement("span", {
+          style: { fontSize: 12.5, fontWeight: 550, color: "var(--dsw-alias-label-primary,currentColor)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 },
+          title: `${vm.name} \xB7 ${vm.uid}`
+        }, vm.name),
+        vm.activity ? import_react6.default.createElement(
+          "span",
+          { style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, color: (tone[vm.activity.tone] ?? tone.info).fg, whiteSpace: "nowrap" } },
+          import_react6.default.createElement("span", { className: vm.activity.key === "busy" ? "dshc-quick-dot" : void 0, style: { width: 5, height: 5, borderRadius: 999, background: "currentColor", display: "inline-block" } }),
+          vm.activity.label
+        ) : null
+      ),
+      // 行 2：余额条（相对池内最高）+ 数值
+      import_react6.default.createElement(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
+        import_react6.default.createElement(
+          "span",
+          {
+            style: { flex: "1 1 auto", minWidth: 30, height: 4, borderRadius: 999, background: "var(--dsw-alias-bg-layer-2,#f1f5f9)", overflow: "hidden" }
+          },
+          import_react6.default.createElement("span", {
+            style: {
+              display: "block",
+              height: "100%",
+              borderRadius: 999,
+              width: `${Math.round(vm.creditsRatio * 100)}%`,
+              background: `linear-gradient(90deg, ${vm.color} 0%, ${vm.color}99 100%)`,
+              transition: "width .3s"
+            }
+          })
+        ),
+        import_react6.default.createElement("span", {
+          title: `${vm.creditsExact} \u79EF\u5206`,
+          style: { fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: "var(--dsw-alias-label-primary,currentColor)", whiteSpace: "nowrap" }
+        }, vm.creditsText)
+      ),
+      // 行 3：状态 + 渠道 + 24h 用量 + 到期 + 在途
+      import_react6.default.createElement(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", minWidth: 0 } },
+        import_react6.default.createElement(Chip, { text: vm.state?.label ?? "\u2014", fg: statusTone.fg, bg: statusTone.bg, title: vm.state?.detail || void 0 }),
+        import_react6.default.createElement(Chip, { text: vm.channelLabel }),
+        vm.inFlight > 0 ? import_react6.default.createElement(Chip, {
+          text: `\u5728\u9014 ${vm.inFlight}${vm.target ? `/${vm.target}` : ""}`,
+          fg: vm.inFlightFull ? tone.warn.fg : tone.info.fg,
+          bg: vm.inFlightFull ? tone.warn.bg : tone.info.bg,
+          title: vm.target ? `\u5355\u53F7\u5728\u9014\u4E0A\u9650 ${vm.target}` : "\u672A\u8BBE\u4E0A\u9650\uFF080 = \u4E0D\u9650\uFF09"
+        }) : null,
+        vm.expiry ? import_react6.default.createElement(Chip, {
+          text: vm.expiry.expired ? "\u51ED\u8BC1\u5DF2\u8FC7\u671F" : `\u5230\u671F ${daysText(vm.expiry.days)}`,
+          fg: vm.expiry.days <= 7 ? tone.warn.fg : void 0,
+          bg: vm.expiry.days <= 7 ? tone.warn.bg : void 0,
+          title: `\u6765\u6E90\uFF1A${vm.expiry.kind === "credential" ? "\u767B\u5F55\u51ED\u8BC1" : "\u79EF\u5206\u5957\u9910"}`
+        }) : null,
+        vm.expiring > 0 ? import_react6.default.createElement(Chip, { text: `${formatCompact(vm.expiring)} \u5C06\u8FC7\u671F`, fg: tone.warn.fg, bg: tone.warn.bg, title: "\u8BE5\u7A97\u53E3\u5185\u5373\u5C06\u8FC7\u671F\u7684\u79EF\u5206\uFF08\u4F18\u5148\u6D88\u8017\uFF09" }) : null,
+        series && series.some((value) => value > 0) ? import_react6.default.createElement(
+          "span",
+          { style: { marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5 } },
+          import_react6.default.createElement(Sparkline, { values: series, color: vm.color, width: 74, height: 18 }),
+          import_react6.default.createElement(
+            "span",
+            { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", whiteSpace: "nowrap" } },
+            `${formatNumber(dayCount)} \u6B21/24h`
+          )
+        ) : dayCount > 0 ? import_react6.default.createElement(
+          "span",
+          { style: { marginLeft: "auto", fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", whiteSpace: "nowrap" } },
+          `${formatNumber(dayCount)} \u6B21/24h`
+        ) : null
+      )
+    )
+  );
+}
+function daysText(days) {
+  if (days < 0) return "\u5DF2\u8FC7\u671F";
+  if (days === 0) return "\u4ECA\u5929";
+  return `${days} \u5929\u540E`;
+}
+function hashString(text) {
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) hash = hash * 31 + text.charCodeAt(i) | 0;
+  return hash;
+}
+function EntryIcon({ size = 16, color = "currentColor" }) {
+  return import_react6.default.createElement(
+    "svg",
+    { width: size, height: size, viewBox: "0 0 20 20", fill: "none", "aria-hidden": "true" },
+    import_react6.default.createElement("path", {
+      d: "M4 12.5a6.5 6.5 0 1 1 12 0",
+      stroke: color,
+      strokeWidth: 1.6,
+      strokeLinecap: "round"
+    }),
+    import_react6.default.createElement("circle", { cx: 10, cy: 13.4, r: 2.1, fill: color }),
+    import_react6.default.createElement("path", { d: "M3 16.6h14", stroke: color, strokeWidth: 1.4, strokeLinecap: "round", opacity: 0.45 })
+  );
+}
+function FreshnessPill({ phase, error, fetchedAt, now }) {
+  const map = {
+    loading: { text: "\u8BFB\u53D6\u4E2D\u2026", fg: tone.idle.fg, bg: tone.idle.bg },
+    fresh: { text: fetchedAt ? `${relativeTime(new Date(fetchedAt).toISOString(), now)}\u66F4\u65B0` : "\u5DF2\u66F4\u65B0", fg: tone.ok.fg, bg: tone.ok.bg },
+    stale: { text: "\u6570\u636E\u504F\u65E7", fg: tone.warn.fg, bg: tone.warn.bg },
+    error: { text: error?.message ? "\u7F51\u5173\u4E0D\u53EF\u8FBE" : "\u8BFB\u53D6\u5931\u8D25", fg: tone.err.fg, bg: tone.err.bg }
+  };
+  const item = map[phase] ?? map.loading;
+  return import_react6.default.createElement(
+    "span",
+    { style: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, color: item.fg } },
+    import_react6.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: item.fg, display: "inline-block" } }),
+    item.text
+  );
+}
+function QuickEntry({ wide, store, prefs, openSettings, now = Date.now() }) {
+  const [snapshot, setSnapshot] = import_react6.default.useState(() => store?.getSnapshot?.());
+  const [enabled, setEnabled] = import_react6.default.useState(() => prefs ? prefs.value : true);
+  const [open, setOpen] = import_react6.default.useState(false);
+  const [anchor, setAnchor] = import_react6.default.useState();
+  const buttonRef = import_react6.default.useRef(null);
+  const rootRef = import_react6.default.useRef(null);
+  import_react6.default.useEffect(() => {
+    if (!store) return void 0;
+    const off = store.subscribe(setSnapshot);
+    store.start?.();
+    return off;
+  }, [store]);
+  import_react6.default.useEffect(() => {
+    if (!prefs) return void 0;
+    const sync = () => setEnabled(prefs.value);
+    sync();
+    return prefs.subscribe?.(sync);
+  }, [prefs]);
+  import_react6.default.useEffect(() => {
+    if (!enabled && open) setOpen(false);
+  }, [enabled, open]);
+  import_react6.default.useLayoutEffect(() => {
+    if (!open) return void 0;
+    const place = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const viewportH = typeof window === "undefined" ? 0 : window.innerHeight;
+      const viewportW = typeof window === "undefined" ? POP_WIDTH : window.innerWidth;
+      const width = Math.min(POP_WIDTH, viewportW - 24);
+      const left = Math.max(8, Math.min(rect.left, viewportW - width - 8));
+      const spaceAbove = rect.top - 8;
+      const spaceBelow = viewportH - rect.bottom - 8;
+      const openUp = spaceAbove >= Math.min(POP_MAX_HEIGHT, 260) || spaceAbove >= spaceBelow;
+      const maxHeight = Math.max(180, Math.min(POP_MAX_HEIGHT, openUp ? spaceAbove : spaceBelow));
+      setAnchor({
+        left,
+        width,
+        maxHeight,
+        ...openUp ? { bottom: viewportH - rect.top + 8 } : { top: rect.bottom + 8 }
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+  import_react6.default.useEffect(() => {
+    if (!open) return void 0;
+    const onPointerDown = (event) => {
+      if (rootRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus?.();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+  import_react6.default.useEffect(() => {
+    if (!open) return;
+    void store?.loadUsage?.({});
+    void store?.loadAux?.({});
+  }, [open, store]);
+  const prevWide = import_react6.default.useRef(wide);
+  import_react6.default.useEffect(() => {
+    if (prevWide.current !== wide) {
+      prevWide.current = wide;
+      setOpen(false);
+    }
+  }, [wide]);
+  if (!enabled) return null;
+  const summary = quickSummaryVM({
+    status: snapshot?.status,
+    usage: snapshot?.usage,
+    now: now()
+  });
+  const phase = snapshot?.phase ?? "loading";
+  const hasAccounts = summary.total > 0;
+  const alert = phase === "error" || summary.inFlightFull > 0 || summary.total > 0 && summary.cooling > 0;
+  const badgeColor = phase === "error" ? tone.err.fg : phase === "stale" ? tone.warn.fg : alert ? tone.warn.fg : tone.ok.fg;
+  const button = import_react6.default.createElement(
+    "button",
+    {
+      ref: buttonRef,
+      type: "button",
+      "aria-haspopup": "dialog",
+      "aria-expanded": open,
+      "aria-label": "\u6E20\u9053\u8D26\u53F7",
+      title: "\u6E20\u9053\u8D26\u53F7 \xB7 \u70B9\u51FB\u67E5\u770B\u8D26\u53F7\u6C60",
+      onClick: () => setOpen((value) => !value),
+      style: {
+        font: "inherit",
+        cursor: "pointer",
+        border: "none",
+        background: open ? "var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))" : "transparent",
+        color: "var(--dsw-alias-label-secondary,#6b7280)",
+        borderRadius: 8,
+        height: 32,
+        padding: wide ? "0 8px" : 0,
+        width: wide ? "100%" : 32,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        minWidth: 0,
+        transition: "background .15s"
+      }
+    },
+    import_react6.default.createElement(
+      "span",
+      { style: { position: "relative", display: "inline-flex", flex: "0 0 auto" } },
+      import_react6.default.createElement(EntryIcon, { size: wide ? 17 : 18, color: badgeColor }),
+      // 角标：rail 态唯一的异常信号
+      alert || phase === "stale" ? import_react6.default.createElement("span", {
+        style: {
+          position: "absolute",
+          right: -1,
+          top: -1,
+          width: 7,
+          height: 7,
+          borderRadius: 999,
+          background: badgeColor,
+          boxShadow: "0 0 0 2px var(--dsw-alias-bg-layer-1,#fff)"
+        }
+      }) : null
+    ),
+    wide ? import_react6.default.createElement(
+      "span",
+      { style: { display: "flex", alignItems: "baseline", gap: 6, minWidth: 0, flex: 1, justifyContent: "space-between" } },
+      import_react6.default.createElement("span", { style: { fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u6E20\u9053"),
+      import_react6.default.createElement(
+        "span",
+        { style: { fontSize: 11.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" } },
+        phase === "error" ? "\u4E0D\u53EF\u8FBE" : hasAccounts ? `${summary.healthy}/${summary.total} \xB7 ${formatCompact(summary.usableCredits)}` : "\u65E0\u8D26\u53F7"
+      )
+    ) : null
+  );
+  const popover = open && anchor ? (0, import_react_dom.createPortal)(
+    import_react6.default.createElement(Popover, {
+      snapshot,
+      summary,
+      anchor,
+      now,
+      rootRef,
+      onClose: () => {
+        setOpen(false);
+        buttonRef.current?.focus?.();
+      },
+      onRefresh: () => void store?.refreshUpstream?.(),
+      openSettings
+    }),
+    document.body
+  ) : null;
+  return import_react6.default.createElement(import_react6.default.Fragment, null, button, popover);
+}
+function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, openSettings }) {
+  const phase = snapshot?.phase ?? "loading";
+  const error = snapshot?.error;
+  const refreshing = snapshot?.refreshing === true;
+  const usage = snapshot?.usage;
+  const sheet = typeof window !== "undefined" && window.innerWidth < 480;
+  const seriesByUid = import_react6.default.useMemo(() => {
+    const buckets = usage?.buckets;
+    if (!Array.isArray(buckets) || buckets.length === 0) return /* @__PURE__ */ new Map();
+    return usageSeriesByKey(buckets, "uid").series;
+  }, [usage]);
+  const usageByUid = import_react6.default.useMemo(() => {
+    const rows = Array.isArray(usage?.by_uid) ? usage.by_uid : [];
+    return new Map(rows.map((row) => [row.key, row]));
+  }, [usage]);
+  const maxCredits = Math.max(0, ...summary.accounts.map((account) => Number(account?.credits) || 0));
+  const vms = summary.accounts.map(
+    (account) => accountCardVM(account, {
+      config: snapshot?.config,
+      maxCredits,
+      channelOf: void 0,
+      authAccounts: snapshot?.authAccounts,
+      creditsByUid: snapshot?.creditsByUid,
+      now: now()
+    })
+  ).sort((a, b) => b.credits - a.credits || a.name.localeCompare(b.name));
+  const daySpark = import_react6.default.useMemo(() => {
+    if (!Array.isArray(usage?.buckets)) return [];
+    return usageBySlot(usage.buckets).map((row) => row.requests);
+  }, [usage]);
+  return import_react6.default.createElement(
+    "div",
+    {
+      ref: rootRef,
+      className: "dshc-quick-pop",
+      role: "dialog",
+      "aria-label": "\u6E20\u9053\u8D26\u53F7",
+      "data-freshness": phase,
+      style: {
+        position: "fixed",
+        zIndex: 60,
+        left: sheet ? 8 : anchor?.left,
+        ...sheet ? { bottom: 8, right: 8 } : anchor?.top !== void 0 ? { top: anchor.top } : { bottom: anchor?.bottom },
+        width: sheet ? "auto" : anchor?.width ?? POP_WIDTH,
+        right: sheet ? 8 : void 0,
+        maxWidth: sheet ? void 0 : "calc(100vw - 16px)",
+        // 高度按按钮上下可用空间收敛（宿主窗口矮时不能顶着边缘被裁）
+        maxHeight: sheet ? "70vh" : anchor?.maxHeight ?? POP_MAX_HEIGHT,
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--dsw-alias-bg-layer-1,#fff)",
+        color: "var(--dsw-alias-label-primary,currentColor)",
+        border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+        borderRadius: 14,
+        boxShadow: "0 18px 48px rgba(15,23,42,.20), 0 2px 8px rgba(15,23,42,.08)",
+        overflow: "hidden"
+      }
+    },
+    import_react6.default.createElement("style", null, QUICK_CSS),
+    // ── 头部：品牌色渐变条 + 标题 + 新鲜度 + 关闭
+    import_react6.default.createElement(
+      "div",
+      {
+        style: {
+          padding: "10px 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          minWidth: 0,
+          background: "linear-gradient(135deg, var(--dsw-alias-button-info-fill,#4176f7)14, transparent 70%)",
+          borderBottom: "1px solid var(--dsw-alias-border-l2,#eef1f5)"
+        }
+      },
+      import_react6.default.createElement("span", { style: { color: tone.info.fg, display: "inline-flex" } }, import_react6.default.createElement(EntryIcon, { size: 15, color: "currentColor" })),
+      import_react6.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
+      import_react6.default.createElement(
+        "span",
+        { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } },
+        summary.version ? `${summary.version}${summary.uptimeSec ? ` \xB7 ${uptimeText(summary.uptimeSec)}` : ""}` : ""
+      ),
+      import_react6.default.createElement(
+        "span",
+        { style: { marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 } },
+        import_react6.default.createElement(FreshnessPill, { phase, error, fetchedAt: snapshot?.fetchedAt, now: now() }),
+        import_react6.default.createElement("button", {
+          type: "button",
+          "aria-label": "\u5173\u95ED",
+          onClick: onClose,
+          style: { font: "inherit", cursor: "pointer", border: "none", background: "transparent", color: "var(--dsw-alias-label-tertiary,#8b93a1)", width: 22, height: 22, borderRadius: 6, lineHeight: 1 }
+        }, "\u2715")
+      )
+    ),
+    // ── 错误态：不显示 0、不假装有数据
+    phase === "error" ? import_react6.default.createElement(
+      "div",
+      { style: { padding: "14px 12px", display: "flex", flexDirection: "column", gap: 8 } },
+      import_react6.default.createElement(
+        "div",
+        { style: { fontSize: 12.5, color: tone.err.fg, display: "flex", alignItems: "center", gap: 6 } },
+        import_react6.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: "currentColor" } }),
+        error?.message ?? "\u7F51\u5173\u4E0D\u53EF\u8FBE"
+      ),
+      import_react6.default.createElement("div", { style: { ...s.muted, fontSize: 11.5 } }, snapshot?.baseURL ? `\u5730\u5740 ${snapshot.baseURL}` : "\u672A\u914D\u7F6E\u7F51\u5173\u5730\u5740"),
+      import_react6.default.createElement(
+        "div",
+        { style: { display: "flex", gap: 8, marginTop: 2 } },
+        import_react6.default.createElement("button", { type: "button", onClick: () => onRefresh?.(), style: { ...s.btnGhost, height: 28, fontSize: 12 } }, "\u91CD\u8BD5"),
+        openSettings ? import_react6.default.createElement("button", { type: "button", onClick: openSettings, style: { ...s.btnPri, height: 28, fontSize: 12 } }, "\u6253\u5F00\u6E20\u9053\u4E2D\u5FC3") : null
+      )
+    ) : import_react6.default.createElement(
+      import_react6.default.Fragment,
+      null,
+      // ── 汇总：三块统计
+      import_react6.default.createElement(
+        "div",
+        { style: { display: "flex", gap: 8, padding: "10px 12px 4px" } },
+        import_react6.default.createElement(
+          Tile,
+          {
+            label: "\u53EF\u7528\u79EF\u5206",
+            value: formatCompact(summary.usableCredits),
+            accent: tone.info.fg,
+            hint: summary.creditsFreshness?.stale ? "\u504F\u65E7" : void 0
+          },
+          import_react6.default.createElement(
+            "div",
+            { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 } },
+            import_react6.default.createElement(Ring, { ratio: summary.healthRatio, color: summary.healthy === summary.total ? tone.ok.fg : tone.warn.fg }),
+            import_react6.default.createElement(
+              "span",
+              { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", lineHeight: 1.35 } },
+              `\u8D26\u53F7 ${summary.healthy}/${summary.total}`,
+              summary.cooling > 0 ? import_react6.default.createElement("br", null) : null,
+              summary.cooling > 0 ? `\u51B7\u5374 ${summary.cooling}` : ""
+            )
+          )
+        ),
+        import_react6.default.createElement(
+          Tile,
+          { label: "\u8FD1 24h", value: summary.usage24h ? formatNumber(summary.usage24h.requests) : "\u2014", hint: "\u6B21" },
+          import_react6.default.createElement(
+            "div",
+            { style: { marginTop: 2, display: "flex", alignItems: "center", gap: 6, minWidth: 0 } },
+            import_react6.default.createElement(Sparkline, { values: daySpark, color: tone.info.fg, width: 92, height: 20 })
+          )
+        )
+      ),
+      import_react6.default.createElement(
+        "div",
+        { style: { padding: "6px 12px 10px" } },
+        import_react6.default.createElement(ChannelBar, {
+          channels: summary.channels.map((row) => ({ ...row, color: channelColor(row.id) })),
+          total: summary.total
+        }),
+        summary.usage24h ? import_react6.default.createElement(
+          "div",
+          { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
+          `${formatTokens(summary.usage24h.tokens)} tokens \xB7 \u6210\u529F ${formatNumber(summary.usage24h.success)} / \u5931\u8D25 ${formatNumber(summary.usage24h.failed)}${summary.inFlight > 0 ? ` \xB7 \u5728\u9014 ${summary.inFlight}` : ""}${typeof summary.sticky === "number" ? ` \xB7 \u7C98\u6027 ${summary.sticky}` : ""}`
+        ) : null
+      ),
+      // ── 账号列表（滚动区）
+      import_react6.default.createElement(
+        "div",
+        {
+          className: "dshc-quick-scroll",
+          style: { display: "flex", flexDirection: "column", gap: 2, padding: "4px 6px 8px", overflowY: "auto", minHeight: 0, flex: 1 }
+        },
+        vms.length === 0 ? import_react6.default.createElement(
+          "div",
+          { style: { ...s.muted, padding: "10px 8px", fontSize: 11.5 } },
+          "\u7F51\u5173\u8FD8\u6CA1\u6709\u8D26\u53F7 \u2014\u2014 \u5230\u300C\u6E20\u9053\u4E2D\u5FC3\u300D\u6DFB\u52A0\u540E\u8FD9\u91CC\u4F1A\u81EA\u52A8\u51FA\u73B0\u3002"
+        ) : vms.map(
+          (vm) => import_react6.default.createElement(AccountQuickRow, {
+            key: vm.uid,
+            vm,
+            series: seriesByUid.get(vm.uid),
+            usageTotal: usageByUid.get(vm.uid)
+          })
+        )
+      ),
+      // ── 底栏：新鲜度 + 动作
+      import_react6.default.createElement(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 12px",
+            borderTop: "1px solid var(--dsw-alias-border-l2,#eef1f5)",
+            background: "var(--dsw-alias-bg-layer-2,#fafbfc)"
+          }
+        },
+        import_react6.default.createElement(
+          "span",
+          { style: { ...s.muted, fontSize: 10.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+          snapshot?.refreshError ? `\u5237\u65B0\u5931\u8D25\uFF1A${snapshot.refreshError.message ?? "\u672A\u77E5\u539F\u56E0"}` : summary.creditsFreshness?.oldestISO ? `\u79EF\u5206 ${relativeTime(summary.creditsFreshness.oldestISO, now())}${summary.creditsFreshness.stale ? "\uFF08\u504F\u65E7\uFF09" : ""}` : " "
+        ),
+        import_react6.default.createElement(
+          "span",
+          { style: { marginLeft: "auto", display: "inline-flex", gap: 6 } },
+          import_react6.default.createElement("button", {
+            type: "button",
+            disabled: refreshing,
+            onClick: onRefresh,
+            title: "\u5411\u4E0A\u6E38\u91CD\u53D6\u5404\u8D26\u53F7\u4F59\u989D\uFF08\u4F1A\u771F\u6253\u4E00\u6B21\u4E0A\u6E38\uFF09",
+            style: { ...s.btnGhost, height: 28, fontSize: 12, opacity: refreshing ? 0.6 : 1 }
+          }, refreshing ? "\u5237\u65B0\u4E2D\u2026" : "\u5237\u65B0"),
+          openSettings ? import_react6.default.createElement("button", { type: "button", onClick: openSettings, style: { ...s.btnPri, height: 28, fontSize: 12 } }, "\u6E20\u9053\u4E2D\u5FC3") : null
+        )
+      )
+    )
+  );
+}
+
+// client/quick-store.js
+var QUICK_POLL_MS = 6e4;
+var QUICK_STALE_MS = 12e4;
+var QUICK_USAGE_TTL_MS = 6e4;
+var QUICK_BACKOFF_MS = 3e5;
+var QUICK_FAIL_THRESHOLD = 3;
+var QUICK_MANUAL_QUIET_MS = 5e3;
+var QUICK_AUX_TTL_MS = 6e5;
+function quickFreshness(snapshot, now = Date.now()) {
+  if (!snapshot) return "loading";
+  if (snapshot.error) return "error";
+  if (!snapshot.fetchedAt) return "loading";
+  return now - snapshot.fetchedAt > QUICK_STALE_MS ? "stale" : "fresh";
+}
+function createQuickStore(rpcCall, options = {}) {
+  const pollMs = options.pollMs ?? QUICK_POLL_MS;
+  const now = options.now ?? (() => Date.now());
+  const doc = options.document ?? (typeof document === "undefined" ? void 0 : document);
+  const usageTtlMs = options.usageTtlMs ?? QUICK_USAGE_TTL_MS;
+  const manualQuietMs = options.manualQuietMs ?? QUICK_MANUAL_QUIET_MS;
+  let snapshot = {
+    phase: "loading",
+    // loading | fresh | stale | error
+    status: void 0,
+    // /status 正文
+    baseURL: "",
+    probe: void 0,
+    error: void 0,
+    fetchedAt: 0,
+    failures: 0,
+    degraded: false,
+    // 是否处于退避期（通知 UI 别期待自动恢复）
+    usage: void 0,
+    usageAvailable: void 0,
+    usageReason: void 0,
+    usageAt: 0,
+    /** 网关 config.json（只为 `pool.max_in_flight*` 分档分母；读不到就降级为无上限显示）。 */
+    config: void 0,
+    /** 凭证盘点（只为「到期」用凭证 expiresAt 优先）；读不到就回落到积分套餐到期。 */
+    authAccounts: void 0,
+    auxAt: 0,
+    refreshing: false,
+    refreshError: void 0,
+    lastRefreshAt: 0
+  };
+  const listeners = /* @__PURE__ */ new Set();
+  let timer;
+  let inFlight;
+  let disposed = false;
+  let visibleListener;
+  let quietUntil = 0;
+  const emit = () => {
+    const next = { ...snapshot, phase: quickFreshness(snapshot, now()), degraded: snapshot.degraded };
+    snapshot = next;
+    for (const listener of [...listeners]) {
+      try {
+        listener(snapshot);
+      } catch {
+      }
+    }
+  };
+  const patch = (part) => {
+    snapshot = { ...snapshot, ...part };
+    emit();
+  };
+  async function loadStatus() {
+    if (disposed || inFlight) return inFlight;
+    inFlight = (async () => {
+      try {
+        const result = await rpcCall(ENDPOINTS.getStatus, {});
+        if (disposed) return;
+        if (!result || result.ok === false) {
+          throw new Error(result?.error?.message ?? "RPC \u8C03\u7528\u5931\u8D25");
+        }
+        const value = result.value ?? {};
+        if (value.reachable === false) {
+          patch({
+            status: void 0,
+            baseURL: value.baseURL ?? snapshot.baseURL,
+            probe: value.probe,
+            error: value.error ?? { code: "unreachable", message: "\u7F51\u5173\u4E0D\u53EF\u8FBE" },
+            fetchedAt: 0,
+            failures: snapshot.failures + 1
+          });
+          return;
+        }
+        if (value.error) {
+          patch({
+            status: void 0,
+            baseURL: value.baseURL ?? snapshot.baseURL,
+            probe: value.probe,
+            error: value.error,
+            fetchedAt: 0,
+            failures: snapshot.failures + 1
+          });
+          return;
+        }
+        patch({
+          status: value.status,
+          baseURL: value.baseURL ?? snapshot.baseURL,
+          probe: value.probe,
+          error: void 0,
+          fetchedAt: now(),
+          failures: 0,
+          degraded: false
+        });
+      } catch (error) {
+        if (disposed) return;
+        patch({
+          error: { code: error?.code ?? "unexpected", message: String(error?.message ?? error) },
+          failures: snapshot.failures + 1
+        });
+      } finally {
+        inFlight = void 0;
+        emit();
+      }
+    })();
+    return inFlight;
+  }
+  async function loadUsage({ force = false } = {}) {
+    if (disposed) return;
+    if (!force && snapshot.usage && now() - snapshot.usageAt < usageTtlMs) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.getUsage, { window: "24h" });
+      if (disposed) return;
+      if (!result || result.ok === false) {
+        patch({ usageAvailable: false, usageReason: result?.error?.message ?? "\u7528\u91CF\u4E0D\u53EF\u7528", usageAt: now() });
+        return;
+      }
+      const value = result.value ?? {};
+      patch({
+        usage: value.available === false ? void 0 : value.usage,
+        usageAvailable: value.available !== false,
+        usageReason: value.reason,
+        usageAt: now()
+      });
+    } catch (error) {
+      if (disposed) return;
+      patch({ usageAvailable: false, usageReason: String(error?.message ?? error), usageAt: now() });
+    }
+  }
+  async function loadAux({ force = false } = {}) {
+    if (disposed) return;
+    if (!force && snapshot.auxAt && now() - snapshot.auxAt < (options.auxTtlMs ?? QUICK_AUX_TTL_MS)) return;
+    const [configResult, accountsResult] = await Promise.all([
+      rpcCall(ENDPOINTS.getConfig, {}).catch((error) => ({ ok: false, error: { message: String(error?.message ?? error) } })),
+      rpcCall(ENDPOINTS.getAccounts, {}).catch(() => ({ ok: false }))
+    ]);
+    if (disposed) return;
+    const configValue = configResult?.ok === false ? void 0 : configResult?.value;
+    const accountsValue = accountsResult?.ok === false ? void 0 : accountsResult?.value;
+    patch({
+      config: configValue?.ok === false ? void 0 : configValue?.config,
+      authAccounts: Array.isArray(accountsValue?.accounts) ? accountsValue.accounts : snapshot.authAccounts,
+      auxAt: now()
+    });
+  }
+  async function refreshUpstream() {
+    if (disposed || snapshot.refreshing) return false;
+    patch({ refreshing: true, refreshError: void 0 });
+    try {
+      const result = await rpcCall(ENDPOINTS.refreshStatus, {});
+      if (disposed) return false;
+      if (!result || result.ok === false) {
+        patch({ refreshing: false, refreshError: result?.error ?? { message: "\u5237\u65B0\u5931\u8D25" } });
+        return false;
+      }
+      const value = result.value ?? {};
+      patch({
+        refreshing: false,
+        status: value.status ?? snapshot.status,
+        baseURL: value.baseURL ?? snapshot.baseURL,
+        error: value.reachable === false ? value.error ?? { message: "\u7F51\u5173\u4E0D\u53EF\u8FBE" } : void 0,
+        refreshError: value.refreshed === false ? value.refreshError ?? { message: "\u5237\u65B0\u672A\u5B8C\u6210" } : void 0,
+        fetchedAt: value.status ? now() : snapshot.fetchedAt,
+        failures: 0,
+        lastRefreshAt: now()
+      });
+      void loadUsage({ force: true });
+      quietUntil = now() + manualQuietMs;
+      return true;
+    } catch (error) {
+      if (disposed) return false;
+      patch({ refreshing: false, refreshError: { message: String(error?.message ?? error) } });
+      return false;
+    } finally {
+      schedule();
+    }
+  }
+  function schedule() {
+    if (disposed || !timer) return;
+    clearTimeout(timer);
+    timer = setTimeout(tick, pollMs);
+    if (typeof timer?.unref === "function") timer.unref();
+  }
+  async function tick() {
+    if (disposed) return;
+    if (doc?.visibilityState === "hidden") {
+      schedule();
+      return;
+    }
+    if (now() < quietUntil) {
+      schedule();
+      return;
+    }
+    if (snapshot.failures >= QUICK_FAIL_THRESHOLD) {
+      timer = setTimeout(tick, QUICK_BACKOFF_MS);
+      if (typeof timer?.unref === "function") timer.unref();
+      patch({ degraded: true });
+      return;
+    }
+    await loadStatus();
+    schedule();
+  }
+  return {
+    getSnapshot: () => snapshot,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    start() {
+      if (disposed) return;
+      if (!timer) {
+        timer = setTimeout(tick, pollMs);
+        if (typeof timer?.unref === "function") timer.unref();
+      }
+      if (doc?.addEventListener && !visibleListener) {
+        visibleListener = () => {
+          if (doc.visibilityState === "visible") void loadStatus().then(schedule);
+        };
+        doc.addEventListener("visibilitychange", visibleListener);
+      }
+      void loadStatus();
+      void loadAux();
+    },
+    loadStatus,
+    loadUsage,
+    loadAux,
+    refreshUpstream,
+    dispose() {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      timer = void 0;
+      if (doc?.removeEventListener && visibleListener) {
+        doc.removeEventListener("visibilitychange", visibleListener);
+      }
+      visibleListener = void 0;
+      listeners.clear();
+    }
+  };
+}
+function createSidebarPrefs(settingsScope, options = {}) {
+  const namespace = options.namespace ?? "dsh-chanhub";
+  const key = options.key ?? "sidebarEntry";
+  const defaultValue = options.defaultValue ?? true;
+  if (!settingsScope || typeof settingsScope.bind !== "function") {
+    return {
+      available: false,
+      writable: false,
+      mode: "unavailable",
+      value: defaultValue,
+      set: async () => false,
+      subscribe: () => () => {
+      },
+      dispose: () => {
+      }
+    };
+  }
+  const scope = settingsScope.bind({ namespace });
+  const read = () => {
+    const snap = scope.getSnapshot?.() ?? {};
+    const value = snap?.value?.[key];
+    return typeof value === "boolean" ? value : defaultValue;
+  };
+  return {
+    available: true,
+    get writable() {
+      const snap = scope.getSnapshot?.() ?? {};
+      return snap.writable === true && snap.mode === "host";
+    },
+    get mode() {
+      return scope.getSnapshot?.()?.mode ?? "unknown";
+    },
+    get value() {
+      return read();
+    },
+    /** 写宿主设置；返回是否成功（失败时不改本地判断，交给订阅回流）。 */
+    async set(next) {
+      try {
+        await scope.set?.(key, next);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    subscribe(listener) {
+      const off = scope.subscribe?.(listener);
+      return typeof off === "function" ? off : () => {
+      };
+    },
+    dispose() {
+      scope.dispose?.();
+    }
+  };
+}
+
 // client/index.js
 var name = "dsh-chanhub";
-var inject = ["slots", "connection"];
+var SETTINGS_NAMESPACE = "dsh-chanhub";
+var inject = ["slots", "connection", "remote", "remote.settings", "settingsScope"];
 var TASK_DEFS = [
   { name: "checkin", label: "\u7B7E\u5230", icon: "\u{1F4C5}", key: "checkin" },
   // balance 第七类任务（网关 balance.go）：逐号查余额不签到，签到后余额才解冻的
@@ -4251,7 +5370,8 @@ function rateLimitedNotice(list) {
     )
   );
 }
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts }) {
+function AccountsTab({ status, channelOf, maxInFlight, limitOf, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts }) {
+  const limitFor = (account) => typeof limitOf === "function" ? limitOf(account) : maxInFlight;
   const [filter, setFilter] = React.useState("all");
   const [view, setView] = React.useState("card");
   const [showDistribution, setShowDistribution] = React.useState(false);
@@ -4313,7 +5433,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
             (account) => React.createElement(AccountCard, {
               key: account.uid,
               account,
-              maxInFlight,
+              maxInFlight: limitFor(account),
               channel: channelOf(account),
               liveCredits: creditsByUid?.[account.uid],
               authAccounts,
@@ -4339,7 +5459,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
               "tbody",
               null,
               ...filtered.map((account) => {
-                const st = accountState(account, maxInFlight);
+                const st = accountState(account, limitFor(account));
                 const exp = accountExpiry({
                   account,
                   authAccounts,
@@ -4357,7 +5477,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                   ),
                   React.createElement("td", null, formatNumber(account.credits ?? 0)),
                   React.createElement("td", null, exp ? React.createElement(ExpiryChip, { expiry: exp }) : "\u2014"),
-                  React.createElement("td", null, `${account.in_flight ?? 0}/${maxInFlight ?? "\u2014"}`),
+                  React.createElement("td", null, `${account.in_flight ?? 0}/${limitFor(account) ?? "\u2014"}`),
                   React.createElement("td", null, `${account.success_count ?? 0}/${account.err_total ?? 0}`)
                 );
               })
@@ -4369,7 +5489,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
     // 账号详情抽屉（点卡片弹出；复用 AccountFold 的完整明细）
     detailAccount ? React.createElement(AccountDrawer, {
       account: detailAccount,
-      maxInFlight,
+      maxInFlight: limitFor(detailAccount),
       channel: channelOf(detailAccount),
       credits: creditsByUid?.[detailAccount.uid],
       scheduleConfig,
@@ -5384,7 +6504,123 @@ function ReactLogSection() {
     )
   );
 }
-function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceControlResult, serviceBusy }) {
+function Switch({ checked, disabled, onChange, label }) {
+  return React.createElement(
+    "button",
+    {
+      type: "button",
+      role: "switch",
+      "aria-checked": checked === true,
+      "aria-label": label,
+      disabled,
+      onClick: () => onChange?.(!checked),
+      style: {
+        font: "inherit",
+        cursor: disabled ? "not-allowed" : "pointer",
+        flex: "0 0 auto",
+        width: 38,
+        height: 22,
+        borderRadius: 999,
+        border: "1px solid transparent",
+        padding: 2,
+        background: checked ? "var(--dsw-alias-button-info-fill,#4176f7)" : "var(--dsw-alias-border-l3,#d1d5db)",
+        opacity: disabled ? 0.5 : 1,
+        transition: "background .18s",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: checked ? "flex-end" : "flex-start"
+      }
+    },
+    React.createElement("span", {
+      style: {
+        width: 16,
+        height: 16,
+        borderRadius: 999,
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(15,23,42,.25)",
+        transition: "all .18s"
+      }
+    })
+  );
+}
+function InterfaceCard({ prefs }) {
+  const [, force] = React.useReducer((value) => value + 1, 0);
+  React.useEffect(() => {
+    if (!prefs?.subscribe) return void 0;
+    return prefs.subscribe(() => force());
+  }, [prefs]);
+  const available = prefs?.available === true;
+  const writable = prefs?.writable === true;
+  const enabled = prefs ? prefs.value : true;
+  const [busy, setBusy] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
+  const toggle = async (next) => {
+    if (!writable || busy) return;
+    setBusy(true);
+    setFailed(false);
+    const ok = await prefs.set(next);
+    setBusy(false);
+    if (!ok) setFailed(true);
+  };
+  return React.createElement(
+    "div",
+    { style: { ...s.card, marginBottom: 16 } },
+    React.createElement(
+      "div",
+      { className: "dshc-row", style: { justifyContent: "space-between" } },
+      React.createElement(
+        "div",
+        { className: "dshc-row" },
+        React.createElement(
+          "span",
+          { style: { ...s.label, display: "flex", alignItems: "center", gap: 6 } },
+          React.createElement(Icons.gear, { style: { width: 15, height: 15, color: "var(--dsw-alias-state-business-primary,#4176ef)" } }),
+          "\u754C\u9762"
+        )
+      ),
+      React.createElement(Tag, {
+        text: !available ? "\u5BBF\u4E3B\u4E0D\u652F\u6301" : writable ? "\u53EF\u4FEE\u6539" : "\u53EA\u8BFB",
+        tone: !available ? "idle" : writable ? "ok" : "warn"
+      })
+    ),
+    React.createElement(
+      "div",
+      {
+        className: "dshc-row",
+        style: { justifyContent: "space-between", gap: 12, marginTop: 10, alignItems: "flex-start" }
+      },
+      React.createElement(
+        "div",
+        { style: { minWidth: 0 } },
+        React.createElement("div", { style: { ...s.label, fontSize: 13 } }, "\u5728\u4FA7\u8FB9\u680F\u5DE6\u4E0B\u89D2\u663E\u793A\u6E20\u9053\u5165\u53E3"),
+        React.createElement(
+          "div",
+          { style: { ...s.muted, marginTop: 3, fontSize: 11.5, lineHeight: 1.6 } },
+          "\u663E\u793A\u300C\u6E20\u9053\u300D\u6309\u94AE\uFF0C\u70B9\u5F00\u5373\u770B\u8D26\u53F7\u6C60\u6458\u8981\u4E0E\u5404\u53F7\u53EF\u7528\u79EF\u5206\uFF08\u53EA\u8BFB\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u6253\u4E0A\u6E38\uFF09\u3002",
+          React.createElement("br", null),
+          "\u5173\u6389\u540E\u5165\u53E3\u9690\u85CF\uFF0C\u672C\u9762\u677F\u4E0D\u53D7\u5F71\u54CD\uFF1B\u4E5F\u53EF\u5728 DSH \u539F\u751F\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u6539\u3002"
+        )
+      ),
+      React.createElement(Switch, {
+        checked: enabled,
+        disabled: !writable || busy,
+        onChange: toggle,
+        label: "\u5728\u4FA7\u8FB9\u680F\u5DE6\u4E0B\u89D2\u663E\u793A\u6E20\u9053\u5165\u53E3"
+      })
+    ),
+    failed ? React.createElement(
+      "div",
+      { style: { ...s.muted, marginTop: 8, fontSize: 11.5, color: tone.err.fg } },
+      "\u4FDD\u5B58\u5931\u8D25\uFF1A\u5BBF\u4E3B\u8BBE\u7F6E\u672A\u5199\u5165\uFF0C\u5DF2\u56DE\u6EDA\u4E3A\u5F53\u524D\u503C\u3002"
+    ) : null,
+    !available ? React.createElement(
+      "div",
+      { style: { ...s.muted, marginTop: 8, fontSize: 11.5 } },
+      "\u5F53\u524D\u5BBF\u4E3B\u6CA1\u6709 settingsScope \u670D\u52A1\uFF0C\u65E0\u6CD5\u5728\u6B64\u5F00\u5173\uFF1B\u5165\u53E3\u6309\u9ED8\u8BA4\uFF08\u5F00\u542F\uFF09\u663E\u793A\u3002"
+    ) : null
+  );
+}
+function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceControlResult, serviceBusy, prefs }) {
   const [draft, setDraft] = React.useState({});
   const groups = React.useMemo(() => fieldsByGroup(), []);
   const config = configInfo?.config ?? {};
@@ -5412,6 +6648,9 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
     return React.createElement(
       "div",
       null,
+      // 界面偏好与网关文件无关 —— 必须留在错误分支里，否则远程部署时用户
+      // 反而没法把侧边栏入口关掉（本卡在正常分支同样渲染）。
+      React.createElement(InterfaceCard, { prefs }),
       React.createElement(Unavailable, {
         title: "\u7F51\u5173\u914D\u7F6E\u8BFB\u5199",
         needs: "\u540C\u673A\u6587\u4EF6\u8BBF\u95EE\uFF08config.json\uFF09",
@@ -5439,6 +6678,8 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
   return React.createElement(
     "div",
     null,
+    // 界面偏好（插件自身偏好，置顶：与网关配置无关，任何部署形态都可用）
+    React.createElement(InterfaceCard, { prefs }),
     // 服务操作（置顶：重启网关 + 可写状态）
     React.createElement(
       "div",
@@ -5726,7 +6967,7 @@ function TabBar({ active, onChange, statusText, onAdd }) {
     }, "\uFF0B \u6DFB\u52A0\u8D26\u53F7") : null
   );
 }
-function ChanhubPanel({ rpcCall }) {
+function ChanhubPanel({ rpcCall, prefs }) {
   const [activeTab, setActiveTab] = React.useState("accounts");
   const [data, setData] = React.useState(null);
   const [configInfo, setConfigInfo] = React.useState(null);
@@ -6150,6 +7391,7 @@ function ChanhubPanel({ rpcCall }) {
   }, [rpcCall]);
   const status = data?.status;
   const maxInFlight = maxInFlightOf(configInfo?.config);
+  const limitOf = React.useCallback((account) => realmLimitOf(configInfo?.config, account?.realm), [configInfo?.config]);
   const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
   const onReveal = React.useCallback(async () => {
     try {
@@ -6255,6 +7497,7 @@ function ChanhubPanel({ rpcCall }) {
       status,
       channelOf,
       maxInFlight,
+      limitOf,
       onAction: onAccountAction,
       busy: busyAccount,
       onRefresh: refresh,
@@ -6313,7 +7556,8 @@ function ChanhubPanel({ rpcCall }) {
       saving,
       onServiceControl,
       serviceControlResult: serviceResult,
-      serviceBusy
+      serviceBusy,
+      prefs
     }) : null,
     // 添加账号弹窗（OAuth 设备授权）。会话态在网关侧，故关掉弹窗不丢失在途登录；
     // 重开只是重新发起——这是有意的：避免面板里藏一个不可见的后台轮询。
@@ -6360,6 +7604,32 @@ function apply(ctx) {
   const rpcCall = async (endpoint, payload, signal) => {
     return ctx.connection.rpc.call(CHANNEL, endpoint, payload, signal);
   };
+  const effect = (factory, label) => {
+    if (typeof ctx.effect === "function") return ctx.effect(factory, label);
+    return void 0;
+  };
+  const prefs = createSidebarPrefs(ctx.settingsScope, { namespace: SETTINGS_NAMESPACE, key: "sidebarEntry" });
+  const store = createQuickStore(rpcCall);
+  effect(() => () => store.dispose(), "dsh-chanhub: sidebar quick store");
+  effect(() => () => prefs.dispose?.(), "dsh-chanhub: sidebar entry prefs");
+  ctx.slots.inject(
+    "sidebar.footer.action",
+    () => ctx.slots.register(
+      {
+        name: "sidebar.footer.action",
+        id: "chanhub-quick",
+        order: 100,
+        label: () => "\u6E20\u9053\u8D26\u53F7",
+        inject: () => ({
+          store,
+          prefs,
+          // 宿主只提供「打开设置面板」；按 section 深链不存在，故不做假设。
+          openSettings: () => ctx.remote?.settings?.openSettingsDocument?.()
+        })
+      },
+      QuickEntry
+    )
+  );
   ctx.slots.inject(
     "settings.section",
     () => ctx.slots.register(
@@ -6368,7 +7638,7 @@ function apply(ctx) {
         id: "dsh-chanhub",
         order: 11,
         label: () => "\u6E20\u9053\u4E2D\u5FC3",
-        inject: () => ({ rpcCall })
+        inject: () => ({ rpcCall, prefs })
       },
       ChanhubPanel
     )

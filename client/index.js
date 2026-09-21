@@ -59,6 +59,7 @@ import {
   niceMax,
   qualitySummary,
   realmAvailability,
+  realmLimitOf,
   relativeTime,
   scheduleHoursText,
   scheduleState,
@@ -75,9 +76,15 @@ import { coerceField, fieldsByGroup, formatFieldValue, getPath } from '../lib/co
 import { CHANNEL, ENDPOINTS } from './endpoints.js';
 import { AddAccountDialog } from './add-account.js';
 import { UsageTab } from './usage/index.js';
+import { QuickEntry } from './quick-entry.js';
+import { createQuickStore, createSidebarPrefs } from './quick-store.js';
 
 const name = 'dsh-chanhub';
-const inject = ['slots', 'connection'];
+/** 插件 settings 命名空间（与宿主 lib/index.js 的 SETTINGS_NAMESPACE 同值）。 */
+const SETTINGS_NAMESPACE = 'dsh-chanhub';
+// settingsScope：读写插件偏好（侧边栏入口开关）；remote/remote.settings：
+// 打开设置面板（openSettingsDocument）。旧宿主缺这些服务时各自降级，不硬失败。
+const inject = ['slots', 'connection', 'remote', 'remote.settings', 'settingsScope'];
 
 /** RPC 端点（与宿主 lib/index.js 的 ENDPOINTS 保持一致）。 */
 
@@ -698,7 +705,10 @@ function rateLimitedNotice(list) {
  * @param props - `{status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts}`。
  * @returns React 元素。
  */
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts }) {
+function AccountsTab({ status, channelOf, maxInFlight, limitOf, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts }) {
+  // 在途上限按 realm 分档（与网关 pool.inFlightLimit 同规则）：global 号用
+  // max_in_flight_global。缺 limitOf（旧调用）时回落到统一 maxInFlight。
+  const limitFor = (account) => (typeof limitOf === 'function' ? limitOf(account) : maxInFlight);
   const [filter, setFilter] = React.useState('all');
   const [view, setView] = React.useState('card');
   const [showDistribution, setShowDistribution] = React.useState(false);
@@ -761,7 +771,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                   React.createElement(AccountCard, {
                     key: account.uid,
                     account,
-                    maxInFlight,
+                    maxInFlight: limitFor(account),
                     channel: channelOf(account),
                     liveCredits: creditsByUid?.[account.uid],
                     authAccounts,
@@ -778,7 +788,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                   ),
                   React.createElement('tbody', null,
                     ...filtered.map((account) => {
-                      const st = accountState(account, maxInFlight);
+                      const st = accountState(account, limitFor(account));
                       const exp = accountExpiry({
                         account,
                         authAccounts,
@@ -793,7 +803,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                         React.createElement('td', null, exp
                           ? React.createElement(ExpiryChip, { expiry: exp })
                           : '—'),
-                        React.createElement('td', null, `${account.in_flight ?? 0}/${maxInFlight ?? '—'}`),
+                        React.createElement('td', null, `${account.in_flight ?? 0}/${limitFor(account) ?? '—'}`),
                         React.createElement('td', null, `${account.success_count ?? 0}/${account.err_total ?? 0}`),
                       );
                     }),
@@ -807,7 +817,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
     detailAccount
       ? React.createElement(AccountDrawer, {
           account: detailAccount,
-          maxInFlight,
+          maxInFlight: limitFor(detailAccount),
           channel: channelOf(detailAccount),
           credits: creditsByUid?.[detailAccount.uid],
           scheduleConfig,
@@ -1903,17 +1913,119 @@ function ReactLogSection() {
 }
 
 /**
- * 配置 Tab：53 项分组折叠 + 危险语义标注 + 时长校验 + 服务控制。
+ * 开关（pill + 滑块）：比裸 checkbox 更合本面板的视觉语言，且带 role="switch"。
+ * @param props - `{checked, disabled, onChange, label}`。
+ * @returns React 元素。
+ */
+function Switch({ checked, disabled, onChange, label }) {
+  return React.createElement('button', {
+    type: 'button',
+    role: 'switch',
+    'aria-checked': checked === true,
+    'aria-label': label,
+    disabled,
+    onClick: () => onChange?.(!checked),
+    style: {
+      font: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer', flex: '0 0 auto',
+      width: 38, height: 22, borderRadius: 999, border: '1px solid transparent', padding: 2,
+      background: checked ? 'var(--dsw-alias-button-info-fill,#4176f7)' : 'var(--dsw-alias-border-l3,#d1d5db)',
+      opacity: disabled ? 0.5 : 1, transition: 'background .18s',
+      display: 'inline-flex', alignItems: 'center', justifyContent: checked ? 'flex-end' : 'flex-start',
+    },
+  },
+    React.createElement('span', {
+      style: {
+        width: 16, height: 16, borderRadius: 999, background: '#fff',
+        boxShadow: '0 1px 3px rgba(15,23,42,.25)', transition: 'all .18s',
+      },
+    }),
+  );
+}
+
+/**
+ * 「界面」偏好卡：插件自身的前端偏好（**不是**网关 config.json 的 52 项）。
+ *
+ * 为什么单独一张卡、且必须渲染在 ConfigTab 的错误提前返回之前：这些偏好不依赖
+ * 网关文件；远程部署 / config.json 不可读时用户仍然要能把侧边栏入口关掉。
+ *
+ * @param props - `{prefs}`：quick-store 的 createSidebarPrefs 返回值。
+ * @returns React 元素。
+ */
+function InterfaceCard({ prefs }) {
+  const [, force] = React.useReducer((value) => value + 1, 0);
+  React.useEffect(() => {
+    if (!prefs?.subscribe) return undefined;
+    return prefs.subscribe(() => force());
+  }, [prefs]);
+
+  const available = prefs?.available === true;
+  const writable = prefs?.writable === true;
+  const enabled = prefs ? prefs.value : true;
+  const [busy, setBusy] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
+
+  const toggle = async (next) => {
+    if (!writable || busy) return;
+    setBusy(true);
+    setFailed(false);
+    const ok = await prefs.set(next);
+    setBusy(false);
+    if (!ok) setFailed(true);
+  };
+
+  return React.createElement('div', { style: { ...s.card, marginBottom: 16 } },
+    React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+      React.createElement('div', { className: 'dshc-row' },
+        React.createElement('span', { style: { ...s.label, display: 'flex', alignItems: 'center', gap: 6 } },
+          React.createElement(Icons.gear, { style: { width: 15, height: 15, color: 'var(--dsw-alias-state-business-primary,#4176ef)' } }),
+          '界面'),
+      ),
+      React.createElement(Tag, {
+        text: !available ? '宿主不支持' : writable ? '可修改' : '只读',
+        tone: !available ? 'idle' : writable ? 'ok' : 'warn',
+      }),
+    ),
+    React.createElement('div', {
+      className: 'dshc-row',
+      style: { justifyContent: 'space-between', gap: 12, marginTop: 10, alignItems: 'flex-start' },
+    },
+      React.createElement('div', { style: { minWidth: 0 } },
+        React.createElement('div', { style: { ...s.label, fontSize: 13 } }, '在侧边栏左下角显示渠道入口'),
+        React.createElement('div', { style: { ...s.muted, marginTop: 3, fontSize: 11.5, lineHeight: 1.6 } },
+          '显示「渠道」按钮，点开即看账号池摘要与各号可用积分（只读，不会自动打上游）。',
+          React.createElement('br', null),
+          '关掉后入口隐藏，本面板不受影响；也可在 DSH 原生插件设置里改。'),
+      ),
+      React.createElement(Switch, {
+        checked: enabled,
+        disabled: !writable || busy,
+        onChange: toggle,
+        label: '在侧边栏左下角显示渠道入口',
+      }),
+    ),
+    failed
+      ? React.createElement('div', { style: { ...s.muted, marginTop: 8, fontSize: 11.5, color: tone.err.fg } },
+          '保存失败：宿主设置未写入，已回滚为当前值。')
+      : null,
+    !available
+      ? React.createElement('div', { style: { ...s.muted, marginTop: 8, fontSize: 11.5 } },
+          '当前宿主没有 settingsScope 服务，无法在此开关；入口按默认（开启）显示。')
+      : null,
+  );
+}
+
+/**
+ * 配置 Tab：53 项分组折叠 + 危险语义标注 + 时长校验 + 服务控制 + 界面偏好。
  *
  * 保存优先走网关端点 `POST /admin/config`（写盘 + 字段级热应用，见 lib/index.js）；
  * 网关端点不可用时降级为宿主直写 config.json。角标「↻ 需重启」来自
  * config-spec.js 的 `restart` 字段 —— 那是**网关热改面**的镜像，
  * 过期会让标注与真实结局打架，故与网关同步维护。
  *
- * @param props - `{configInfo, onSave, saving, onServiceControl, serviceControlResult, serviceBusy}`。
+ * @param props - `{configInfo, onSave, saving, onServiceControl, serviceControlResult, serviceBusy, prefs}`。
  * @returns React 元素。
  */
-function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceControlResult, serviceBusy }) {
+function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceControlResult, serviceBusy, prefs }) {
   const [draft, setDraft] = React.useState({});
   const groups = React.useMemo(() => fieldsByGroup(), []);
 
@@ -1949,6 +2061,9 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
     return React.createElement(
       'div',
       null,
+      // 界面偏好与网关文件无关 —— 必须留在错误分支里，否则远程部署时用户
+      // 反而没法把侧边栏入口关掉（本卡在正常分支同样渲染）。
+      React.createElement(InterfaceCard, { prefs }),
       React.createElement(Unavailable, {
         title: '网关配置读写',
         needs: '同机文件访问（config.json）',
@@ -1973,6 +2088,8 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
   return React.createElement(
     'div',
     null,
+    // 界面偏好（插件自身偏好，置顶：与网关配置无关，任何部署形态都可用）
+    React.createElement(InterfaceCard, { prefs }),
     // 服务操作（置顶：重启网关 + 可写状态）
     React.createElement('div', { style: s.card },
       React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
@@ -2308,7 +2425,7 @@ function TabBar({ active, onChange, statusText, onAdd }) {
  * @param props - `{rpcCall}`。
  * @returns React 元素。
  */
-function ChanhubPanel({ rpcCall }) {
+function ChanhubPanel({ rpcCall, prefs }) {
   const [activeTab, setActiveTab] = React.useState('accounts');
   const [data, setData] = React.useState(null);
   const [configInfo, setConfigInfo] = React.useState(null);
@@ -2832,6 +2949,9 @@ function ChanhubPanel({ rpcCall }) {
 
   const status = data?.status;
   const maxInFlight = maxInFlightOf(configInfo?.config);
+  // 按 realm 取在途上限（global 档优先）—— 账号卡/状态判定/在途列都用它，
+  // 避免 global 号按 cn 档位误判「在途占满」。
+  const limitOf = React.useCallback((account) => realmLimitOf(configInfo?.config, account?.realm), [configInfo?.config]);
   // admin 门槛可用性：探测 /admin/* 路由存在（405 判定）。true = 管理端点已开启，
   // 成长码写操作（点亮/领取）与批量任务按钮才出现；false = 如实隐藏并说明。
   const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
@@ -2941,6 +3061,7 @@ function ChanhubPanel({ rpcCall }) {
           status,
           channelOf,
           maxInFlight,
+          limitOf,
           onAction: onAccountAction,
           busy: busyAccount,
           onRefresh: refresh,
@@ -3008,6 +3129,7 @@ function ChanhubPanel({ rpcCall }) {
           onServiceControl,
           serviceControlResult: serviceResult,
           serviceBusy,
+          prefs,
         })
       : null,
 
@@ -3063,6 +3185,39 @@ function apply(ctx) {
   const rpcCall = async (endpoint, payload, signal) => {
     return ctx.connection.rpc.call(CHANNEL, endpoint, payload, signal);
   };
+  // ctx.effect 在宿主里必有；渲染测试的极简垫片没有 —— 缺了也不能炸（生命周期
+  // 归属只是「谁负责 dispose」，没有它插件照样能跑）。
+  const effect = (factory, label) => {
+    if (typeof ctx.effect === 'function') return ctx.effect(factory, label);
+    return undefined;
+  };
+
+  // 侧边栏入口偏好：宿主 settings 命名空间 `dsh-chanhub.sidebarEntry`（跨浏览器一致），
+  // 客户端用 settingsScope 读写；旧宿主没有该服务时降级为「默认开启、不可改」。
+  const prefs = createSidebarPrefs(ctx.settingsScope, { namespace: SETTINGS_NAMESPACE, key: 'sidebarEntry' });
+  // 侧边栏数据源：footer 按钮角标与 popover 读同一份快照（口径统一由 derive.js 保证）。
+  const store = createQuickStore(rpcCall);
+  effect(() => () => store.dispose(), 'dsh-chanhub: sidebar quick store');
+  effect(() => () => prefs.dispose?.(), 'dsh-chanhub: sidebar entry prefs');
+
+  // foot 区入口（list 槽；cordis 面板按默认 order=0 排在前，我们取 100 排其后）。
+  ctx.slots.inject('sidebar.footer.action', () =>
+    ctx.slots.register(
+      {
+        name: 'sidebar.footer.action',
+        id: 'chanhub-quick',
+        order: 100,
+        label: () => '渠道账号',
+        inject: () => ({
+          store,
+          prefs,
+          // 宿主只提供「打开设置面板」；按 section 深链不存在，故不做假设。
+          openSettings: () => ctx.remote?.settings?.openSettingsDocument?.(),
+        }),
+      },
+      QuickEntry,
+    ),
+  );
 
   ctx.slots.inject('settings.section', () =>
     ctx.slots.register(
@@ -3071,7 +3226,7 @@ function apply(ctx) {
         id: 'dsh-chanhub',
         order: 11,
         label: () => '渠道中心',
-        inject: () => ({ rpcCall }),
+        inject: () => ({ rpcCall, prefs }),
       },
       ChanhubPanel,
     ),

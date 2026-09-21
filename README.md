@@ -73,6 +73,16 @@ mismatch). The panel renders each area according to what it actually detects.
   explicitly in the response. The panel's per-field "↻ needs restart" badges mirror
   that same list — `lib/config-spec.js` is kept in sync with the gateway's
   `dispatchHotApply`.
+- **Sidebar quick entry** — a "渠道" entry in the sidebar foot (same area as the settings
+  button): collapsed shows `healthy/total · usable credits`, the 56px rail shows an icon
+  plus an alert dot; clicking opens a self-contained popover with a usable-credits KPI +
+  health ring, a 24h sparkline, a channel distribution bar, and one compact card per
+  account (channel color, relative credit bar, status/in-flight, expiry, 24h sparkline).
+  Automatic paths only hit read-only endpoints (`/status` every 60s, buckets on expand);
+  **only the explicit Refresh button** calls the upstream-refreshing `/admin/refresh`.
+  Unreachable gateways say so (with the address) instead of showing zeros. Toggle it in
+  **Settings → 渠道中心 → Config → 界面** (persisted in plugin settings, effective
+  immediately, and still reachable when the gateway `config.json` cannot be read).
 - **Fallback is never silent** — when the hot-apply endpoint is unusable
   (e.g. `config.json` mounted `:ro`), the panel still writes the file on the host,
   but reports *why* hot-apply failed, marks every changed field as

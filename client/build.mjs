@@ -19,7 +19,9 @@ const result = await build({
   format: 'cjs',
   platform: 'browser',
   target: ['chrome100'],
-  external: ['react', 'react/jsx-runtime'],
+  // react-dom 与 react 一样由宿主 loader 提供：侧边栏 popover 必须 createPortal
+  // 到 body（侧边栏 grid track 会裁剪子内容），所以要从外部 require 它。
+  external: ['react', 'react/jsx-runtime', 'react-dom'],
   write: false,
   minify: process.env.NODE_ENV === 'production',
   legalComments: 'none',

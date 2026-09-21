@@ -538,6 +538,197 @@ export function maxInFlightOf(gatewayConfig) {
 }
 
 /**
+ * 按 realm 取在途上限 —— 与网关 `pool.inFlightLimit(e)` **同一规则**。
+ *
+ * 网关：`maxInFlightGlobal > 0 && realm == "global"` → 用 global 档，否则用
+ * `max_in_flight`（`internal/pool/pick.go`）。面板早期只读 `max_in_flight`，
+ * 于是 global 档生效时账号卡的占用条分母与「在途占满」判定都会误报。
+ *
+ * @param gatewayConfig - config.json 内容。
+ * @param realm - 账号所属域（`'cn'` / `'global'`）。
+ * @returns 数值；缺失时 undefined。
+ */
+export function realmLimitOf(gatewayConfig, realm) {
+  if (realm === 'global') {
+    const globalTier = getPath(gatewayConfig ?? {}, 'pool.max_in_flight_global');
+    if (typeof globalTier === 'number' && globalTier > 0) return globalTier;
+  }
+  return maxInFlightOf(gatewayConfig);
+}
+
+/** 渠道识别色（仅用于侧边栏卡片的小色点/竖条；面板其它地方仍走 tone 令牌）。 */
+export const CHANNEL_COLOR = {
+  workbuddy: '#4f6ef7',
+  traework: '#a855f7',
+  qoder: '#06b6d4',
+};
+
+/**
+ * 渠道识别色（未知渠道回落到中性灰，不编造品牌色）。
+ * @param channel - 渠道 id。
+ * @returns CSS 颜色。
+ */
+export function channelColor(channel) {
+  return CHANNEL_COLOR[channel] ?? '#94a3b8';
+}
+
+/**
+ * 「活跃」近似标签。
+ *
+ * 为什么只能近似：「本会话在用哪个账号」要会话粘性键（网关侧由首条 user 消息
+ * 派生的内容哈希），浏览器侧不可复现 —— 见侧边栏设计文档。这里只如实说
+ * 「占用中 / 刚用过」，**没有证据就不返回**（不猜）。
+ *
+ * @param account - `/status` 的账号项。
+ * @param now - 当前毫秒时间戳。
+ * @returns `{key,label,tone}` 或 undefined。
+ */
+export function activityOf(account, now = Date.now()) {
+  const inFlight = Number(account?.in_flight) || 0;
+  if (inFlight > 0) return { key: 'busy', label: '占用中', tone: 'info' };
+  const last = Date.parse(account?.last_success ?? '');
+  if (Number.isFinite(last) && now - last < 90_000) return { key: 'recent', label: '刚用过', tone: 'ok' };
+  return undefined;
+}
+
+/**
+ * 侧边栏摘要视图模型 —— 与账号池 Tab **同一口径**（同一纯函数，避免两处数字打架）。
+ *
+ * @param params - `{status, usage, config, now}`。
+ * @returns 摘要 VM。
+ */
+export function quickSummaryVM({ status, usage, config, now = Date.now() } = {}) {
+  const accounts = Array.isArray(status?.accounts) ? status.accounts : [];
+  // 可用积分 = Σ accounts[].credits（不可消耗积分不并入 —— 与面板同一约定）。
+  const usableCredits = accounts.reduce((sum, account) => sum + (Number(account?.credits) || 0), 0);
+  const channels = CHANNEL_ORDER.map((id) => ({ id, label: CHANNEL_LABEL[id] ?? id, count: 0, credits: 0 }));
+  const byChannel = new Map(channels.map((row) => [row.id, row]));
+  for (const account of accounts) {
+    const raw = typeof account?.channel === 'string' && account.channel !== '' ? account.channel : 'workbuddy';
+    const row = byChannel.get(raw) ?? byChannel.get('workbuddy');
+    if (!row) continue;
+    row.count += 1;
+    row.credits += Number(account?.credits) || 0;
+  }
+  const inFlight = accounts.reduce((sum, account) => sum + (Number(account?.in_flight) || 0), 0);
+  const total = Number(status?.total) || 0;
+  const healthy = Number(status?.healthy) || 0;
+  const window24h = usage?.total ?? undefined;
+  return {
+    accounts,
+    total,
+    healthy,
+    cooling: Number(status?.cooling) || 0,
+    disabled: Number(status?.disabled) || 0,
+    inFlightFull: Number(status?.in_flight_full) || 0,
+    inFlight,
+    sticky: typeof status?.sticky_sessions === 'number' ? status.sticky_sessions : undefined,
+    usableCredits,
+    channels: channels.filter((row) => row.count > 0 || row.id === 'workbuddy'),
+    healthRatio: total > 0 ? healthy / total : 0,
+    /** 近 24h（**滚动窗口**，不是自然日）：请求/成功/失败/tokens。 */
+    usage24h: window24h
+      ? {
+          requests: Number(window24h.requests) || 0,
+          success: Number(window24h.success) || 0,
+          failed: Number(window24h.failed) || 0,
+          tokens: Number(window24h.total_tokens) || 0,
+          credit: Number(window24h.credit) || 0,
+        }
+      : undefined,
+    uptimeSec: Number(status?.uptime_sec) || 0,
+    version: status?.version,
+    realmTotals: status?.realm_totals,
+    creditsFreshness: creditsFreshness(accounts, now),
+  };
+}
+
+/**
+ * 单个账号的侧边栏卡片视图模型（复用账号池的判定/格式化，保证同一数字）。
+ *
+ * @param account - `/status` 的账号项。
+ * @param params - `{config, maxCredits, channelOf, authAccounts, creditsByUid, now}`。
+ * @returns 卡片 VM。
+ */
+export function accountCardVM(account, params = {}) {
+  const { config, maxCredits, channelOf, authAccounts, creditsByUid, now = Date.now() } = params;
+  const limit = realmLimitOf(config, account?.realm);
+  const state = accountState(account, limit);
+  const credits = Number(account?.credits) || 0;
+  const inFlight = Number(account?.in_flight) || 0;
+  const target = typeof limit === 'number' && limit > 0 ? limit : undefined;
+  const channel =
+    typeof account?.channel === 'string' && account.channel !== ''
+      ? account.channel
+      : (channelOf?.(account) ?? 'workbuddy');
+  const expiry = accountExpiry({
+    account,
+    authAccounts,
+    creditsDetail: creditsByUid?.[account?.uid],
+    now,
+  });
+  const creditsAt = isZeroTime(account?.credits_at) ? undefined : account?.credits_at;
+  const lastSuccess = isZeroTime(account?.last_success) ? undefined : account?.last_success;
+  return {
+    uid: String(account?.uid ?? ''),
+    name: account?.nickname || String(account?.uid ?? '').slice(0, 8),
+    realm: account?.realm,
+    channel,
+    channelLabel: CHANNEL_LABEL[channel] ?? channel,
+    color: channelColor(channel),
+    credits,
+    creditsText: formatCompact(credits),
+    creditsExact: formatNumber(credits),
+    /** 相对池内最高余额的占比（卡片里那根横条用；0–1）。 */
+    creditsRatio: maxCredits > 0 ? Math.min(1, credits / (maxCredits || 1)) : 0,
+    expiring: Number(account?.credits_expiring) || 0,
+    state,
+    inFlight,
+    target,
+    inFlightRatio: target ? Math.min(1, inFlight / target) : 0,
+    inFlightFull: Boolean(target && inFlight >= target),
+    activity: activityOf(account, now),
+    expiry,
+    creditsAt,
+    creditsAtText: creditsAt ? relativeTime(creditsAt, now) : undefined,
+    lastSuccessText: lastSuccess ? relativeTime(lastSuccess, now) : undefined,
+    successCount: Number(account?.success_count) || 0,
+    errTotal: Number(account?.err_total) || 0,
+  };
+}
+
+/**
+ * 迷你折线（sparkline）路径 —— 侧边栏 popover 的 24h 用量走势。
+ *
+ * 纯函数，便于单测；只为「有无起伏」服务，不做坐标轴（面板里的大图才有）。
+ *
+ * @param values - 数值序列（时间升序，可含 0）。
+ * @param options - `{width, height, padding}`。
+ * @returns `{points, area, max, flat}`；序列为空时 `points` 为空串。
+ */
+export function sparkPath(values, options = {}) {
+  const { width = 96, height = 22, padding = 2 } = options;
+  const list = (Array.isArray(values) ? values : []).map((value) => Number(value) || 0);
+  if (list.length === 0) return { points: '', area: '', max: 0, flat: true };
+  const max = Math.max(...list);
+  const min = Math.min(...list);
+  const span = max - min || 1;
+  // 全平序列画在竖直中线：贴着底部画会被读成「0 用量」，贴顶会读成「打满」。
+  const flat = max === min;
+  const stepX = list.length > 1 ? (width - padding * 2) / (list.length - 1) : 0;
+  const pointAt = (value, index) => {
+    const x = padding + index * stepX;
+    const y = flat ? height / 2 : height - padding - ((value - min) / span) * (height - padding * 2);
+    return [Number(x.toFixed(2)), Number(y.toFixed(2))];
+  };
+  const points = list.map((value, index) => pointAt(value, index).join(',')).join(' ');
+  const first = pointAt(list[0], 0);
+  const last = pointAt(list[list.length - 1], list.length - 1);
+  const area = `${first[0]},${height - padding} ${points} ${last[0]},${height - padding}`;
+  return { points, area, max, flat };
+}
+
+/**
  * 建账号 → channel 解析函数。
  *
  * 优先级（新→旧）：

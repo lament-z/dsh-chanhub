@@ -344,6 +344,9 @@ test('组合：客户端 bundle 的 slots 注册元信息正确（Loader 消费�
   };
   const mod = factory((id) => {
     if (id === 'react') return React;
+    // 本用例不真渲染（React 是桩），但 bundle 顶层会 require react-dom —— 给最小桩，
+    // 免得为了元信息断言去装整套 react-dom。
+    if (id === 'react-dom') return { createPortal: () => null };
     throw new Error(id);
   });
 
@@ -352,19 +355,36 @@ test('组合：客户端 bundle 的 slots 注册元信息正确（Loader 消费�
     connection: { rpc: { call: async () => ({ ok: true, value: {} }) } },
     slots: {
       inject: (name, fn) => {
-        assert.equal(name, 'settings.section', '必须注册到 settings.section');
+        assert.ok(
+          ['settings.section', 'sidebar.footer.action'].includes(name),
+          `未预期的槽位 ${name}`,
+        );
         fn();
       },
       register: (meta, component) => registered.push({ meta, component }),
     },
   });
 
-  assert.equal(registered.length, 1, '必须注册恰好一个 settings.section');
-  const { meta, component } = registered[0];
+  // 两个注册：设置面板（渠道中心）+ 侧边栏 foot 入口（渠道账号）
+  assert.equal(registered.length, 2, '应注册设置面板与侧边栏入口各一个');
+  const { meta, component } = registered.find((row) => row.meta.name === 'settings.section');
   assert.equal(meta.name, 'settings.section');
   assert.equal(meta.id, 'dsh-chanhub', 'slot id 必须与插件 id 一致');
   assert.equal(meta.label(), '渠道中心', '侧边栏显示名必须是中文「渠道中心」');
   assert.equal(typeof component, 'function');
   const injected = meta.inject();
   assert.equal(typeof injected.rpcCall, 'function');
+  // 配置 Tab 的「界面」开关要能拿到偏好句柄
+  assert.equal(typeof injected.prefs, 'object');
+
+  const quick = registered.find((row) => row.meta.name === 'sidebar.footer.action');
+  assert.equal(quick.meta.id, 'chanhub-quick', 'foot 槽 id 必须稳定（list 槽按 id 去重）');
+  assert.equal(quick.meta.order, 100, '排在 cordis 面板（默认 order 0）之后');
+  assert.equal(quick.meta.label(), '渠道账号');
+  assert.equal(typeof quick.component, 'function');
+  const quickInjected = quick.meta.inject();
+  assert.equal(typeof quickInjected.store?.subscribe, 'function', '入口要订阅共享快照');
+  assert.equal(typeof quickInjected.store?.refreshUpstream, 'function', '手动刷新入口');
+  assert.equal(typeof quickInjected.prefs?.set, 'function', '偏好要能读写');
+  assert.equal(typeof quickInjected.openSettings, 'function', '要能打开渠道中心');
 });
