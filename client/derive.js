@@ -456,3 +456,362 @@ export function resolveChannel(explicit, domain) {
   }
   return 'workbuddy';
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   用量 Tab 专用派生逻辑（纯函数，node 下可测）
+   ══════════════════════════════════════════════════════════════════════════
+   数据边界（务必分清，混算会得出错误结论）：
+     · 窗口分桶 /v1/stats/buckets —— 受 window 参数约束，落盘 data/usage.json，
+       重启不清；槽粒度混合（近 48h 小时槽，更早日槽）。
+     · 进程累计 /v1/stats —— 无窗口维度，自进程启动累计，重启清零。
+   两者口径不同，UI 必须分区标注，不得相减或相加。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 单位换算常量（token 展示用）。 */
+const K = 1000;
+const M = 1000 * 1000;
+
+/**
+ * 槽类型：网关 `bucketSlot()` 的镜像判定。
+ *
+ * 为什么需要：小时槽 `h:2026-09-21T08` 与日槽 `d:2026-09-19` 混在同一数组里，
+ * 语义完全不同（前者=某小时，后者=整天折叠）。若不区分，热力图/时间轴会把
+ * 「一整天的量」画成「某个小时」，凭空造出不存在的小时分布。
+ *
+ * @param slot - 槽字符串。
+ * @returns `'hour'` | `'day'` | `'unknown'`。
+ */
+export function slotKind(slot) {
+  if (typeof slot !== 'string' || slot.length < 2) return 'unknown';
+  if (slot.startsWith('h:')) return 'hour';
+  if (slot.startsWith('d:')) return 'day';
+  return 'unknown';
+}
+
+/**
+ * 解析槽字符串为时间戳（本地时区，与网关 `time.Format` 同构）。
+ * @param slot - 槽字符串。
+ * @returns 毫秒时间戳；无法解析时返回 NaN。
+ */
+export function parseSlot(slot) {
+  const kind = slotKind(slot);
+  if (kind === 'unknown') return Number.NaN;
+  // h:2026-09-21T08 → 2026-09-21T08:00 本地时间
+  // d:2026-09-19     → 2026-09-19T00:00 本地时间
+  const raw = slot.slice(2);
+  return kind === 'hour' ? Date.parse(`${raw}:00:00`) : Date.parse(`${raw}T00:00:00`);
+}
+
+/**
+ * 按时间槽聚合分桶行 —— **修掉旧实现的核心 bug**。
+ *
+ * 旧实现：`buckets.slice(-48)` 直接把 (槽 × 域 × 账号 × 模型) 的**行**当柱子渲染。
+ *   3 账号 × 5 模型 = 每小时 15 行，72h 窗口下最后一屏只有约 3 小时的数据，
+ *   且同一小时被画成 15 根柱 —— 柱数 ≠ 槽数，时间轴与总量对不上。
+ * 本函数：先按 `slot` 求和，一行代表**一个时间槽**，柱数 === 槽数。
+ *
+ * @param buckets - `/v1/stats/buckets` 的 buckets 数组。
+ * @returns 时间升序的 `[{slot, kind, at, requests, failed, success, tokens, promptTokens, completionTokens, credit, latencyMS}]`。
+ */
+export function usageBySlot(buckets) {
+  if (!Array.isArray(buckets)) return [];
+  const table = new Map();
+  for (const row of buckets) {
+    if (!row || typeof row.slot !== 'string') continue;
+    const key = row.slot;
+    let entry = table.get(key);
+    if (!entry) {
+      entry = {
+        slot: key,
+        kind: slotKind(key),
+        at: parseSlot(key),
+        requests: 0, failed: 0, success: 0,
+        promptTokens: 0, completionTokens: 0, tokens: 0,
+        credit: 0, latencySum: 0,
+      };
+      table.set(key, entry);
+    }
+    const requests = Number(row.requests) || 0;
+    entry.requests += requests;
+    entry.failed += Number(row.failed) || 0;
+    entry.promptTokens += Number(row.prompt_tokens) || 0;
+    entry.completionTokens += Number(row.completion_tokens) || 0;
+    entry.tokens += Number(row.total_tokens) || 0;
+    entry.credit += Number(row.credit) || 0;
+    // 均值必须按请求数加权重算 —— 分桶只有各自均值，直接平均会失真
+    // （与网关 accumulate() 的加权口径一致）。
+    entry.latencySum += (Number(row.avg_latency_ms) || 0) * requests;
+  }
+  return [...table.values()]
+    .map((entry) => ({
+      slot: entry.slot,
+      kind: entry.kind,
+      at: entry.at,
+      requests: entry.requests,
+      failed: entry.failed,
+      success: entry.requests - entry.failed,
+      promptTokens: entry.promptTokens,
+      completionTokens: entry.completionTokens,
+      tokens: entry.tokens,
+      credit: entry.credit,
+      latencyMS: entry.requests > 0 ? entry.latencySum / entry.requests : 0,
+    }))
+    .sort((a, b) => a.at - b.at);
+}
+
+/**
+ * 按模型聚合分桶行（堆叠面积用）。
+ *
+ * @param buckets - buckets 数组。
+ * @returns `{slots:[slot...], models:[{key,total,values:[...]}]}`；`values` 与 `slots` 对齐。
+ */
+export function usageBySlotAndModel(buckets) {
+  const bySlot = usageBySlot(buckets);
+  const slots = bySlot.map((row) => row.slot);
+  const index = new Map(slots.map((slot, i) => [slot, i]));
+  const table = new Map();
+  for (const row of Array.isArray(buckets) ? buckets : []) {
+    if (!row || typeof row.slot !== 'string' || index.has(row.slot) === false) continue;
+    const key = typeof row.model === 'string' && row.model !== '' ? row.model : '-';
+    let entry = table.get(key);
+    if (!entry) {
+      entry = { key, total: 0, values: new Array(slots.length).fill(0) };
+      table.set(key, entry);
+    }
+    const requests = Number(row.requests) || 0;
+    entry.values[index.get(row.slot)] += requests;
+    entry.total += requests;
+  }
+  return { slots, models: [...table.values()].sort((a, b) => b.total - a.total) };
+}
+
+/**
+ * 归因表占比与派生列。
+ *
+ * @param rows - `by_uid` / `by_realm` / `by_model` 之一。
+ * @param total - 同响应里的 `total`。
+ * @returns 每行补上 `share`（0–1）与 `successRate`（0–1）。
+ */
+export function usageShares(rows, total) {
+  const list = Array.isArray(rows) ? rows : [];
+  const totalRequests = Number(total?.requests) || list.reduce((sum, row) => sum + (Number(row?.requests) || 0), 0);
+  return list.map((row) => {
+    const requests = Number(row?.requests) || 0;
+    const failed = Number(row?.failed) || 0;
+    return {
+      ...row,
+      share: totalRequests > 0 ? requests / totalRequests : 0,
+      successRate: requests > 0 ? (requests - failed) / requests : 0,
+    };
+  });
+}
+
+/**
+ * Token 结构比例（窗口口径：分桶只有 prompt / completion 两段）。
+ *
+ * 刻意**不**拆缓存段：`cache_*` 只存在于进程累计的 `/v1/stats`，
+ * 混进窗口结构条就是跨口径拼数据。
+ *
+ * @param total - 窗口 total。
+ * @returns `{prompt, completion, total, promptShare, completionShare}`。
+ */
+export function tokenStructure(total) {
+  const prompt = Number(total?.prompt_tokens) || 0;
+  const completion = Number(total?.completion_tokens) || 0;
+  const sum = Number(total?.total_tokens) || prompt + completion;
+  const denom = sum > 0 ? sum : 1;
+  return {
+    prompt,
+    completion,
+    total: sum,
+    promptShare: prompt / denom,
+    completionShare: completion / denom,
+  };
+}
+
+/**
+ * 存量积分（跨账号汇总）。
+ *
+ * 语义要点（用户明确要求 + ui-design §5.1）：**只把可消耗算进总数**，
+ * 不可消耗单列 —— 混算会让用户按虚高余额判断账号价值。
+ *
+ * @param accounts - `/status` 的 accounts。
+ * @param creditsByUid - `{uid: {available, credits:{usable_total, unusable_total}}}`。
+ * @param channelOf - `(account) => channel`。
+ * @returns `{usable, unusable, byChannel:[{id,usable,count}], accountCount}`。
+ */
+export function creditStock(accounts, creditsByUid, channelOf = () => 'workbuddy') {
+  const list = Array.isArray(accounts) ? accounts : [];
+  const byChannel = new Map();
+  let usable = 0;
+  let unusable = 0;
+  for (const account of list) {
+    const channel = channelOf(account) ?? 'workbuddy';
+    if (!byChannel.has(channel)) byChannel.set(channel, { id: channel, usable: 0, count: 0 });
+    const bucket = byChannel.get(channel);
+    const live = Number(account?.credits) || 0;
+    bucket.usable += live;
+    bucket.count += 1;
+    usable += live;
+    // 不可消耗 = 上游总额 − 可消耗。明细端点在场时取更精确的口径。
+    const detail = creditsByUid?.[account?.uid];
+    if (detail?.available === true && detail.credits) {
+      unusable += Number(detail.credits.unusable_total) || 0;
+    } else {
+      const upstream = Number(account?.credits_total);
+      if (Number.isFinite(upstream)) unusable += Math.max(0, upstream - live);
+    }
+  }
+  return { usable, unusable, byChannel: [...byChannel.values()], accountCount: list.length };
+}
+
+/**
+ * 燃尽天数预估：存量 ÷ 窗口日均消耗。
+ *
+ * 仅当窗口有正消耗时才有意义 —— 无消耗时返回 `null`，由 UI 显示「—」，
+ * 而不是除零得 Infinity 或编一个数字。
+ *
+ * @param usable - 可用存量。
+ * @param windowCredit - 窗口内积分消耗。
+ * @param windowValue - 窗口字符串（`24h`/`72h`/`168h`/`720h`）。
+ * @returns `{days, perDay}` 或 `null`。
+ */
+export function creditBurn(usable, windowCredit, windowValue) {
+  const hours = windowHours(windowValue);
+  const credit = Number(windowCredit) || 0;
+  const stock = Number(usable) || 0;
+  if (hours === null || credit <= 0 || stock <= 0) return null;
+  const perHour = credit / hours;
+  const perDay = perHour * 24;
+  if (!Number.isFinite(perDay) || perDay <= 0) return null;
+  return { days: stock / perDay, perDay };
+}
+
+/** 窗口字符串 → 小时数（与网关 parseWindow 的可选值一致）。 */
+export function windowHours(value) {
+  const map = { '24h': 24, '72h': 72, '168h': 168, '720h': 720, '7d': 168, '30d': 720 };
+  return map[value] ?? null;
+}
+
+/**
+ * 余额新鲜度：最早一次余额更新的相对时间。
+ * @param accounts - accounts 数组。
+ * @returns `{oldestISO, stale}`；stale 表示超过 1 小时未更新。
+ */
+export function creditsFreshness(accounts, now = Date.now()) {
+  const times = (Array.isArray(accounts) ? accounts : [])
+    .map((account) => Date.parse(account?.credits_at))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (times.length === 0) return { oldestISO: null, stale: false };
+  const oldest = Math.min(...times);
+  return { oldestISO: new Date(oldest).toISOString(), stale: now - oldest > 3600e3 };
+}
+
+/**
+ * Token 数量紧凑格式化（k / M）。
+ * @param value - 数字。
+ * @returns 如 `412.3k` / `11.68M`。
+ */
+export function formatTokens(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (Math.abs(value) >= M) return `${(value / M).toFixed(2)}M`;
+  if (Math.abs(value) >= K) return `${(value / K).toFixed(1)}k`;
+  return String(Math.round(value));
+}
+
+/**
+ * 积分格式化（小数量保留更多位，避免 0.03 被显示成 0.0）。
+ * @param value - 数字。
+ * @returns 字符串。
+ */
+export function formatCredit(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (value === 0) return '0';
+  if (Math.abs(value) >= 1000) return formatNumber(Math.round(value));
+  if (Math.abs(value) >= 1) return value.toFixed(2);
+  return value.toFixed(3);
+}
+
+/**
+ * 百分比格式化。
+ * @param value - 0–1 的比例。
+ * @param digits - 小数位（默认 1）。
+ * @returns 如 `99.8%`；非有限值返回 `—`。
+ */
+export function formatPercent(value, digits = 1) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+/**
+ * 时间段标签（轴刻度 / tooltip）。
+ * @param slot - 槽字符串。
+ * @returns 小时槽 → `MM-DD HH:00`；日槽 → `YYYY-MM-DD（日槽）`；其他 → 原串。
+ */
+export function slotLabel(slot) {
+  const at = parseSlot(slot);
+  if (!Number.isFinite(at)) return slot;
+  const date = new Date(at);
+  const pad = (value) => String(value).padStart(2, '0');
+  if (slotKind(slot) === 'day') {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}（日槽）`;
+  }
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:00`;
+}
+
+/**
+ * 刻度上限取整（图表 y 轴用）。
+ * @param value - 数据最大值。
+ * @returns 不小于 value 的「好看」上限。
+ */
+export function niceMax(value) {
+  const max = Number(value);
+  if (!Number.isFinite(max) || max <= 0) return 1;
+  const power = Math.pow(10, Math.floor(Math.log10(max)));
+  return Math.ceil(max / (power / 2)) * (power / 2);
+}
+
+/**
+ * 进程累计口径的时长（uptime 秒 → 中文）。
+ * @param seconds - 秒。
+ * @returns 如 `3 小时 12 分`。
+ */
+export function uptimeText(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return '—';
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  if (hours >= 24) return `${Math.floor(hours / 24)} 天 ${hours % 24} 小时`;
+  if (hours > 0) return `${hours} 小时 ${minutes} 分`;
+  if (minutes > 0) return `${minutes} 分`;
+  return `${Math.floor(value)} 秒`;
+}
+
+/**
+ * 逐键请求序列（归因表 sparkline 用）。
+ *
+ * 与 `usageShares` 的分工：后者给「整窗口合计 + 占比」，本函数给「随时间的变化」。
+ * 两者都从同一份 buckets 派生，但一个按槽聚合、一个按键聚合并保留时间轴。
+ *
+ * @param buckets - buckets 数组。
+ * @param field - `'uid'` | `'realm'` | `'model'`。
+ * @returns `{slots:[slot...], series: Map<key, number[]>}`，`series` 的值与 `slots` 对齐。
+ */
+export function usageSeriesByKey(buckets, field) {
+  const slots = usageBySlot(buckets).map((row) => row.slot);
+  const index = new Map(slots.map((slot, i) => [slot, i]));
+  const series = new Map();
+  for (const row of Array.isArray(buckets) ? buckets : []) {
+    if (!row || typeof row.slot !== 'string') continue;
+    const slotIndex = index.get(row.slot);
+    if (slotIndex === undefined) continue;
+    // 与网关 accumulate() 的键规则一致：空键在 uid/model 维度无意义，跳过。
+    const raw = row[field];
+    const key = typeof raw === 'string' && raw !== '' ? raw : '';
+    if (key === '' && field !== 'realm') continue;
+    const useKey = key === '' ? 'total' : key;
+    if (!series.has(useKey)) series.set(useKey, new Array(slots.length).fill(0));
+    series.get(useKey)[slotIndex] += Number(row.requests) || 0;
+  }
+  return { slots, series };
+}

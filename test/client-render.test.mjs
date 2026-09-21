@@ -244,6 +244,87 @@ function realStatusFixture() {
   };
 }
 
+/**
+ * 用量分桶 fixture：**三账号 × 两模型 × 三槽**。
+ *
+ * 为什么必须是这个形状：旧实现把 (槽 × 账号 × 模型) 的**行**当柱子渲染，
+ * 单账号单模型的 fixture 恰好「行数 === 槽数」，根本测不出这个缺陷。
+ * 这里 8 行 → 3 槽，是能抓到回归的最小形状。
+ */
+function usageFixture() {
+  const rows = [];
+  const uids = ['uid-1', 'uid-2', 'uid-3'];
+  const models = ['cn:glm-5.2', 'cn:glm-5.2-air'];
+  const slots = ['d:2026-09-19', 'h:2026-09-19T17', 'h:2026-09-19T18'];
+  for (const slot of slots) {
+    for (const uid of uids) {
+      for (const model of models) {
+        rows.push({
+          slot, realm: 'cn', uid, model,
+          requests: 2, failed: uid === 'uid-2' ? 1 : 0, streaming: 1,
+          prompt_tokens: 100, completion_tokens: 50, total_tokens: 150,
+          credit: 0.25, avg_latency_ms: 300, last_seen: new Date().toISOString(),
+        });
+      }
+    }
+  }
+  return {
+    enabled: true,
+    window: '72h0m0s',
+    degraded: false,
+    now: new Date().toISOString(),
+    total: { key: 'total', requests: 24, success: 18, failed: 6, prompt_tokens: 2400, completion_tokens: 1200, total_tokens: 3600, credit: 6, avg_latency_ms: 300 },
+    buckets: rows,
+    by_uid: [
+      { key: 'uid-1', requests: 12, success: 12, failed: 0, prompt_tokens: 1200, completion_tokens: 600, total_tokens: 1800, credit: 3, avg_latency_ms: 300 },
+      { key: 'uid-2', requests: 6, success: 0, failed: 6, prompt_tokens: 600, completion_tokens: 300, total_tokens: 900, credit: 1.5, avg_latency_ms: 300 },
+      { key: 'uid-3', requests: 6, success: 6, failed: 0, prompt_tokens: 600, completion_tokens: 300, total_tokens: 900, credit: 1.5, avg_latency_ms: 300 },
+    ],
+    by_realm: [{ key: 'cn', requests: 24, success: 18, failed: 6, total_tokens: 3600, credit: 6, avg_latency_ms: 300 }],
+    by_model: [
+      { key: 'cn:glm-5.2', requests: 18, success: 14, failed: 4, total_tokens: 2700, credit: 4.5, avg_latency_ms: 300 },
+      { key: 'cn:glm-5.2-air', requests: 6, success: 4, failed: 2, total_tokens: 900, credit: 1.5, avg_latency_ms: 300 },
+    ],
+    note: '分桶为进程内聚合（重启清零）。',
+  };
+}
+
+/** 进程累计 fixture（/v1/stats）—— 与窗口分桶是**不同口径**，用于验证分区标注。 */
+function statsFixture() {
+  return {
+    enabled: true,
+    since: '2026-09-21T08:00:00Z',
+    now: new Date().toISOString(),
+    uptime_sec: 11520,
+    total: {
+      model: 'total', requests: 40, success: 38, failed: 2, streaming: 16,
+      avg_ttfb_ms: 840, avg_latency_ms: 1200, tokens_per_sec: 62.4,
+      prompt_tokens: 8200, completion_tokens: 1800, total_tokens: 10000,
+      cache_hit_tokens: 5600, cache_miss_tokens: 2600, cache_write_tokens: 0,
+      cache_hit_rate: 0.68, credit: 26.96, credit_per_req: 0.674,
+    },
+    models: [
+      {
+        model: 'global:deepseek-chat', requests: 30, success: 29, failed: 1, streaming: 12,
+        avg_ttfb_ms: 840, avg_latency_ms: 1200, tokens_per_sec: 62.4,
+        prompt_tokens: 6000, completion_tokens: 1400, total_tokens: 7400,
+        cache_hit_tokens: 4000, cache_miss_tokens: 2000, cache_write_tokens: 0,
+        cache_hit_rate: 0.667, credit: 20.22, credit_per_req: 0.674, credits: 'x0.06',
+        last_seen: new Date().toISOString(),
+      },
+      {
+        model: 'cn:glm-5.2', requests: 10, success: 9, failed: 1, streaming: 4,
+        avg_ttfb_ms: 0, avg_latency_ms: 900, tokens_per_sec: 40,
+        prompt_tokens: 2200, completion_tokens: 400, total_tokens: 2600,
+        cache_hit_tokens: 0, cache_miss_tokens: 0, cache_write_tokens: 0,
+        cache_hit_rate: 0, credit: 6.74, credit_per_req: 0.674,
+        // 倍率缺失：必须显示 —，绝不显示 x0.00
+        last_seen: new Date().toISOString(),
+      },
+    ],
+  };
+}
+
 /** 构造一个按 endpoint 返回固定数据的 rpcCall。 */
 function fakeRpc(status) {
   const calls = [];
@@ -294,7 +375,7 @@ function fakeRpc(status) {
           },
         };
       case 'getStats':
-        return { ok: true, value: { available: false, reason: '该网关版本未提供 /v1/stats（请求统计视图不可用）' } };
+        return { ok: true, value: { available: true, stats: statsFixture() } };
       case 'getTasks':
         return {
           ok: true,
@@ -325,24 +406,7 @@ function fakeRpc(status) {
           },
         };
       case 'getUsage':
-        return {
-          ok: true,
-          value: {
-            available: true,
-            usage: {
-              enabled: true,
-              window: '72h0m0s',
-              degraded: false,
-              now: new Date().toISOString(),
-              total: { key: 'total', requests: 3, success: 2, failed: 1, prompt_tokens: 120, completion_tokens: 40, total_tokens: 160, credit: 0.5, avg_latency_ms: 300 },
-              buckets: [{ slot: 'h:2026-09-19T17', realm: 'cn', uid: 'uid-1', model: 'cn:glm-5.2', requests: 3, success: 2, failed: 1, streaming: 1, prompt_tokens: 120, completion_tokens: 40, total_tokens: 160, credit: 0.5, avg_latency_ms: 300, last_seen: new Date().toISOString() }],
-              by_uid: [{ key: 'uid-1', requests: 3, success: 2, failed: 1, prompt_tokens: 120, completion_tokens: 40, total_tokens: 160, credit: 0.5, avg_latency_ms: 300 }],
-              by_realm: [{ key: 'cn', requests: 3, success: 2, failed: 1, total_tokens: 160, avg_latency_ms: 300 }],
-              by_model: [{ key: 'cn:glm-5.2', requests: 3, success: 2, failed: 1, total_tokens: 160, avg_latency_ms: 300 }],
-              note: '分桶为进程内聚合（重启清零）。',
-            },
-          },
-        };
+        return { ok: true, value: { available: true, usage: usageFixture() } };
       case 'getLogs':
         return {
           ok: true,
@@ -1501,3 +1565,294 @@ test('渲染：「＋ 添加账号」→ traework 走通发起到粘贴的接线
     dom.window.close();
   }
 });
+
+// ---------------------------------------------------------------------------
+// 用量 Tab（窗口分桶 + 进程累计两个口径；表/图/存量）
+// ---------------------------------------------------------------------------
+
+/** 切到用量 Tab 并返回最新 DOM。 */
+async function openUsage(document) {
+  await clickTab(document, '用量');
+  return document.getElementById('app');
+}
+
+test('渲染用量：英雄区四联 KPI + 存量卡（总量口径）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    const html = app.innerHTML;
+    for (const label of ['请求总量', 'Tokens', '积分消耗', '平均延迟']) {
+      assert.ok(html.includes(label), `缺英雄 KPI：${label}`);
+    }
+    // 窗口总量：24 请求 / 6 积分 / 3600 tokens
+    assert.match(html, /请求总量[\s\S]{0,220}24/, '请求总量应取 usage.total.requests');
+    assert.match(html, /成功率 75\.00%/, `缺成功率（18/24）：${html.match(/成功率[^<]*/)?.[0]}`);
+    assert.match(html, /每请求 0\.250 积分/, `缺每请求积分：${html.match(/每请求[^<]*/)?.[0]}`);
+    // Token 结构：输入/输出两段（窗口口径只有这两段）
+    assert.match(html, /prompt 2\.4k · completion 1\.2k · 合计 3\.6k/, `Token 结构口径不符：${html.match(/prompt[^<]*/)?.[0]}`);
+    // 存量只看可消耗：2880 + 10 + 500 = 3390；不可消耗 240 + 90 = 330
+    assert.match(html, /可用积分（存量 · 只算可消耗）/, '缺存量卡标题');
+    assert.ok(html.includes('3,390'), `存量应可消耗合计 3390，实际未见`);
+    // 不可消耗单列。取值规则：逐套餐明细端点在场时用其 unusable_total（更精确），
+    // 否则回退 credits_total − credits。fixture 的 getCredits 对每个账号都回
+    // unusable_total=500 → 3 账号合计 1500。
+    assert.match(html, /另 1,500 不可消耗/, `不可消耗须单列且明细优先：${html.match(/另[^<]*/)?.[0]}`);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：时序柱数 === 时间槽数（旧实现把行当柱的回归）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    const html = app.innerHTML;
+    // fixture: 3 账号 × 2 模型 × 3 槽 = 18 行 → 必须聚合成 3 个槽
+    assert.match(html, /3 个时间槽（按槽聚合，柱数 = 槽数）/, `未按槽聚合标注：${html.match(/个时间槽[^<]*/)?.[0]}`);
+    // 主图折线点数必须等于槽数（3），而不是行数（18）
+    const path = document.querySelector('.dshc-uchart .line-main');
+    assert.ok(path, '缺主图折线');
+    const points = path.getAttribute('d').split('L').length;
+    assert.equal(points, 3, `柱/线点数必须等于槽数 3，实际 ${points}（旧实现会给 18）`);
+    // 日槽必须分区标注（否则日总量被读成某个小时）
+    assert.ok(document.querySelector('.dshc-uchart .dayband'), '缺日槽底纹');
+    assert.match(app.innerHTML, /日槽（无小时维度）/, '缺日槽分区标注');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：主图指标可切（请求 / Tokens / 积分）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    await openUsage(document);
+    const app = document.getElementById('app');
+    const metricButton = (label) => [...app.querySelectorAll('button')]
+      .find((b) => b.textContent.trim() === label && b.closest('.dshc-uchart') === null && b.parentElement.textContent.includes('请求'));
+    // 默认请求口径有失败堆叠；切到 Tokens 后不应再有失败面积
+    assert.ok(document.querySelector('.dshc-uchart .area-fail'), '请求口径应有失败堆叠');
+    const tokensButton = [...app.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Tokens');
+    assert.ok(tokensButton, '缺 Tokens 指标按钮');
+    await React.act(async () => { tokensButton.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    assert.ok(!document.querySelector('.dshc-uchart .area-fail'), 'Tokens 口径不应有失败堆叠');
+    assert.match(app.innerHTML, /单一指标面积（Tokens 无失败维度）/, '缺口径说明');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：分析视图四态都可切换且各自出图', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    await openUsage(document);
+    const app = document.getElementById('app');
+    const view = (label) => [...app.querySelectorAll('button')].find((b) => b.textContent.trim() === label);
+    for (const label of ['双轴', '燃尽投影', '模型堆叠', '时段热力']) {
+      const button = view(label);
+      assert.ok(button, `缺分析视图按钮：${label}`);
+      await React.act(async () => { button.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+      const html = app.innerHTML;
+      assert.ok(html.includes(label), `切换后未保持视图：${label}`);
+    }
+    // 燃尽投影：必须带「非承诺」限定词 + 外推虚线 + 见底点
+    const burn = view('燃尽投影');
+    await React.act(async () => { burn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    assert.ok(document.querySelector('.line-proj'), '缺外推虚线');
+    assert.ok(document.querySelector('.dot-die'), '缺见底点');
+    assert.match(app.innerHTML, /非承诺/, '外推必须带「非承诺」限定词');
+    // 模型堆叠：层数 = 模型数（2）
+    const stack = view('模型堆叠');
+    await React.act(async () => { stack.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    assert.equal(document.querySelectorAll('.dshc-uchart .seg').length, 2, '堆叠层数应等于模型数');
+    // 时段热力：只有小时槽（2 行 = 2 天），且必须报告被排除的日槽
+    const heat = view('时段热力');
+    await React.act(async () => { heat.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    const cells = document.querySelectorAll('.dshc-uheat i');
+    assert.ok(cells.length > 0, '热力图无格子');
+    assert.equal(cells.length / 24, Math.round(cells.length / 24), '热力格数应为 24 的整数倍');
+    assert.match(app.innerHTML, /日槽只有当天总量、无小时维度，未上此图/, '必须如实报告被排除的日槽');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：归因表三维切换 + 账号映射昵称/渠道', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    // 默认按账号：uid-1 → 昵称「甲」+ 渠道 WB；uid-2 → 手动停用的号 + Trae
+    let html = app.innerHTML;
+    assert.ok(html.includes('甲'), '账号维度必须映射昵称（旧实现只给 uid 前 8 位）');
+    assert.ok(html.includes('WB') || html.includes('Trae'), '账号维度必须带渠道标签');
+    assert.ok(html.includes('占比'), '缺占比列');
+    // 成功率列：uid-2 全失败 → 应标红 0.00%
+    assert.match(html, /0\.00%/, '全失败账号的成功率应为 0.00%');
+    // 切到按域
+    const realmButton = [...app.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('按域'));
+    assert.ok(realmButton, '缺按域按钮');
+    await React.act(async () => { realmButton.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    html = app.innerHTML;
+    assert.ok(html.includes('cn'), '按域视图缺 cn');
+    // 切到按模型
+    const modelButton = [...app.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('按模型'));
+    assert.ok(modelButton, '缺按模型按钮');
+    await React.act(async () => { modelButton.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    html = app.innerHTML;
+    assert.ok(html.includes('cn:glm-5.2'), '按模型视图缺模型名');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：模型全景释放 /v1/stats（进程累计口径，含倍率缺失显示 —）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    const html = app.innerHTML;
+    assert.ok(html.includes('模型全景'), '缺模型全景区');
+    assert.match(html, /进程累计 · 重启清零/, '必须标注进程累计口径（与窗口分桶区分）');
+    assert.ok(html.includes('已运行 3 小时 12 分'), `缺 uptime：${html.match(/已运行[^<]*/)?.[0]}`);
+    // 倍率原文透出
+    assert.ok(html.includes('x0.06'), '缺上游倍率原文');
+    // 缓存命中率（进程口径）
+    assert.match(html, /68%/, '缺缓存命中率');
+    // 无倍率的那一行必须是 —，不得出现 x0.00
+    assert.ok(!html.includes('x0.00'), '倍率缺失不得显示 x0.00（缺失 ≠ 免费）');
+    // TTFB 缺观测（avg_ttfb_ms=0）必须显示 —，不得显示 0 ms。
+    // 精确定位到模型全景表格：按列索引取 TTFB（第 5 列），避免用字符串包含判断
+    // 误伤别处的 "900 ms"（前一轮就是被 900 里的 "0 ms" 咬到）。
+    const modelTable = [...document.querySelectorAll('table')]
+      .find((table) => table.textContent.includes('模型全景') === false && table.textContent.includes('倍率'));
+    assert.ok(modelTable, '缺模型全景表格');
+    const ttfbs = [...modelTable.querySelectorAll('tbody tr')].map((tr) => tr.children[4].textContent.trim());
+    assert.ok(ttfbs.includes('—'), `缺观测的 TTFB 应显示 —，实际 ${JSON.stringify(ttfbs)}`);
+    assert.ok(!ttfbs.some((text) => text === '0 ms'), `TTFB 不得显示 0 ms（缺失 ≠ 0）：${JSON.stringify(ttfbs)}`);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：两个口径必须分区标注（不得混算）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    const html = app.innerHTML;
+    assert.match(html, /窗口聚合 · 近 3 天/, '缺窗口口径 tag');
+    assert.match(html, /落盘 data\/usage\.json/, '缺落盘说明');
+    assert.match(html, /两者不可混算/, '缺少口径不可混算的说明');
+    // 环：成功率标窗口口径，缓存命中标进程口径
+    assert.match(html, /窗口口径/, '环缺窗口口径标注');
+    assert.match(html, /进程累计口径/, '环缺进程口径标注');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：窗口切换会重新拉取分桶', { skip }, async () => {
+  const rpc = fakeRpc(realStatusFixture());
+  const { cleanup, document } = await mount(rpc);
+  try {
+    const app = await openUsage(document);
+    const before = rpc.calls.filter((call) => call.endpoint === 'getUsage').length;
+    const month = [...app.querySelectorAll('button')].find((b) => b.textContent.trim() === '30 天');
+    assert.ok(month, '缺 30 天窗口按钮');
+    await React.act(async () => { month.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    await React.act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    const after = rpc.calls.filter((call) => call.endpoint === 'getUsage');
+    assert.ok(after.length > before, '切窗口必须重新拉取分桶');
+    assert.equal(after[after.length - 1].payload.window, '720h', '窗口参数必须传到网关');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：分桶端点缺失时如实降级，且模型全景仍可用', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    if (endpoint === 'getUsage') {
+      return { ok: true, value: { available: false, reason: '该网关版本未提供 /v1/stats/buckets（分桶用量不可用）' } };
+    }
+    return base(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    const app = await openUsage(document);
+    const html = app.innerHTML;
+    assert.match(html, /该网关版本未提供 \/v1\/stats\/buckets/, '缺降级原因');
+    assert.ok(html.includes('模型全景'), '分桶缺失时模型全景仍应渲染（进程口径不依赖分桶）');
+    assert.ok(html.includes('x0.06'), '降级时模型全景仍应出数据');
+    // 不得把「端点不存在」渲染成「加载失败」
+    assert.ok(!html.includes('加载失败'), '不得把缺端点说成加载失败');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：数据口径的诚实性（无数据不编造）', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    if (endpoint === 'getUsage') {
+      return {
+        ok: true,
+        value: {
+          available: true,
+          usage: {
+            enabled: true, window: '72h0m0s', degraded: false, now: new Date().toISOString(),
+            total: { key: 'total', requests: 0, success: 0, failed: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, credit: 0, avg_latency_ms: 0 },
+            buckets: [], by_uid: [], by_realm: [], by_model: [], note: '',
+          },
+        },
+      };
+    }
+    return base(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    const app = await openUsage(document);
+    const html = app.innerHTML;
+    assert.match(html, /该窗口内没有请求记录/, '空窗口应给引导语');
+    // 无消耗 → 不编造燃尽天数
+    assert.ok(!/≈ 还可/.test(html), '无消耗时不得编造燃尽天数');
+    assert.match(html, /不做外推/, '缺「不做外推」的说明');
+    assert.ok(!html.includes('NaN'), '空数据不得渲染 NaN');
+    assert.ok(!html.includes('Infinity'), '空数据不得渲染 Infinity');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：degraded 时按域仍可用，且警告如实显示', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    if (endpoint === 'getUsage') {
+      const value = (await base(endpoint, payload)).value;
+      return { ok: true, value: { available: true, usage: { ...value.usage, degraded: true } } };
+    }
+    return base(endpoint, payload);
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    const app = await openUsage(document);
+    assert.match(app.innerHTML, /网关已降级为「槽 × 域」两维/, 'degraded 警告必须显示');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：不含横向滚动溢出容器（移动端不撑破）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    // 表格必须包在可横滑容器里（既有 .dshc-tblwrap 约定），而不是裸 table
+    const tables = [...app.querySelectorAll('table')];
+    assert.ok(tables.length > 0, '用量页应有表格');
+    for (const table of tables) {
+      assert.ok(table.closest('.dshc-tblwrap'), '所有表格必须包在 .dshc-tblwrap（否则撑破卡片）');
+    }
+    // 图表容器必须有 min-width:0 链（.dshc-uchart 自带）
+    assert.ok(app.querySelector('.dshc-uchart'), '缺图表容器');
+  } finally {
+    await cleanup();
+  }
+});
+

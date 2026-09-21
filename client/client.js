@@ -364,6 +364,71 @@ var FOLD_CSS = `
 /* \u7B49\u5F85\u6388\u6743\u7684\u5C0F\u8F6C\u5708 */
 @keyframes dshc-spin { to { transform: rotate(360deg); } }
 .dshc-spinner { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--dsw-alias-border-l2,#e5e7eb); border-top-color: var(--dsw-alias-button-info-fill,#4176e6); animation: dshc-spin .8s linear infinite; }
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u7528\u91CF\u56FE\u8868\uFF08\u7EAF\u5185\u8054 SVG + CSS \u53D8\u91CF\uFF09 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+   \u5173\u952E\u7EA6\u675F\uFF08\u539F\u578B\u5B9E\u6D4B\uFF09\uFF1A**SVG \u7684 fill/stroke \u4E0D\u5199 var()**\u3002
+   presentation attribute \u91CC\u5199 var() \u5728\u90E8\u5206\u6D4F\u89C8\u5668\u4E0D\u89E3\u6790 \u2192 \u4E00\u5F8B\u6302 class\uFF0C
+   \u989C\u8272\u7531\u8FD9\u91CC\u51B3\u5B9A\u3002\u5207\u4E3B\u9898\u53EA\u6362\u53D8\u91CF\uFF0CSVG \u65E0\u9700\u91CD\u6E32\u67D3\u3002 */
+.dshc-uchart { position: relative; min-width: 0; }
+.dshc-uchart > svg { display: block; width: 100%; overflow: visible; }
+.dshc-uchart .grid { stroke: var(--dsw-alias-border-l2,#e5e7eb); stroke-dasharray: 2 3; stroke-width: 1; }
+.dshc-uchart .axt { fill: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 10.5px; }
+.dshc-uchart .axt.warn { fill: var(--dsw-alias-state-warn-primary,#b45309); }
+.dshc-uchart .axt.err { fill: var(--dsw-alias-state-error-primary,#dc2626); }
+/* \u9762\u79EF + \u6298\u7EBF\uFF08\u4E3B\u56FE\uFF09 */
+.dshc-uchart .area-main { fill: url(#dshcAreaMain); }
+.dshc-uchart .area-fail { fill: url(#dshcAreaFail); }
+.dshc-uchart .line-main { fill: none; stroke: var(--dsw-alias-brand-primary,#4f6ef7); stroke-width: 2; stroke-linejoin: round; }
+/* \u67F1 + \u6298\u7EBF\uFF08\u53CC\u8F74\uFF09 */
+.dshc-uchart .bar-main { fill: url(#dshcBarMain); }
+.dshc-uchart .bar-main.bad { fill: url(#dshcBarBad); }
+.dshc-uchart .line-credit { fill: none; stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; }
+.dshc-uchart .dot-credit { fill: var(--dsw-alias-bg-layer-1,#fff); stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; }
+/* \u71C3\u5C3D\u6295\u5F71 */
+.dshc-uchart .area-burn { fill: url(#dshcAreaBurn); }
+.dshc-uchart .line-burn { fill: none; stroke: var(--dsw-alias-label-secondary,#61666b); stroke-width: 2; stroke-linejoin: round; }
+.dshc-uchart .line-proj { fill: none; stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; stroke-dasharray: 5 4; }
+.dshc-uchart .dot-die { fill: var(--dsw-alias-bg-layer-1,#fff); stroke: var(--dsw-alias-state-error-primary,#dc2626); stroke-width: 2.5; }
+/* \u65E5\u69FD\u533A\u5E95\u7EB9\uFF08\u65E0\u5C0F\u65F6\u7EF4\u5EA6\uFF0C\u5FC5\u987B\u89C6\u89C9\u4E0A\u533A\u5206\uFF09 */
+.dshc-uchart .dayband { fill: var(--dsw-alias-label-tertiary,#8b93a1); opacity: .07; }
+.dshc-uchart .slotdiv { stroke: var(--dsw-alias-border-l2,#e5e7eb); stroke-dasharray: 3 3; stroke-width: 1; }
+/* \u5806\u53E0\u9762\u79EF */
+.dshc-uchart .seg { stroke: var(--dsw-alias-bg-layer-1,#fff); stroke-width: .6; }
+/* hover \u5341\u5B57\u7EBF / \u5706\u70B9 / \u63D0\u793A */
+.dshc-ucross { position: absolute; top: 0; width: 1px; background: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .45; pointer-events: none; display: none; }
+.dshc-udot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--dsw-alias-bg-layer-1,#fff); border: 2px solid var(--dsw-alias-brand-primary,#4f6ef7); transform: translate(-50%,-50%); pointer-events: none; display: none; }
+.dshc-utip { position: absolute; z-index: 6; pointer-events: none; background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 8px; padding: 7px 9px; box-shadow: 0 6px 20px rgba(0,0,0,.16); font-size: 11.5px; white-space: nowrap; line-height: 1.65; color: var(--dsw-alias-label-primary,currentColor); }
+/* \u73AF\u5F62\u767E\u5206\u6BD4 */
+.dshc-uring { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+@media (max-width: 560px) { .dshc-uring { grid-template-columns: 1fr; } }
+.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px; text-align: center; min-width: 0; }
+.dshc-uring svg { display: block; margin: 0 auto; }
+.dshc-uring .rv { font-size: 17px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-uring .rl { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-top: 2px; }
+.dshc-uring .track { fill: none; stroke: var(--dsw-alias-bg-layer-2,#f3f4f6); stroke-width: 7; }
+.dshc-uring .arc { fill: none; stroke-width: 7; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+.dshc-uring .arc.ok { stroke: var(--dsw-alias-state-success-primary,#22c55e); }
+.dshc-uring .arc.brand { stroke: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-uring .arc.warn { stroke: var(--dsw-alias-state-warn-primary,#f59e0b); }
+/* Token \u7ED3\u6784\u6761 */
+.dshc-ustack { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
+.dshc-ustack > i { display: block; height: 100%; }
+/* \u82F1\u96C4\u533A */
+.dshc-uhero { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 10px; }
+@media (max-width: 820px) { .dshc-uhero { grid-template-columns: 1fr; } }
+.dshc-ustock { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; min-width: 0; }
+.dshc-ustock .big { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--dsw-alias-state-success-primary,#059669); }
+.dshc-uchans { display: flex; margin-top: 10px; border-top: 1px solid var(--dsw-alias-border-l2,#e5e7eb); padding-top: 8px; }
+.dshc-uchans > div { flex: 1; min-width: 0; text-align: center; border-right: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-uchans > div:last-child { border-right: 0; }
+.dshc-uchans .n { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-uchans .c { font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+/* \u5360\u6BD4\u6761 */
+.dshc-ushare { display: inline-block; height: 6px; border-radius: 999px; background: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .85; vertical-align: middle; }
+/* \u65F6\u6BB5\u70ED\u529B */
+.dshc-uheat { display: grid; gap: 2px; min-width: 0; }
+.dshc-uheat .hl { font-size: 10px; color: var(--dsw-alias-label-tertiary,#8b93a1); line-height: 14px; white-space: nowrap; }
+.dshc-uheat i { height: 14px; border-radius: 2px; background: var(--dsw-alias-brand-primary,#4f6ef7); display: block; }
+.dshc-uheat i.zero { background: var(--dsw-alias-bg-layer-2,#f3f4f6); opacity: 1 !important; }
 `;
 
 // lib/config-spec.js
@@ -484,7 +549,7 @@ var CONFIG_FIELDS = (
     // ---- admin（1 项）----
     { path: "admin.enabled", label: "\u542F\u7528\u7BA1\u7406\u7AEF\u70B9", type: "bool", default: "false", restart: true, danger: true, note: "\u5F00\u542F\u4E14 api_key \u4E3A\u7A7A \u2192 \u7F51\u5173\u62D2\u7EDD\u542F\u52A8" },
     // ---- 顶层（4 项）----
-    { path: "listen", label: "\u76D1\u542C\u5730\u5740", type: "string", default: ":7863", restart: true, note: "assembly \u671F\u6355\u83B7\uFF0C\u5FC5\u987B\u91CD\u542F" },
+    { path: "listen", label: "\u76D1\u542C\u5730\u5740", type: "string", default: ":7866", restart: true, note: "assembly \u671F\u6355\u83B7\uFF0C\u5FC5\u987B\u91CD\u542F" },
     { path: "api_key", label: "API key", type: "string", default: "", restart: false, danger: true, note: "\u70ED\u751F\u6548\uFF1B\u6539\u52A8\u540E\u9700\u540C\u6B65\u66F4\u65B0\u63D2\u4EF6\u8BBE\u7F6E\uFF0C\u5426\u5219\u9762\u677F\u5931\u8054" },
     { path: "auth_dir", label: "\u51ED\u8BC1\u76EE\u5F55", type: "string", default: "./auths", restart: true },
     { path: "state_file", label: "\u72B6\u6001\u843D\u76D8\u8DEF\u5F84", type: "string", default: "./data/state.json", restart: true }
@@ -834,6 +899,191 @@ function resolveChannel(explicit, domain) {
     return "traework";
   }
   return "workbuddy";
+}
+var K = 1e3;
+var M = 1e3 * 1e3;
+function slotKind(slot) {
+  if (typeof slot !== "string" || slot.length < 2) return "unknown";
+  if (slot.startsWith("h:")) return "hour";
+  if (slot.startsWith("d:")) return "day";
+  return "unknown";
+}
+function parseSlot(slot) {
+  const kind = slotKind(slot);
+  if (kind === "unknown") return Number.NaN;
+  const raw = slot.slice(2);
+  return kind === "hour" ? Date.parse(`${raw}:00:00`) : Date.parse(`${raw}T00:00:00`);
+}
+function usageBySlot(buckets) {
+  if (!Array.isArray(buckets)) return [];
+  const table = /* @__PURE__ */ new Map();
+  for (const row of buckets) {
+    if (!row || typeof row.slot !== "string") continue;
+    const key = row.slot;
+    let entry = table.get(key);
+    if (!entry) {
+      entry = {
+        slot: key,
+        kind: slotKind(key),
+        at: parseSlot(key),
+        requests: 0,
+        failed: 0,
+        success: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        tokens: 0,
+        credit: 0,
+        latencySum: 0
+      };
+      table.set(key, entry);
+    }
+    const requests = Number(row.requests) || 0;
+    entry.requests += requests;
+    entry.failed += Number(row.failed) || 0;
+    entry.promptTokens += Number(row.prompt_tokens) || 0;
+    entry.completionTokens += Number(row.completion_tokens) || 0;
+    entry.tokens += Number(row.total_tokens) || 0;
+    entry.credit += Number(row.credit) || 0;
+    entry.latencySum += (Number(row.avg_latency_ms) || 0) * requests;
+  }
+  return [...table.values()].map((entry) => ({
+    slot: entry.slot,
+    kind: entry.kind,
+    at: entry.at,
+    requests: entry.requests,
+    failed: entry.failed,
+    success: entry.requests - entry.failed,
+    promptTokens: entry.promptTokens,
+    completionTokens: entry.completionTokens,
+    tokens: entry.tokens,
+    credit: entry.credit,
+    latencyMS: entry.requests > 0 ? entry.latencySum / entry.requests : 0
+  })).sort((a, b) => a.at - b.at);
+}
+function usageBySlotAndModel(buckets) {
+  const bySlot = usageBySlot(buckets);
+  const slots = bySlot.map((row) => row.slot);
+  const index = new Map(slots.map((slot, i) => [slot, i]));
+  const table = /* @__PURE__ */ new Map();
+  for (const row of Array.isArray(buckets) ? buckets : []) {
+    if (!row || typeof row.slot !== "string" || index.has(row.slot) === false) continue;
+    const key = typeof row.model === "string" && row.model !== "" ? row.model : "-";
+    let entry = table.get(key);
+    if (!entry) {
+      entry = { key, total: 0, values: new Array(slots.length).fill(0) };
+      table.set(key, entry);
+    }
+    const requests = Number(row.requests) || 0;
+    entry.values[index.get(row.slot)] += requests;
+    entry.total += requests;
+  }
+  return { slots, models: [...table.values()].sort((a, b) => b.total - a.total) };
+}
+function usageShares(rows, total) {
+  const list = Array.isArray(rows) ? rows : [];
+  const totalRequests = Number(total?.requests) || list.reduce((sum, row) => sum + (Number(row?.requests) || 0), 0);
+  return list.map((row) => {
+    const requests = Number(row?.requests) || 0;
+    const failed = Number(row?.failed) || 0;
+    return {
+      ...row,
+      share: totalRequests > 0 ? requests / totalRequests : 0,
+      successRate: requests > 0 ? (requests - failed) / requests : 0
+    };
+  });
+}
+function tokenStructure(total) {
+  const prompt = Number(total?.prompt_tokens) || 0;
+  const completion = Number(total?.completion_tokens) || 0;
+  const sum = Number(total?.total_tokens) || prompt + completion;
+  const denom = sum > 0 ? sum : 1;
+  return {
+    prompt,
+    completion,
+    total: sum,
+    promptShare: prompt / denom,
+    completionShare: completion / denom
+  };
+}
+function creditStock(accounts, creditsByUid, channelOf = () => "workbuddy") {
+  const list = Array.isArray(accounts) ? accounts : [];
+  const byChannel = /* @__PURE__ */ new Map();
+  let usable = 0;
+  let unusable = 0;
+  for (const account of list) {
+    const channel = channelOf(account) ?? "workbuddy";
+    if (!byChannel.has(channel)) byChannel.set(channel, { id: channel, usable: 0, count: 0 });
+    const bucket = byChannel.get(channel);
+    const live = Number(account?.credits) || 0;
+    bucket.usable += live;
+    bucket.count += 1;
+    usable += live;
+    const detail = creditsByUid?.[account?.uid];
+    if (detail?.available === true && detail.credits) {
+      unusable += Number(detail.credits.unusable_total) || 0;
+    } else {
+      const upstream = Number(account?.credits_total);
+      if (Number.isFinite(upstream)) unusable += Math.max(0, upstream - live);
+    }
+  }
+  return { usable, unusable, byChannel: [...byChannel.values()], accountCount: list.length };
+}
+function creditBurn(usable, windowCredit, windowValue) {
+  const hours = windowHours(windowValue);
+  const credit = Number(windowCredit) || 0;
+  const stock = Number(usable) || 0;
+  if (hours === null || credit <= 0 || stock <= 0) return null;
+  const perHour = credit / hours;
+  const perDay = perHour * 24;
+  if (!Number.isFinite(perDay) || perDay <= 0) return null;
+  return { days: stock / perDay, perDay };
+}
+function windowHours(value) {
+  const map = { "24h": 24, "72h": 72, "168h": 168, "720h": 720, "7d": 168, "30d": 720 };
+  return map[value] ?? null;
+}
+function formatTokens(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
+  if (Math.abs(value) >= M) return `${(value / M).toFixed(2)}M`;
+  if (Math.abs(value) >= K) return `${(value / K).toFixed(1)}k`;
+  return String(Math.round(value));
+}
+function formatCredit(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
+  if (value === 0) return "0";
+  if (Math.abs(value) >= 1e3) return formatNumber(Math.round(value));
+  if (Math.abs(value) >= 1) return value.toFixed(2);
+  return value.toFixed(3);
+}
+function formatPercent(value, digits = 1) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
+  return `${(value * 100).toFixed(digits)}%`;
+}
+function slotLabel(slot) {
+  const at = parseSlot(slot);
+  if (!Number.isFinite(at)) return slot;
+  const date = new Date(at);
+  const pad = (value) => String(value).padStart(2, "0");
+  if (slotKind(slot) === "day") {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}\uFF08\u65E5\u69FD\uFF09`;
+  }
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:00`;
+}
+function niceMax(value) {
+  const max = Number(value);
+  if (!Number.isFinite(max) || max <= 0) return 1;
+  const power = Math.pow(10, Math.floor(Math.log10(max)));
+  return Math.ceil(max / (power / 2)) * (power / 2);
+}
+function uptimeText(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return "\u2014";
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor(value % 3600 / 60);
+  if (hours >= 24) return `${Math.floor(hours / 24)} \u5929 ${hours % 24} \u5C0F\u65F6`;
+  if (hours > 0) return `${hours} \u5C0F\u65F6 ${minutes} \u5206`;
+  if (minutes > 0) return `${minutes} \u5206`;
+  return `${Math.floor(value)} \u79D2`;
 }
 
 // client/add-account.js
@@ -2909,151 +3159,1160 @@ function CheckinOutcomesCard({ task, liveByUid }) {
     )
   );
 }
-function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
-  const bucketsAvailable = usage?.available === true;
-  const usageData = usage?.usage;
+var USAGE_METRICS = [
+  { id: "requests", label: "\u8BF7\u6C42", unit: "\u8BF7\u6C42", pick: (row) => row.requests, bad: (row) => row.failed, fmt: formatNumber, hasFail: true },
+  { id: "tokens", label: "Tokens", unit: "tokens", pick: (row) => row.tokens, bad: () => 0, fmt: formatTokens, hasFail: false },
+  { id: "credit", label: "\u79EF\u5206", unit: "\u79EF\u5206", pick: (row) => row.credit, bad: () => 0, fmt: formatCredit, hasFail: false }
+];
+var USAGE_VIEWS = [
+  { id: "combo", label: "\u53CC\u8F74" },
+  { id: "burn", label: "\u71C3\u5C3D\u6295\u5F71" },
+  { id: "stack", label: "\u6A21\u578B\u5806\u53E0" },
+  { id: "heat", label: "\u65F6\u6BB5\u70ED\u529B" }
+];
+var USAGE_DIMS = [
+  { id: "uid", label: "\u6309\u8D26\u53F7" },
+  { id: "realm", label: "\u6309\u57DF" },
+  { id: "model", label: "\u6309\u6A21\u578B" }
+];
+var USAGE_SEG_COLORS = [
+  "var(--dsw-alias-brand-primary,#4f6ef7)",
+  "var(--dsw-alias-state-success-primary,#22c55e)",
+  "var(--dsw-alias-state-warn-primary,#f59e0b)",
+  "var(--dsw-alias-state-business-primary,#a855f7)",
+  "var(--dsw-alias-button-info-fill,#0ea5e9)",
+  "var(--dsw-alias-label-tertiary,#94a3b8)"
+];
+var USAGE_FALLBACK_WIDTH = 640;
+function UsageChart({ render, deps = [] }) {
+  const boxRef = React.useRef(null);
+  const drawRef = React.useRef(null);
+  const [width, setWidth] = React.useState(USAGE_FALLBACK_WIDTH);
+  const [measured, setMeasured] = React.useState(false);
+  React.useEffect(() => {
+    const node = boxRef.current;
+    if (!node) return void 0;
+    const measure = () => {
+      const next = node.clientWidth;
+      if (next > 0) {
+        setMeasured(true);
+        setWidth((prev) => next !== prev ? next : prev);
+      }
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return void 0;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  React.useEffect(() => {
+    const node = boxRef.current;
+    if (!node) return;
+    const next = node.clientWidth;
+    if (next > 0) {
+      setMeasured(true);
+      setWidth((prev) => next !== prev ? next : prev);
+    }
+  }, deps);
+  drawRef.current = render;
+  const effectiveWidth = measured ? width : USAGE_FALLBACK_WIDTH;
+  return React.createElement(
+    "div",
+    { className: "dshc-uchart", ref: boxRef },
+    drawRef.current(effectiveWidth)
+  );
+}
+function UsageDefs({ scope }) {
+  return React.createElement(
+    "defs",
+    null,
+    React.createElement(
+      "linearGradient",
+      { id: `${scope}AreaMain`, x1: "0", y1: "0", x2: "0", y2: "1" },
+      React.createElement("stop", { offset: "0", stopColor: "var(--dsw-alias-brand-primary,#4f6ef7)", stopOpacity: 0.42 }),
+      React.createElement("stop", { offset: "1", stopColor: "var(--dsw-alias-brand-primary,#4f6ef7)", stopOpacity: 0.02 })
+    ),
+    React.createElement(
+      "linearGradient",
+      { id: `${scope}AreaFail`, x1: "0", y1: "0", x2: "0", y2: "1" },
+      React.createElement("stop", { offset: "0", stopColor: "var(--dsw-alias-state-error-primary,#dc2626)", stopOpacity: 0.85 }),
+      React.createElement("stop", { offset: "1", stopColor: "var(--dsw-alias-state-error-primary,#dc2626)", stopOpacity: 0.5 })
+    ),
+    React.createElement(
+      "linearGradient",
+      { id: `${scope}BarMain`, x1: "0", y1: "0", x2: "0", y2: "1" },
+      React.createElement("stop", { offset: "0", stopColor: "var(--dsw-alias-brand-primary,#4f6ef7)", stopOpacity: 0.85 }),
+      React.createElement("stop", { offset: "1", stopColor: "var(--dsw-alias-brand-primary,#4f6ef7)", stopOpacity: 0.45 })
+    ),
+    React.createElement(
+      "linearGradient",
+      { id: `${scope}BarBad`, x1: "0", y1: "0", x2: "0", y2: "1" },
+      React.createElement("stop", { offset: "0", stopColor: "var(--dsw-alias-state-error-primary,#dc2626)", stopOpacity: 0.9 }),
+      React.createElement("stop", { offset: "1", stopColor: "var(--dsw-alias-state-error-primary,#dc2626)", stopOpacity: 0.5 })
+    ),
+    React.createElement(
+      "linearGradient",
+      { id: `${scope}AreaBurn`, x1: "0", y1: "0", x2: "0", y2: "1" },
+      React.createElement("stop", { offset: "0", stopColor: "var(--dsw-alias-state-error-primary,#dc2626)", stopOpacity: 0.22 }),
+      React.createElement("stop", { offset: "1", stopColor: "var(--dsw-alias-state-error-primary,#dc2626)", stopOpacity: 0.01 })
+    )
+  );
+}
+function usageLine(points) {
+  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point[0].toFixed(1)},${point[1].toFixed(1)}`).join("");
+}
+function UsageAreaChart({ rows, metric }) {
+  const boxRef = React.useRef(null);
+  const [hover, setHover] = React.useState(null);
+  const def = USAGE_METRICS.find((item) => item.id === metric) ?? USAGE_METRICS[0];
+  return React.createElement(UsageChart, {
+    deps: [metric, rows.length],
+    render: (width) => {
+      const H = 210;
+      const PL = 46;
+      const PR = 14;
+      const PT = 16;
+      const PB = 26;
+      const innerW = Math.max(10, width - PL - PR);
+      const innerH = H - PT - PB;
+      const n = rows.length;
+      const max = niceMax(Math.max(1, ...rows.map((row) => def.pick(row))));
+      const x = (index) => PL + (n <= 1 ? innerW / 2 : index / (n - 1) * innerW);
+      const y = (value) => PT + (1 - value / max) * innerH;
+      const top = rows.map((row, index) => [x(index), y(def.pick(row))]);
+      const failTop = rows.map((row, index) => [x(index), y(def.bad(row))]);
+      const areaMain = `${usageLine(top)}L${x(n - 1).toFixed(1)},${(PT + innerH).toFixed(1)}L${x(0).toFixed(1)},${(PT + innerH).toFixed(1)}Z`;
+      const areaFail = `${usageLine(failTop)}L${x(n - 1).toFixed(1)},${(PT + innerH).toFixed(1)}L${x(0).toFixed(1)},${(PT + innerH).toFixed(1)}Z`;
+      const firstDay = rows.findIndex((row) => row.kind === "day");
+      const hasDay = rows.some((row) => row.kind === "day");
+      const hasHour = rows.some((row) => row.kind === "hour");
+      const band = firstDay >= 0 ? [
+        React.createElement("rect", {
+          key: "band",
+          className: "dayband",
+          x: PL,
+          y: PT,
+          width: Math.max(0, x(firstDay) - PL),
+          height: innerH
+        }),
+        React.createElement("line", {
+          key: "div",
+          className: "slotdiv",
+          x1: x(firstDay),
+          x2: x(firstDay),
+          y1: PT,
+          y2: PT + innerH
+        }),
+        React.createElement("text", {
+          key: "lt",
+          className: "axt",
+          x: (PL + x(firstDay)) / 2,
+          y: PT + 11,
+          textAnchor: "middle"
+        }, "\u65E5\u69FD\uFF08\u65E0\u5C0F\u65F6\u7EF4\u5EA6\uFF09"),
+        hasHour ? React.createElement("text", {
+          key: "rt",
+          className: "axt",
+          x: (x(firstDay) + (width - PR)) / 2,
+          y: PT + 11,
+          textAnchor: "middle"
+        }, "\u5C0F\u65F6\u69FD") : null
+      ] : null;
+      const grid = [0, 0.25, 0.5, 0.75, 1].map((frac) => {
+        const gy = PT + innerH * frac;
+        return React.createElement(
+          "g",
+          { key: `g${frac}` },
+          React.createElement("line", { className: "grid", x1: PL, x2: width - PR, y1: gy, y2: gy }),
+          React.createElement(
+            "text",
+            { className: "axt", x: PL - 6, y: gy + 3.5, textAnchor: "end" },
+            def.fmt(max * (1 - frac))
+          )
+        );
+      });
+      const tickIndexes = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1];
+      const ticks = [...new Set(tickIndexes)].map((index) => {
+        const row = rows[index];
+        const anchor = index === 0 ? "start" : index === n - 1 ? "end" : "middle";
+        return React.createElement("text", {
+          key: `t${index}`,
+          className: "axt",
+          x: x(index),
+          y: H - 8,
+          textAnchor: anchor
+        }, slotLabel(row.slot));
+      });
+      const peak = Math.max(...rows.map((row) => def.pick(row)));
+      const svg2 = React.createElement(
+        "svg",
+        {
+          viewBox: `0 0 ${width} ${H}`,
+          width,
+          height: H,
+          onMouseMove: (event) => handleHover(event, width, PL, innerW, n, H, x),
+          onMouseLeave: () => setHover(null)
+        },
+        React.createElement(UsageDefs, { scope: "dshcMain" }),
+        ...grid,
+        band,
+        React.createElement("path", { className: "area-main", d: areaMain }),
+        def.hasFail ? React.createElement("path", { className: "area-fail", d: areaFail }) : null,
+        React.createElement("path", { className: "line-main", d: usageLine(top) }),
+        ...ticks
+      );
+      return React.createElement(
+        "div",
+        { ref: boxRef, style: { position: "relative" } },
+        svg2,
+        hover === null ? null : React.createElement(
+          React.Fragment,
+          null,
+          React.createElement("div", { className: "dshc-ucross", style: { display: "block", height: innerH, left: hover.px } }),
+          React.createElement("div", { className: "dshc-udot", style: { display: "block", left: hover.px, top: hover.py } }),
+          React.createElement(
+            "div",
+            {
+              className: "dshc-utip",
+              style: { display: "block", left: hover.tipX, top: hover.tipY, maxWidth: width - 8 }
+            },
+            React.createElement("div", null, React.createElement("b", null, slotLabel(hover.row.slot))),
+            React.createElement(
+              "div",
+              null,
+              "\u8BF7\u6C42 ",
+              React.createElement("b", null, formatNumber(hover.row.requests)),
+              hover.row.failed > 0 ? React.createElement("span", { style: { color: tone.err.fg } }, ` \xB7 \u5931\u8D25 ${formatNumber(hover.row.failed)}`) : null
+            ),
+            React.createElement(
+              "div",
+              null,
+              `tokens ${formatTokens(hover.row.tokens)} \xB7 \u79EF\u5206 ${formatCredit(hover.row.credit)}`
+            ),
+            React.createElement(
+              "div",
+              { style: { ...s.muted, fontSize: 11 } },
+              `\u5EF6\u8FDF ${Math.round(hover.row.latencyMS)} ms \xB7 \u5360\u6BD4 ${formatPercent(hover.row.requests / Math.max(1, hover.total))}`
+            )
+          )
+        ),
+        React.createElement(
+          "div",
+          { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
+          def.hasFail ? "\u7EA2\u8272\u4E0B\u6BB5 = \u5931\u8D25\u8BF7\u6C42\u5806\u53E0" : `\u5355\u4E00\u6307\u6807\u9762\u79EF\uFF08${def.label} \u65E0\u5931\u8D25\u7EF4\u5EA6\uFF09`,
+          ` \xB7 \u5CF0\u503C ${def.fmt(peak)} ${def.unit}/\u69FD`
+        )
+      );
+      function handleHover(event, boxWidth, padLeft, innerWidth, count, height, xOf) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (rect.width === 0 || count === 0) return;
+        const scale = rect.height / height;
+        const px = event.clientX - rect.left;
+        const index = Math.max(0, Math.min(
+          count - 1,
+          Math.round((px / rect.width * boxWidth - padLeft) / innerWidth * (count - 1))
+        ));
+        const row = rows[index];
+        const total = rows.reduce((sum, item) => sum + item.requests, 0);
+        setHover({
+          row,
+          total,
+          px: xOf(index) * scale,
+          py: (PT + (1 - def.pick(row) / max) * innerH) * scale,
+          tipX: Math.min(Math.max(4, xOf(index) * scale + 12), Math.max(4, innerWidth - 4)),
+          tipY: Math.max(2, (PT + (1 - def.pick(row) / max) * innerH) * scale - 76)
+        });
+      }
+    }
+  });
+}
+function UsageComboChart({ rows }) {
+  return React.createElement(UsageChart, {
+    deps: [rows.length],
+    render: (width) => {
+      const H = 160;
+      const PL = 46;
+      const PR = 46;
+      const PT = 12;
+      const PB = 22;
+      const innerW = Math.max(10, width - PL - PR);
+      const innerH = H - PT - PB;
+      const n = rows.length;
+      const maxR = niceMax(Math.max(1, ...rows.map((row) => row.requests)));
+      const maxC = niceMax(Math.max(1, ...rows.map((row) => row.credit)));
+      const x = (index) => PL + (n <= 1 ? innerW / 2 : index / (n - 1) * innerW);
+      const yR = (value) => PT + (1 - value / maxR) * innerH;
+      const yC = (value) => PT + (1 - value / maxC) * innerH;
+      const barW = Math.max(2, innerW / Math.max(1, n) - 2);
+      const bars = rows.map((row, index) => {
+        const bad = row.requests > 0 && row.failed / row.requests > 0.05;
+        const top = yR(row.requests);
+        return React.createElement("rect", {
+          key: `b${index}`,
+          className: `bar-main${bad ? " bad" : ""}`,
+          x: (x(index) - barW / 2).toFixed(1),
+          y: top.toFixed(1),
+          width: barW.toFixed(1),
+          height: Math.max(0, PT + innerH - top).toFixed(1)
+        }, React.createElement("title", null, `${slotLabel(row.slot)} \xB7 ${formatNumber(row.requests)} \u8BF7\u6C42`));
+      });
+      const creditPoints = rows.map((row, index) => [x(index), yC(row.credit)]);
+      const step = Math.max(1, Math.ceil(n / 8));
+      const dots = rows.map((row, index) => index % step === 0 ? React.createElement("circle", { key: `d${index}`, className: "dot-credit", cx: x(index).toFixed(1), cy: yC(row.credit).toFixed(1), r: 2.6 }) : null);
+      const grid = [0, 0.5, 1].map((frac) => {
+        const gy = PT + innerH * frac;
+        return React.createElement(
+          "g",
+          { key: `g${frac}` },
+          React.createElement("line", { className: "grid", x1: PL, x2: width - PR, y1: gy, y2: gy }),
+          React.createElement("text", { className: "axt", x: PL - 6, y: gy + 3.5, textAnchor: "end" }, formatTokens(maxR * (1 - frac))),
+          React.createElement("text", { className: "axt warn", x: width - PR + 6, y: gy + 3.5 }, formatCredit(maxC * (1 - frac)))
+        );
+      });
+      return React.createElement(
+        "svg",
+        { viewBox: `0 0 ${width} ${H}`, width, height: H },
+        React.createElement(UsageDefs, { scope: "dshcCombo" }),
+        ...grid,
+        ...bars,
+        React.createElement("path", { className: "line-credit", d: usageLine(creditPoints) }),
+        ...dots,
+        React.createElement("text", { className: "axt", x: PL, y: H - 6 }, slotLabel(rows[0].slot)),
+        React.createElement("text", { className: "axt", x: width - PR, y: H - 6, textAnchor: "end" }, slotLabel(rows[n - 1].slot))
+      );
+    }
+  });
+}
+function UsageBurnChart({ rows, stock, windowValue }) {
+  const burn = creditBurn(stock.usable, rows.reduce((sum, row) => sum + row.credit, 0), windowValue);
+  const note = burn === null ? "\u7A97\u53E3\u5185\u65E0\u79EF\u5206\u6D88\u8017\u6216\u65E0\u53EF\u7528\u5B58\u91CF \u2014\u2014 \u65E0\u6CD5\u5916\u63A8\uFF08\u663E\u793A \u2014 \u800C\u4E0D\u662F\u7F16\u4E00\u4E2A\u5929\u6570\uFF09" : `\u7A97\u53E3\u901F\u7387 ${formatCredit(burn.perDay / 24)} \u79EF\u5206/\u65F6 \xB7 \u5B58\u91CF ${formatNumber(Math.round(stock.usable))} \xB7 \u9884\u8BA1 ${burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`}\u540E\u89C1\u5E95`;
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement("div", { style: { ...s.muted, marginBottom: 8 } }, note),
+    burn === null ? null : React.createElement(UsageChart, {
+      deps: [rows.length, stock.usable],
+      render: (width) => {
+        const H = 170;
+        const PL = 52;
+        const PR = 16;
+        const PT = 14;
+        const PB = 24;
+        const innerW = Math.max(10, width - PL - PR);
+        const innerH = H - PT - PB;
+        const n = rows.length;
+        const spent = rows.reduce((sum, row) => sum + row.credit, 0);
+        const startStock = stock.usable + spent;
+        const perHour = burn.perDay / 24;
+        const hoursLeft = perHour > 0 ? stock.usable / perHour : 0;
+        const extra = Math.max(2, Math.ceil(hoursLeft));
+        const totalSlots = n + extra;
+        const maxY = niceMax(startStock);
+        const x = (index) => PL + index / Math.max(1, totalSlots - 1) * innerW;
+        const y = (value) => PT + (1 - Math.max(0, value) / maxY) * innerH;
+        let used = 0;
+        const actual = rows.map((row, index) => {
+          used += row.credit;
+          return [x(index), y(startStock - used)];
+        });
+        const proj = Array.from({ length: extra + 1 }, (_, step) => [
+          x(n - 1 + step),
+          y(stock.usable - perHour * step)
+        ]);
+        let dieIndex = proj.findIndex((point) => point[1] >= PT + innerH - 0.5);
+        if (dieIndex < 0) dieIndex = proj.length - 1;
+        const dieX = proj[dieIndex][0];
+        const dieY = PT + innerH;
+        const daysText = burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`;
+        const grid = [0, 0.5, 1].map((frac) => {
+          const gy = PT + innerH * frac;
+          return React.createElement(
+            "g",
+            { key: `g${frac}` },
+            React.createElement("line", { className: "grid", x1: PL, x2: width - PR, y1: gy, y2: gy }),
+            React.createElement("text", { className: "axt", x: PL - 6, y: gy + 3.5, textAnchor: "end" }, formatTokens(maxY * (1 - frac)))
+          );
+        });
+        return React.createElement(
+          "svg",
+          { viewBox: `0 0 ${width} ${H}`, width, height: H },
+          React.createElement(UsageDefs, { scope: "dshcBurn" }),
+          ...grid,
+          React.createElement("path", {
+            className: "area-burn",
+            d: `${usageLine(actual)}L${x(n - 1).toFixed(1)},${(PT + innerH).toFixed(1)}L${x(0).toFixed(1)},${(PT + innerH).toFixed(1)}Z`
+          }),
+          React.createElement("path", { className: "line-burn", d: usageLine(actual) }),
+          React.createElement("path", { className: "line-proj", d: usageLine(proj) }),
+          React.createElement("line", {
+            x1: PL,
+            x2: width - PR,
+            y1: dieY,
+            y2: dieY,
+            stroke: tone.err.fg,
+            strokeWidth: 1,
+            opacity: 0.5
+          }),
+          React.createElement("circle", { className: "dot-die", cx: dieX.toFixed(1), cy: dieY, r: 4 }),
+          React.createElement("text", {
+            className: "axt err",
+            x: Math.min(dieX + 8, width - PR - 66),
+            y: dieY - 7
+          }, `\u2248 ${daysText}\u540E\u89C1\u5E95`),
+          React.createElement("line", {
+            x1: x(n - 1).toFixed(1),
+            x2: x(n - 1).toFixed(1),
+            y1: PT,
+            y2: PT + innerH,
+            stroke: tone.idle.fg,
+            strokeWidth: 1,
+            opacity: 0.4
+          }),
+          React.createElement("text", { className: "axt", x: x(n - 1).toFixed(1), y: H - 8, textAnchor: "middle" }, "\u73B0\u5728"),
+          React.createElement("text", { className: "axt", x: PL, y: H - 8 }, "\u7A97\u53E3\u8D77\u70B9"),
+          React.createElement("text", { className: "axt", x: width - PR, y: H - 8, textAnchor: "end" }, "\u5916\u63A8")
+        );
+      }
+    }),
+    React.createElement(
+      "div",
+      { style: { ...s.muted, fontSize: 11, marginTop: 6, lineHeight: 1.7 } },
+      "\u5B9E\u7EBF = \u7A97\u53E3\u8D77\u70B9\u5B58\u91CF\u6309\u5DF2\u6D88\u8017\u9010\u69FD\u56DE\u63A8\uFF08**\u56DE\u63A8\u503C\uFF0C\u975E\u9010\u65F6\u5B9E\u6D4B**\uFF09\xB7 \u865A\u7EBF = \u6309\u7A97\u53E3\u901F\u7387\u7EBF\u6027\u5916\u63A8\uFF08\u975E\u627F\u8BFA\uFF09\xB7 \u5706\u70B9 = \u9884\u8BA1\u89C1\u5E95\u3002",
+      "\u7A97\u53E3\u8D77\u70B9\u5B58\u91CF\u672C\u8EAB\u4E5F\u662F\u63A8\u7B97\uFF1A\u5F53\u524D\u53EF\u7528\u5B58\u91CF + \u7A97\u53E3\u5185\u5DF2\u6D88\u8017\u3002\u5B58\u91CF\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF0C\u4E0D\u542B\u6E20\u9053\u4E13\u7528\u6C60\u3002",
+      "\u8D26\u672C\u53EA\u8986\u76D6\u672C\u7F51\u5173\u7ECF\u624B\u7684\u8BF7\u6C42\uFF1B\u8D26\u53F7\u5728\u4ED6\u5904\u7684\u6D88\u8017\u4E0D\u5728\u5176\u4E2D\uFF0C\u6545\u5916\u63A8\u5929\u6570\u504F\u4E50\u89C2\u3002"
+    )
+  );
+}
+function UsageStackChart({ buckets }) {
+  const data = usageBySlotAndModel(buckets);
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(UsageChart, {
+      deps: [data.slots.length, data.models.length],
+      render: (width) => {
+        const H = 180;
+        const PL = 46;
+        const PR = 14;
+        const PT = 12;
+        const PB = 24;
+        const innerW = Math.max(10, width - PL - PR);
+        const innerH = H - PT - PB;
+        const n = data.slots.length;
+        const totals = Array.from({ length: n }, (_, index) => data.models.reduce((sum, model) => sum + model.values[index], 0));
+        const max = niceMax(Math.max(1, ...totals));
+        const x = (index) => PL + (n <= 1 ? innerW / 2 : index / (n - 1) * innerW);
+        const y = (value) => PT + (1 - value / max) * innerH;
+        const layers = data.models.map((model, layer) => {
+          const below = (index) => data.models.slice(0, layer).reduce((sum, item) => sum + item.values[index], 0);
+          const upper = model.values.map((value, index) => [x(index), y(below(index) + value)]);
+          const lower = model.values.map((value, index) => [x(index), y(below(index))]).reverse();
+          const d = `${usageLine(upper)}L${lower.map((point) => `${point[0].toFixed(1)},${point[1].toFixed(1)}`).join("L")}Z`;
+          return React.createElement("path", {
+            key: model.key,
+            className: "seg",
+            d,
+            fill: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length],
+            opacity: 0.82
+          });
+        });
+        const grid = [0, 0.5, 1].map((frac) => {
+          const gy = PT + innerH * frac;
+          return React.createElement(
+            "g",
+            { key: `g${frac}` },
+            React.createElement("line", { className: "grid", x1: PL, x2: width - PR, y1: gy, y2: gy }),
+            React.createElement("text", { className: "axt", x: PL - 6, y: gy + 3.5, textAnchor: "end" }, formatTokens(max * (1 - frac)))
+          );
+        });
+        return React.createElement(
+          "svg",
+          { viewBox: `0 0 ${width} ${H}`, width, height: H },
+          ...grid,
+          ...layers,
+          React.createElement("text", { className: "axt", x: PL, y: H - 8 }, slotLabel(data.slots[0])),
+          React.createElement("text", { className: "axt", x: width - PR, y: H - 8, textAnchor: "end" }, slotLabel(data.slots[n - 1]))
+        );
+      }
+    }),
+    React.createElement(
+      "div",
+      { className: "dshc-row", style: { marginTop: 8 } },
+      ...data.models.slice(0, 8).map(
+        (model, layer) => React.createElement(
+          "span",
+          { key: model.key, style: { ...s.tag, display: "inline-flex", alignItems: "center", gap: 5 } },
+          React.createElement("i", {
+            style: {
+              display: "inline-block",
+              width: 9,
+              height: 9,
+              borderRadius: 2,
+              background: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length]
+            }
+          }),
+          `${model.key} `,
+          React.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, formatNumber(model.total))
+        )
+      )
+    )
+  );
+}
+function UsageHeatmap({ rows }) {
+  const hourRows = rows.filter((row) => row.kind === "hour");
+  const dayRows = rows.filter((row) => row.kind === "day");
+  if (hourRows.length === 0) {
+    return React.createElement(
+      "div",
+      { style: s.muted },
+      "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u5C0F\u65F6\u69FD\uFF08\u5C0F\u65F6\u69FD\u53EA\u4FDD\u7559\u8FD1 48 \u5C0F\u65F6\uFF1B\u66F4\u65E9\u7684\u6570\u636E\u88AB\u7F51\u5173\u6298\u53E0\u6210\u65E5\u69FD\uFF0C\u65E0\u5C0F\u65F6\u7EF4\u5EA6\uFF09\u3002"
+    );
+  }
+  const days = [...new Set(hourRows.map((row) => slotLabel(row.slot).slice(0, 5)))];
+  const cells = days.map(
+    (day) => Array.from({ length: 24 }, (_, hour) => hourRows.filter((row) => slotLabel(row.slot).slice(0, 5) === day && new Date(row.at).getHours() === hour).reduce((sum, row) => sum + row.requests, 0))
+  );
+  const max = Math.max(1, ...cells.flat());
+  let bestIndex = 0;
+  let bestValue = -1;
+  cells.flat().forEach((value, index) => {
+    if (value > bestValue) {
+      bestValue = value;
+      bestIndex = index;
+    }
+  });
   return React.createElement(
     "div",
     null,
+    React.createElement(
+      "div",
+      {
+        className: "dshc-uheat",
+        style: { gridTemplateColumns: "26px repeat(24, minmax(0, 1fr))" }
+      },
+      React.createElement("div", null),
+      ...Array.from({ length: 24 }, (_, hour) => React.createElement("div", {
+        key: `h${hour}`,
+        className: "hl",
+        style: { textAlign: "center" }
+      }, hour % 3 === 0 ? String(hour) : "")),
+      ...days.flatMap((day, dayIndex) => [
+        React.createElement("div", { key: `d${day}`, className: "hl" }, day),
+        ...cells[dayIndex].map((value, hour) => {
+          const ratio = value / max;
+          return React.createElement("i", {
+            key: `${day}-${hour}`,
+            className: value === 0 ? "zero" : "",
+            style: value === 0 ? void 0 : { opacity: (0.12 + ratio * 0.88).toFixed(2) },
+            title: `${day} ${hour}:00 \xB7 ${formatNumber(value)} \u8BF7\u6C42 \xB7 \u76F8\u5BF9\u5CF0\u503C ${formatPercent(ratio, 0)}`
+          });
+        })
+      ])
+    ),
+    React.createElement(
+      "div",
+      { style: { ...s.muted, fontSize: 11, marginTop: 6, lineHeight: 1.7 } },
+      `\u5CF0\u503C ${days[Math.floor(bestIndex / 24)]} ${bestIndex % 24}:00 \xB7 ${formatNumber(bestValue)} \u8BF7\u6C42\u3002`,
+      "\u4EC5\u8986\u76D6\u5C0F\u65F6\u69FD\uFF08\u8FD1 48h\uFF09\u3002",
+      dayRows.length > 0 ? `\u53E6\u6709 ${days.length > 0 ? "" : ""}${dayRows.length} \u4E2A\u65E5\u69FD\u53EA\u6709\u5F53\u5929\u603B\u91CF\u3001\u65E0\u5C0F\u65F6\u7EF4\u5EA6\uFF0C\u672A\u4E0A\u6B64\u56FE\uFF08\u4E0D\u662F\u4E22\u5931\u6570\u636E\uFF09\u3002` : ""
+    )
+  );
+}
+function UsageRings({ rings }) {
+  const list = rings.filter(Boolean);
+  if (list.length === 0) return null;
+  return React.createElement(
+    "div",
+    { className: "dshc-uring" },
+    ...list.map((ring) => {
+      const radius = 22;
+      const circumference = 2 * Math.PI * radius;
+      const ratio = Math.max(0, Math.min(1, Number(ring.value) || 0));
+      return React.createElement(
+        "div",
+        { key: ring.label },
+        React.createElement(
+          "svg",
+          { viewBox: "0 0 60 60", width: 66, height: 66 },
+          React.createElement("circle", { className: "track", cx: 30, cy: 30, r: radius }),
+          React.createElement("circle", {
+            className: `arc ${ring.cls}`,
+            cx: 30,
+            cy: 30,
+            r: radius,
+            strokeDasharray: `${(circumference * ratio).toFixed(1)} ${circumference.toFixed(1)}`
+          })
+        ),
+        React.createElement("div", { className: "rv" }, formatPercent(ratio, 0)),
+        React.createElement("div", { className: "rl" }, ring.label),
+        ring.note ? React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, ring.note) : null
+      );
+    })
+  );
+}
+function UsageHero({ total, rows, stock, windowValue }) {
+  const requests = Number(total?.requests) || 0;
+  const failed = Number(total?.failed) || 0;
+  const credit = Number(total?.credit) || 0;
+  const latency = Number(total?.avg_latency_ms) || 0;
+  const structure = tokenStructure(total);
+  const burn = creditBurn(stock.usable, credit, windowValue);
+  const successRate = requests > 0 ? (requests - failed) / requests : 0;
+  const cards = [
+    {
+      label: "\u8BF7\u6C42\u603B\u91CF",
+      value: formatNumber(requests),
+      sub: `\u6210\u529F ${formatNumber(requests - failed)} \xB7 \u5931\u8D25 ${formatNumber(failed)} \xB7 \u6210\u529F\u7387 ${formatPercent(successRate, 2)}`
+    },
+    {
+      label: "Tokens",
+      value: formatTokens(structure.total),
+      sub: `\u2191${formatTokens(structure.prompt)} / \u2193${formatTokens(structure.completion)}`
+    },
+    {
+      label: "\u79EF\u5206\u6D88\u8017",
+      value: formatCredit(credit),
+      sub: `\u6BCF\u8BF7\u6C42 ${requests > 0 ? formatCredit(credit / requests) : "\u2014"} \u79EF\u5206`,
+      tone: tone.ok.fg
+    },
+    {
+      label: "\u5E73\u5747\u5EF6\u8FDF",
+      value: latency > 0 ? `${Math.round(latency)} ms` : "\u2014",
+      sub: "\u7A97\u53E3\u5185\u6309\u8BF7\u6C42\u52A0\u6743"
+    }
+  ];
+  return React.createElement(
+    "div",
+    { className: "dshc-uhero" },
+    React.createElement(
+      "div",
+      { className: "dshc-kpis" },
+      ...cards.map(
+        (card) => React.createElement(
+          "div",
+          { key: card.label, className: "dshc-kpi", style: { cursor: "default" } },
+          React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, card.label),
+          React.createElement("div", {
+            style: {
+              fontSize: 21,
+              fontWeight: 600,
+              lineHeight: 1.25,
+              color: card.tone ?? "var(--dsw-alias-label-primary,currentColor)"
+            }
+          }, card.value),
+          React.createElement("div", { style: { ...s.muted, fontSize: 11, marginTop: 2 } }, card.sub)
+        )
+      )
+    ),
+    React.createElement(
+      "div",
+      { className: "dshc-ustock" },
+      React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, "\u53EF\u7528\u79EF\u5206\uFF08\u5B58\u91CF \xB7 \u53EA\u7B97\u53EF\u6D88\u8017\uFF09"),
+      React.createElement(
+        "div",
+        { className: "dshc-row", style: { alignItems: "baseline", gap: 8 } },
+        React.createElement("span", { className: "big" }, formatNumber(Math.round(stock.usable))),
+        stock.unusable > 0 ? React.createElement(Tag, { text: `\u53E6 ${formatNumber(Math.round(stock.unusable))} \u4E0D\u53EF\u6D88\u8017`, tone: "warn" }) : null
+      ),
+      React.createElement(
+        "div",
+        { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
+        burn === null ? "\u5B58\u91CF\u8D8B\u52BF\uFF1A\u7A97\u53E3\u5185\u65E0\u6D88\u8017\u6216\u65E0\u5B58\u91CF\uFF0C\u4E0D\u505A\u5916\u63A8" : `\u6309\u8FD1 ${windowHours(windowValue)} \u5C0F\u65F6\u901F\u7387\uFF08${formatCredit(burn.perDay)} \u79EF\u5206/\u5929\uFF09\u2248 \u8FD8\u53EF ${burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`}`
+      ),
+      React.createElement(
+        "div",
+        { className: "dshc-uchans" },
+        ...stock.byChannel.map(
+          (channel) => React.createElement(
+            "div",
+            { key: channel.id },
+            React.createElement("div", { className: "n" }, CHANNEL_LABEL[channel.id] ?? channel.id),
+            React.createElement("div", { className: "c" }, channel.count > 0 ? formatNumber(Math.round(channel.usable)) : "\u2014"),
+            React.createElement("div", { className: "n" }, `${channel.count} \u53F7`)
+          )
+        )
+      ),
+      React.createElement(
+        "div",
+        { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
+        "\u5B58\u91CF\u4E0E\u6D88\u8017\u662F\u4E24\u4E2A\u53E3\u5F84\uFF1A\u5B58\u91CF\u662F\u300C\u73B0\u5728\u8FD8\u5269\u591A\u5C11\u300D\uFF0C\u6D88\u8017\u662F\u300C\u7A97\u53E3\u5185\u82B1\u4E86\u591A\u5C11\u300D\u3002\u4E0D\u53EF\u6D88\u8017\u5355\u5217\uFF0C\u4E0D\u5E76\u5165\u53EF\u7528\u3002"
+      )
+    )
+  );
+}
+function UsageTables({ rows, dim, total, accounts, channelOf }) {
+  const [sortKey, setSortKey] = React.useState("requests");
+  const nameOf = React.useCallback((key) => {
+    if (dim !== "uid") return null;
+    const account = (accounts ?? []).find((item) => item.uid === key);
+    if (!account) return null;
+    return {
+      name: account.nickname || `${key.slice(0, 8)}\u2026`,
+      channel: CHANNEL_LABEL[channelOf?.(account)] ?? "",
+      realm: account.realm ?? ""
+    };
+  }, [accounts, channelOf, dim]);
+  const withShare = React.useMemo(() => usageShares(rows, total), [rows, total]);
+  const sorted = React.useMemo(() => {
+    const list = [...withShare];
+    if (sortKey === "credit") list.sort((a, b) => (Number(b.credit) || 0) - (Number(a.credit) || 0));
+    else if (sortKey === "tokens") list.sort((a, b) => (Number(b.total_tokens) || 0) - (Number(a.total_tokens) || 0));
+    else list.sort((a, b) => (Number(b.requests) || 0) - (Number(a.requests) || 0));
+    return list;
+  }, [withShare, sortKey]);
+  const headers = [
+    { key: "name", label: dim === "uid" ? "\u8D26\u53F7" : dim === "realm" ? "\u57DF" : "\u6A21\u578B", sortable: false },
+    { key: "share", label: "\u5360\u6BD4", sortable: false },
+    { key: "requests", label: "\u8BF7\u6C42", sortable: true },
+    { key: "success", label: "\u6210\u529F\u7387", sortable: false },
+    { key: "tokens", label: "Tokens", sortable: true },
+    { key: "credit", label: "\u79EF\u5206", sortable: true },
+    { key: "latency", label: "\u5E73\u5747\u5EF6\u8FDF", sortable: false }
+  ];
+  const header = React.createElement(
+    "tr",
+    null,
+    ...headers.map((item) => React.createElement("th", {
+      key: item.key,
+      style: item.sortable ? { cursor: "pointer", userSelect: "none" } : void 0,
+      title: item.sortable ? "\u70B9\u51FB\u5207\u6362\u6392\u5E8F" : void 0,
+      onClick: item.sortable ? () => setSortKey((prev) => prev === item.key ? "requests" : item.key) : void 0
+    }, `${item.label}${sortKey === item.key && item.sortable ? " \u2193" : ""}`))
+  );
+  const body = sorted.map((row, index) => {
+    const meta = nameOf(row.key);
+    const colorIndex = index % USAGE_SEG_COLORS.length;
+    return React.createElement(
+      "tr",
+      { key: row.key ?? index },
+      React.createElement(
+        "td",
+        null,
+        React.createElement(
+          "span",
+          { style: { display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 } },
+          React.createElement("span", { className: "dshc-dot", style: { background: USAGE_SEG_COLORS[colorIndex] } }),
+          React.createElement("span", null, meta ? meta.name : row.key || "\u2014"),
+          meta?.channel ? React.createElement(Tag, { text: meta.channel, tone: "info" }) : null,
+          meta?.realm ? React.createElement(Tag, { text: meta.realm, tone: "idle" }) : null
+        )
+      ),
+      React.createElement(
+        "td",
+        null,
+        React.createElement(
+          "span",
+          { style: { display: "inline-flex", alignItems: "center", gap: 6 } },
+          React.createElement("span", {
+            className: "dshc-ushare",
+            style: { width: Math.max(3, Math.round(row.share * 90)) }
+          }),
+          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, formatPercent(row.share, 1))
+        )
+      ),
+      React.createElement("td", null, formatNumber(row.requests ?? 0)),
+      React.createElement("td", {
+        style: row.successRate < 0.97 ? { color: tone.err.fg } : void 0,
+        title: `${formatNumber(row.failed ?? 0)} \u6B21\u5931\u8D25`
+      }, formatPercent(row.successRate, 2)),
+      React.createElement("td", {
+        title: `\u8F93\u5165 ${formatNumber(row.prompt_tokens ?? 0)} \xB7 \u8F93\u51FA ${formatNumber(row.completion_tokens ?? 0)}`
+      }, formatTokens(Number(row.total_tokens) || 0)),
+      React.createElement("td", null, formatCredit(Number(row.credit) || 0)),
+      React.createElement("td", null, row.requests > 0 ? `${Math.round(Number(row.avg_latency_ms) || 0)} ms` : "\u2014")
+    );
+  });
+  return React.createElement(
+    "div",
+    { className: "dshc-tblwrap" },
+    React.createElement(
+      "table",
+      null,
+      React.createElement("thead", null, header),
+      React.createElement("tbody", null, ...body)
+    )
+  );
+}
+function UsageModelPanel({ stats }) {
+  if (!stats || stats.enabled !== true) {
+    return React.createElement(
+      "div",
+      { style: s.muted },
+      "\u8BE5\u7F51\u5173\u672A\u63D0\u4F9B /v1/stats\uFF08\u8FDB\u7A0B\u7D2F\u8BA1\u89C6\u56FE\u4E0D\u53EF\u7528\uFF09\u3002\u7A97\u53E3\u5206\u6876\u6570\u636E\u4E0D\u53D7\u5F71\u54CD\u3002"
+    );
+  }
+  const models = Array.isArray(stats.models) ? stats.models : [];
+  const total = stats.total ?? {};
+  const rows = [
+    { label: "\u5408\u8BA1", row: total, isTotal: true },
+    ...models.map((model) => ({ label: model.model, row: model, isTotal: false }))
+  ];
+  return React.createElement(
+    "div",
+    { className: "dshc-tblwrap" },
+    React.createElement(
+      "table",
+      null,
+      React.createElement(
+        "thead",
+        null,
+        React.createElement(
+          "tr",
+          null,
+          ...["\u6A21\u578B", "\u8BF7\u6C42", "\u5931\u8D25", "\u541E\u5410", "TTFB", "\u7F13\u5B58\u547D\u4E2D", "\u79EF\u5206/\u8BF7\u6C42", "\u500D\u7387", "\u6700\u8FD1"].map((label) => React.createElement("th", { key: label }, label))
+        )
+      ),
+      React.createElement(
+        "tbody",
+        null,
+        ...rows.map(({ label, row, isTotal }) => {
+          const requests = Number(row.requests) || 0;
+          const hitRate = typeof row.cache_hit_rate === "number" ? row.cache_hit_rate : null;
+          return React.createElement(
+            "tr",
+            {
+              key: label,
+              style: isTotal ? { fontWeight: 600 } : void 0
+            },
+            React.createElement(
+              "td",
+              { style: { ...s.code, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" } },
+              label
+            ),
+            React.createElement("td", null, formatNumber(requests)),
+            React.createElement("td", null, formatNumber(Number(row.failed) || 0)),
+            React.createElement(
+              "td",
+              null,
+              typeof row.tokens_per_sec === "number" && row.tokens_per_sec > 0 ? `${row.tokens_per_sec.toFixed(1)} tok/s` : "\u2014"
+            ),
+            React.createElement(
+              "td",
+              null,
+              typeof row.avg_ttfb_ms === "number" && row.avg_ttfb_ms > 0 ? `${Math.round(row.avg_ttfb_ms)} ms` : "\u2014"
+            ),
+            React.createElement("td", null, hitRate === null ? "\u2014" : formatPercent(hitRate, 0)),
+            React.createElement("td", null, formatCredit(Number(row.credit_per_req) || 0)),
+            // 倍率取上游原文；缺失显示 —（绝不显示 x0.00 —— 缺失 ≠ 免费）
+            React.createElement("td", null, row.credits ? React.createElement(Tag, { text: row.credits, tone: "idle" }) : React.createElement("span", { style: s.muted }, "\u2014")),
+            React.createElement(
+              "td",
+              { style: s.muted },
+              row.last_seen ? relativeTime(row.last_seen) : "\u2014"
+            )
+          );
+        })
+      )
+    )
+  );
+}
+function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accounts, channelOf, creditsByUid }) {
+  const bucketsAvailable = usage?.available === true;
+  const usageData = usage?.usage;
+  const buckets = Array.isArray(usageData?.buckets) ? usageData.buckets : [];
+  const rows = React.useMemo(() => usageBySlot(buckets), [buckets]);
+  const stock = React.useMemo(
+    () => creditStock(accounts, creditsByUid, channelOf ?? (() => "workbuddy")),
+    [accounts, creditsByUid, channelOf]
+  );
+  const [metric, setMetric] = React.useState("requests");
+  const [dim, setDim] = React.useState("uid");
+  const [view, setView] = React.useState("combo");
+  const total = usageData?.total ?? {};
+  const windowText = USAGE_WINDOWS.find((item) => item.value === usageWindow)?.label ?? usageWindow;
+  const processesUptime = stats?.enabled === true ? uptimeText(stats.uptime_sec) : null;
+  const dimRows = usageData?.[`by_${dim}`] ?? [];
+  return React.createElement(
+    "div",
+    null,
+    // ── ① 口径条 ────────────────────────────────────────────────────────
     React.createElement(
       "div",
       { style: s.card },
       React.createElement(
         "div",
         { className: "dshc-row", style: { justifyContent: "space-between" } },
-        React.createElement("div", { style: s.label }, "\u7528\u91CF"),
+        React.createElement(
+          "div",
+          { className: "dshc-row" },
+          React.createElement("div", { style: s.label }, "\u7528\u91CF"),
+          React.createElement(Tag, { text: `\u7A97\u53E3\u805A\u5408 \xB7 \u8FD1 ${windowText}`, tone: "info" }),
+          React.createElement(Tag, { text: "\u843D\u76D8 data/usage.json", tone: "idle" })
+        ),
         React.createElement(
           "div",
           { className: "dshc-row" },
           ...USAGE_WINDOWS.map(
-            (option) => React.createElement(
-              "button",
-              {
-                key: option.value,
-                type: "button",
-                onClick: () => onWindowChange(option.value),
-                style: {
-                  ...s.btnGhost,
-                  height: 26,
-                  padding: "0 10px",
-                  fontSize: 12,
-                  borderColor: usageWindow === option.value ? "var(--dsw-alias-brand-primary,#4f6ef7)" : void 0,
-                  color: usageWindow === option.value ? "var(--dsw-alias-brand-primary,#4f6ef7)" : void 0
-                }
-              },
-              option.label
-            )
+            (option) => React.createElement("button", {
+              key: option.value,
+              type: "button",
+              onClick: () => onWindowChange(option.value),
+              style: {
+                ...s.btnGhost,
+                height: 26,
+                padding: "0 10px",
+                fontSize: 12,
+                borderColor: usageWindow === option.value ? "var(--dsw-alias-brand-primary,#4f6ef7)" : void 0,
+                color: usageWindow === option.value ? "var(--dsw-alias-brand-primary,#4f6ef7)" : void 0
+              }
+            }, option.label)
           ),
-          React.createElement(
-            "button",
-            { type: "button", style: { ...s.btnLink, padding: "0 4px" }, onClick: onRefresh, title: "\u5237\u65B0" },
-            React.createElement(Icons.refresh, null)
-          )
-        )
-      ),
-      !bucketsAvailable ? React.createElement(
-        "div",
-        { style: { ...s.tip, marginTop: 10 } },
-        usage?.reason ?? "\u7F51\u5173\u672A\u63D0\u4F9B\u5206\u6876\u7AEF\u70B9\uFF0C\u9700\u5728\u7F51\u5173\u4FA7\u652F\u6301 GET /v1/stats/buckets\u3002"
-      ) : React.createElement(UsageBucketBody, { usage: usageData })
-    )
-  );
-}
-function UsageBucketBody({ usage }) {
-  if (!usage) {
-    return React.createElement("div", { style: { ...s.muted, marginTop: 10 } }, "\u52A0\u8F7D\u4E2D\u2026");
-  }
-  const buckets = usage.buckets ?? [];
-  const maxRequests = Math.max(1, ...buckets.map((bucket) => bucket.requests));
-  const [dim, setDim] = React.useState("uid");
-  const dimRows = usage[`by_${dim}`] ?? [];
-  const dimMeta = {
-    uid: { label: "\u6309\u8D26\u53F7", columns: ["\u8D26\u53F7", "\u8BF7\u6C42", "\u5931\u8D25", "Tokens", "\u6263\u8D39", "\u5E73\u5747\u5EF6\u8FDF"] },
-    realm: { label: "\u6309\u57DF", columns: ["\u57DF", "\u8BF7\u6C42", "\u5931\u8D25", "Tokens", "\u6263\u8D39", "\u5E73\u5747\u5EF6\u8FDF"] },
-    model: { label: "\u6309\u6A21\u578B", columns: ["\u6A21\u578B", "\u8BF7\u6C42", "\u5931\u8D25", "Tokens", "\u6263\u8D39", "\u5E73\u5747\u5EF6\u8FDF"] }
-  };
-  return React.createElement(
-    "div",
-    { style: { marginTop: 12 } },
-    // 降级提示必须如实显示
-    usage.degraded ? React.createElement(
-      "div",
-      { style: { ...s.warn, marginBottom: 10 } },
-      "\u26A0\uFE0F \u5206\u6876\u952E\u5DF2\u8D85\u51FA\u5BB9\u91CF\u4E0A\u9650\uFF0C\u7F51\u5173\u5DF2\u964D\u7EA7\u4E3A\u300C\u69FD \xD7 \u57DF\u300D\u4E24\u7EF4 \u2014\u2014 \u6309\u8D26\u53F7 / \u6309\u6A21\u578B\u4E24\u4E2A\u7EF4\u5EA6\u5C06\u4E0D\u518D\u7EC6\u5206\u3002"
-    ) : null,
-    // 时序柱（渐变柱）
-    buckets.length === 0 ? React.createElement(
-      "div",
-      { style: { ...s.muted, marginBottom: 12 } },
-      "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u8BF7\u6C42\u8BB0\u5F55\u3002\u53D1\u8D77\u4E00\u6B21\u5BF9\u8BDD\u540E\u5373\u53EF\u770B\u5230\u5206\u6876\u3002"
-    ) : React.createElement(
-      "div",
-      { style: { marginBottom: 14 } },
-      React.createElement(
-        "div",
-        { className: "dshc-bars" },
-        ...buckets.slice(-48).map(
-          (bucket, index) => React.createElement("span", {
-            key: `${bucket.slot}-${bucket.uid}-${bucket.model}-${index}`,
-            className: bucket.failed > 0 ? "bad" : "",
-            title: `${bucket.slot} \xB7 ${bucket.uid ? bucket.uid.slice(0, 8) : "\u5168\u90E8\u8D26\u53F7"} \xB7 ${bucket.model || "\u5168\u90E8\u6A21\u578B"}
-\u8BF7\u6C42 ${bucket.requests} \xB7 \u5931\u8D25 ${bucket.failed} \xB7 tokens ${bucket.total_tokens}`,
-            style: { height: Math.max(3, Math.round(bucket.requests / maxRequests * 72)) }
-          })
+          React.createElement("button", {
+            type: "button",
+            style: { ...s.btnLink, padding: "0 4px" },
+            onClick: onRefresh,
+            title: "\u5237\u65B0"
+          }, React.createElement(Icons.refresh, null))
         )
       ),
       React.createElement(
         "div",
-        { className: "dshc-row", style: { marginTop: 6, justifyContent: "space-between" } },
-        React.createElement(
-          "span",
-          { style: { ...s.muted, fontSize: 11 } },
-          `\u8BF7\u6C42 ${formatNumber(usage.total?.requests ?? 0)} \xB7 \u5931\u8D25 ${formatNumber(usage.total?.failed ?? 0)} \xB7 tokens ${formatNumber(usage.total?.completion_tokens ?? 0)}`
-        )
+        { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
+        usageData?.since ? `\u5206\u6876\u6570\u636E\u8D77\u70B9 ${usageData.since} \xB7 ` : "",
+        "\u69FD\u7C92\u5EA6\uFF1A\u8FD1 48 \u5C0F\u65F6\u4E3A\u5C0F\u65F6\u69FD\uFF0C\u66F4\u65E9\u6298\u53E0\u4E3A\u65E5\u69FD\uFF0830 \u5929\uFF09\u3002",
+        "\u8D26\u672C\u53EA\u7EDF\u8BA1\u7ECF\u672C\u7F51\u5173\u7684\u8BF7\u6C42\uFF08\u65C1\u8DEF\u6D41\u91CF\u4E0D\u5728\u5176\u4E2D\uFF09\u3002",
+        processesUptime ? ` \u53E6\u6709\u300C\u6A21\u578B\u5168\u666F\u300D\u4E3A\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF08\u5DF2\u8FD0\u884C ${processesUptime}\uFF0C\u91CD\u542F\u6E05\u96F6\uFF09\uFF0C\u4E24\u8005\u4E0D\u53EF\u6DF7\u7B97\u3002` : " \u672C\u7F51\u5173\u672A\u63D0\u4F9B\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF08/v1/stats\uFF09\u3002"
       )
     ),
-    // 维度切换（单表）
-    React.createElement(
+    // ── 分桶不可用时的降级：不冒充「加载失败」 ──────────────────────────
+    !bucketsAvailable ? React.createElement(
       "div",
-      { className: "dshc-row", style: { marginBottom: 6 } },
-      ...Object.entries(dimMeta).map(([key, meta]) => segmentButton(key, meta.label, dim, setDim))
-    ),
-    dimRows.length === 0 ? React.createElement("div", { style: s.muted }, "\u65E0\u6570\u636E") : React.createElement(
-      "div",
-      { className: "dshc-tblwrap" },
+      { style: s.card },
       React.createElement(
-        "table",
-        null,
+        "div",
+        { style: s.warn },
+        usage?.reason ?? "\u7F51\u5173\u672A\u63D0\u4F9B\u5206\u6876\u7AEF\u70B9\uFF0C\u9700\u5728\u7F51\u5173\u4FA7\u652F\u6301 GET /v1/stats/buckets\u3002"
+      ),
+      React.createElement(
+        "div",
+        { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } },
+        "\u4E0B\u65B9\u300C\u6A21\u578B\u5168\u666F\u300D\u4F7F\u7528\u8FDB\u7A0B\u7D2F\u8BA1\u7AEF\u70B9\uFF0C\u4E0D\u4F9D\u8D56\u5206\u6876\uFF0C\u4ECD\u53EF\u7528\u3002"
+      )
+    ) : null,
+    // ── ② 英雄总量区 ────────────────────────────────────────────────────
+    bucketsAvailable ? React.createElement(
+      "div",
+      { style: s.card },
+      React.createElement(UsageHero, { total, rows, stock, windowValue: usageWindow }),
+      React.createElement(
+        "div",
+        { style: { marginTop: 12 } },
+        React.createElement(UsageRings, {
+          rings: [
+            {
+              value: (Number(total.requests) || 0) > 0 ? (Number(total.requests) - (Number(total.failed) || 0)) / Number(total.requests) : 0,
+              label: "\u6210\u529F\u7387",
+              cls: "ok",
+              note: "\u7A97\u53E3\u53E3\u5F84"
+            },
+            stats?.enabled === true ? { value: Number(stats.total?.cache_hit_rate) || 0, label: "\u7F13\u5B58\u547D\u4E2D\u7387", cls: "brand", note: "\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84" } : null,
+            stats?.enabled === true && (Number(stats.total?.requests) || 0) > 0 ? {
+              value: (Number(stats.total?.streaming) || 0) / Number(stats.total.requests),
+              label: "\u6D41\u5F0F\u8BF7\u6C42\u5360\u6BD4",
+              cls: "warn",
+              note: "\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84"
+            } : null
+          ]
+        })
+      ),
+      // Token 结构条（窗口口径：只有 prompt / completion 两段）
+      React.createElement(
+        "div",
+        { style: { marginTop: 12 } },
         React.createElement(
-          "thead",
-          null,
+          "div",
+          { className: "dshc-row", style: { justifyContent: "space-between" } },
+          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "Token \u7ED3\u6784\uFF08\u7A97\u53E3\u5408\u8BA1\uFF09"),
           React.createElement(
-            "tr",
-            null,
-            ...dimMeta[dim].columns.map((h) => React.createElement("th", { key: h }, h))
+            "span",
+            { style: { ...s.muted, fontSize: 11 } },
+            `prompt ${formatTokens(tokenStructure(total).prompt)} \xB7 completion ${formatTokens(tokenStructure(total).completion)} \xB7 \u5408\u8BA1 ${formatTokens(tokenStructure(total).total)}`
           )
         ),
         React.createElement(
-          "tbody",
-          null,
-          ...dimRows.map(
-            (row) => React.createElement(
-              "tr",
-              { key: row.key },
-              React.createElement("td", null, row.key),
-              React.createElement("td", null, formatNumber(row.requests ?? 0)),
-              React.createElement("td", null, formatNumber(row.failed ?? 0)),
-              React.createElement("td", {
-                title: `Prompt ${formatNumber(row.prompt_tokens ?? 0)} \xB7 Completion ${formatNumber(row.completion_tokens ?? 0)}`
-              }, formatNumber(row.total_tokens ?? 0)),
-              React.createElement("td", null, typeof row.credit === "number" ? row.credit.toFixed(4) : "\u2014"),
-              React.createElement("td", null, `${(row.avg_latency_ms ?? 0).toFixed(0)} ms`)
-            )
-          )
+          "div",
+          { className: "dshc-ustack", style: { marginTop: 6 } },
+          React.createElement("i", {
+            style: { width: `${(tokenStructure(total).promptShare * 100).toFixed(1)}%`, background: "var(--dsw-alias-brand-primary,#4f6ef7)" },
+            title: `\u8F93\u5165 prompt ${formatNumber(tokenStructure(total).prompt)}`
+          }),
+          React.createElement("i", {
+            style: {
+              width: `${(tokenStructure(total).completionShare * 100).toFixed(1)}%`,
+              background: "var(--dsw-alias-button-info-fill,#4176e6)",
+              opacity: 0.55
+            },
+            title: `\u8F93\u51FA completion ${formatNumber(tokenStructure(total).completion)}`
+          })
+        ),
+        React.createElement(
+          "div",
+          { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
+          "\u4EC5\u7A97\u53E3\u53E3\u5F84 \u2014\u2014 \u5206\u6876\u53EA\u6709 prompt / completion \u4E24\u6BB5\uFF1B\u7F13\u5B58\u547D\u4E2D\u7387\u5C5E\u4E8E\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF0C\u89C1\u4E0A\u65B9\u73AF\u4E0E\u300C\u6A21\u578B\u5168\u666F\u300D\uFF0C\u4E0D\u5E76\u5165\u6B64\u6761\u3002"
         )
       )
+    ) : null,
+    // ── ③ 主图（走势） ──────────────────────────────────────────────────
+    bucketsAvailable ? React.createElement(
+      "div",
+      { style: s.card },
+      React.createElement(
+        "div",
+        { className: "dshc-row", style: { justifyContent: "space-between" } },
+        React.createElement(
+          "div",
+          { className: "dshc-row" },
+          React.createElement("div", { style: s.label }, "\u8D70\u52BF"),
+          React.createElement(
+            "span",
+            { style: { ...s.muted, fontSize: 11 } },
+            `${rows.length} \u4E2A\u65F6\u95F4\u69FD\uFF08\u6309\u69FD\u805A\u5408\uFF0C\u67F1\u6570 = \u69FD\u6570\uFF09`
+          )
+        ),
+        React.createElement(
+          "div",
+          { className: "dshc-row" },
+          ...USAGE_METRICS.map((item) => segmentButton(item.id, item.label, metric, setMetric))
+        )
+      ),
+      rows.length === 0 ? React.createElement(
+        "div",
+        { style: { ...s.muted, marginTop: 10 } },
+        "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u8BF7\u6C42\u8BB0\u5F55\u3002\u53D1\u8D77\u4E00\u6B21\u5BF9\u8BDD\u540E\u5373\u53EF\u770B\u5230\u5206\u6876\u3002"
+      ) : React.createElement(
+        "div",
+        { style: { marginTop: 10 } },
+        React.createElement(UsageAreaChart, { rows, metric })
+      )
+    ) : null,
+    // ── ④ 分析视图（切换式，避免图墙） ──────────────────────────────────
+    bucketsAvailable && rows.length > 0 ? React.createElement(
+      "div",
+      { style: s.card },
+      React.createElement(
+        "div",
+        { className: "dshc-row", style: { justifyContent: "space-between", marginBottom: 10 } },
+        React.createElement("div", { style: s.label }, "\u5206\u6790\u89C6\u56FE"),
+        React.createElement(
+          "div",
+          { className: "dshc-row" },
+          ...USAGE_VIEWS.map((item) => segmentButton(item.id, item.label, view, setView))
+        )
+      ),
+      view === "combo" ? React.createElement(
+        "div",
+        null,
+        React.createElement(
+          "div",
+          { className: "dshc-row", style: { justifyContent: "space-between" } },
+          React.createElement(
+            "span",
+            { style: { ...s.muted, fontSize: 11 } },
+            "\u67F1 = \u8BF7\u6C42\uFF08\u5931\u8D25\u5360\u6BD4 > 5% \u8F6C\u7EA2\uFF09\xB7 \u7EBF = \u79EF\u5206\u6D88\u8017"
+          ),
+          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "\u53CC\u8F74 \xB7 \u5DE6=\u8BF7\u6C42 / \u53F3=\u79EF\u5206")
+        ),
+        React.createElement(
+          "div",
+          { style: { marginTop: 10 } },
+          React.createElement(UsageComboChart, { rows })
+        )
+      ) : null,
+      view === "burn" ? React.createElement(
+        "div",
+        null,
+        React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow })
+      ) : null,
+      view === "stack" ? React.createElement(
+        "div",
+        null,
+        React.createElement(
+          "div",
+          { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
+          "\u6BCF\u4E2A\u69FD\u7684\u8BF7\u6C42\u6309\u6A21\u578B\u62C6\u5206\u5806\u53E0\uFF08\u5168\u7A97\u53E3\u7D2F\u8BA1\u7ED3\u6784\uFF09"
+        ),
+        React.createElement(UsageStackChart, { buckets })
+      ) : null,
+      view === "heat" ? React.createElement(
+        "div",
+        null,
+        React.createElement(
+          "div",
+          { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
+          "\u884C = \u5C0F\u65F6\u69FD\u8986\u76D6\u7684\u65E5\u671F \xB7 \u5217 = \u5C0F\u65F6 \xB7 \u6DF1\u6D45 = \u8BF7\u6C42\u91CF"
+        ),
+        React.createElement(
+          "div",
+          { style: { overflowX: "auto", minWidth: 0 } },
+          React.createElement(UsageHeatmap, { rows })
+        )
+      ) : null
+    ) : null,
+    // ── ⑤ 归因表 ────────────────────────────────────────────────────────
+    bucketsAvailable && dimRows.length > 0 ? React.createElement(
+      "div",
+      { style: s.card },
+      React.createElement(
+        "div",
+        { className: "dshc-row", style: { justifyContent: "space-between", marginBottom: 8 } },
+        React.createElement("div", { style: s.label }, "\u5F52\u56E0"),
+        React.createElement(
+          "div",
+          { className: "dshc-row" },
+          ...USAGE_DIMS.map((item) => segmentButton(
+            item.id,
+            item.label,
+            dim,
+            setDim,
+            item.id === "uid" ? (usageData?.by_uid ?? []).length : void 0
+          ))
+        )
+      ),
+      usageData?.degraded ? React.createElement(
+        "div",
+        { style: { ...s.warn, marginBottom: 8 } },
+        "\u26A0\uFE0F \u5206\u6876\u952E\u5DF2\u8D85\u51FA\u5BB9\u91CF\u4E0A\u9650\uFF0C\u7F51\u5173\u5DF2\u964D\u7EA7\u4E3A\u300C\u69FD \xD7 \u57DF\u300D\u4E24\u7EF4 \u2014\u2014 \u6309\u8D26\u53F7 / \u6309\u6A21\u578B\u4E24\u4E2A\u7EF4\u5EA6\u5C06\u4E0D\u518D\u7EC6\u5206\u3002"
+      ) : null,
+      React.createElement(UsageTables, {
+        rows: dimRows,
+        dim,
+        total,
+        accounts,
+        channelOf
+      }),
+      React.createElement(
+        "div",
+        { style: { ...s.muted, fontSize: 11, marginTop: 8, lineHeight: 1.7 } },
+        "\u5360\u6BD4\u6761 = \u8BE5\u884C\u8BF7\u6C42\u6570\u5360\u7A97\u53E3\u603B\u91CF\u7684\u6BD4\u4F8B\uFF1B\u70B9\u51FB\u300C\u8BF7\u6C42 / Tokens / \u79EF\u5206\u300D\u8868\u5934\u53EF\u5207\u6362\u6392\u5E8F\u3002"
+      )
+    ) : null,
+    // ── ⑥ 模型全景（进程累计；分桶不可用时仍可用） ──────────────────────
+    React.createElement(
+      "div",
+      { style: s.card },
+      React.createElement(CardHead, {
+        title: "\u6A21\u578B\u5168\u666F",
+        extra: React.createElement(
+          "span",
+          { className: "dshc-row" },
+          React.createElement(Tag, { text: "\u8FDB\u7A0B\u7D2F\u8BA1 \xB7 \u91CD\u542F\u6E05\u96F6", tone: "idle" }),
+          stats?.enabled === true && stats.since ? React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, `\u8D77\u70B9 ${stats.since}`) : null
+        )
+      }),
+      React.createElement(UsageModelPanel, { stats })
     ),
-    React.createElement("div", { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, usage.note ?? "")
+    // ── 数据说明（如实呈现） ────────────────────────────────────────────
+    React.createElement(
+      "div",
+      { style: { ...s.card, padding: "12px 16px" } },
+      React.createElement(
+        "div",
+        { style: { ...s.muted, fontSize: 11, lineHeight: 1.8 } },
+        usageData?.note ?? "",
+        usageData?.note ? React.createElement("br", null) : null,
+        "\u300C\u7A97\u53E3\u805A\u5408\u300D\u4E0E\u300C\u8FDB\u7A0B\u7D2F\u8BA1\u300D\u662F\u4E24\u4E2A\u72EC\u7ACB\u53E3\u5F84\uFF0C\u6570\u503C\u4E0D\u53EF\u76F8\u52A0\u6216\u76F8\u51CF\uFF1A\u524D\u8005\u53D7\u7A97\u53E3\u4E0E\u843D\u76D8\u7EA6\u675F\uFF0C\u540E\u8005\u91CD\u542F\u6E05\u96F6\u3002"
+      )
+    )
   );
 }
 function LogsTab({ logs, logChannel, onChannelChange, onRefresh, onClear }) {
@@ -4090,7 +5349,11 @@ function ChanhubPanel({ rpcCall }) {
       usage,
       usageWindow,
       onWindowChange: setUsageWindow,
-      onRefresh: refresh
+      onRefresh: refresh,
+      // 存量与归因命名都复用账号池同源数据 —— 不新增任何网关请求
+      accounts: data?.status?.accounts ?? [],
+      channelOf,
+      creditsByUid
     }) : null,
     activeTab === "logs" ? React.createElement(LogsTab, {
       logs,

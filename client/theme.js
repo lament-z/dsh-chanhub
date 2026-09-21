@@ -340,4 +340,69 @@ export const FOLD_CSS = `
 /* 等待授权的小转圈 */
 @keyframes dshc-spin { to { transform: rotate(360deg); } }
 .dshc-spinner { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--dsw-alias-border-l2,#e5e7eb); border-top-color: var(--dsw-alias-button-info-fill,#4176e6); animation: dshc-spin .8s linear infinite; }
+/* ══════════ 用量图表（纯内联 SVG + CSS 变量） ══════════════════════════════
+   关键约束（原型实测）：**SVG 的 fill/stroke 不写 var()**。
+   presentation attribute 里写 var() 在部分浏览器不解析 → 一律挂 class，
+   颜色由这里决定。切主题只换变量，SVG 无需重渲染。 */
+.dshc-uchart { position: relative; min-width: 0; }
+.dshc-uchart > svg { display: block; width: 100%; overflow: visible; }
+.dshc-uchart .grid { stroke: var(--dsw-alias-border-l2,#e5e7eb); stroke-dasharray: 2 3; stroke-width: 1; }
+.dshc-uchart .axt { fill: var(--dsw-alias-label-tertiary,#8b93a1); font-size: 10.5px; }
+.dshc-uchart .axt.warn { fill: var(--dsw-alias-state-warn-primary,#b45309); }
+.dshc-uchart .axt.err { fill: var(--dsw-alias-state-error-primary,#dc2626); }
+/* 面积 + 折线（主图） */
+.dshc-uchart .area-main { fill: url(#dshcAreaMain); }
+.dshc-uchart .area-fail { fill: url(#dshcAreaFail); }
+.dshc-uchart .line-main { fill: none; stroke: var(--dsw-alias-brand-primary,#4f6ef7); stroke-width: 2; stroke-linejoin: round; }
+/* 柱 + 折线（双轴） */
+.dshc-uchart .bar-main { fill: url(#dshcBarMain); }
+.dshc-uchart .bar-main.bad { fill: url(#dshcBarBad); }
+.dshc-uchart .line-credit { fill: none; stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; }
+.dshc-uchart .dot-credit { fill: var(--dsw-alias-bg-layer-1,#fff); stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; }
+/* 燃尽投影 */
+.dshc-uchart .area-burn { fill: url(#dshcAreaBurn); }
+.dshc-uchart .line-burn { fill: none; stroke: var(--dsw-alias-label-secondary,#61666b); stroke-width: 2; stroke-linejoin: round; }
+.dshc-uchart .line-proj { fill: none; stroke: var(--dsw-alias-state-warn-primary,#f59e0b); stroke-width: 2; stroke-dasharray: 5 4; }
+.dshc-uchart .dot-die { fill: var(--dsw-alias-bg-layer-1,#fff); stroke: var(--dsw-alias-state-error-primary,#dc2626); stroke-width: 2.5; }
+/* 日槽区底纹（无小时维度，必须视觉上区分） */
+.dshc-uchart .dayband { fill: var(--dsw-alias-label-tertiary,#8b93a1); opacity: .07; }
+.dshc-uchart .slotdiv { stroke: var(--dsw-alias-border-l2,#e5e7eb); stroke-dasharray: 3 3; stroke-width: 1; }
+/* 堆叠面积 */
+.dshc-uchart .seg { stroke: var(--dsw-alias-bg-layer-1,#fff); stroke-width: .6; }
+/* hover 十字线 / 圆点 / 提示 */
+.dshc-ucross { position: absolute; top: 0; width: 1px; background: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .45; pointer-events: none; display: none; }
+.dshc-udot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--dsw-alias-bg-layer-1,#fff); border: 2px solid var(--dsw-alias-brand-primary,#4f6ef7); transform: translate(-50%,-50%); pointer-events: none; display: none; }
+.dshc-utip { position: absolute; z-index: 6; pointer-events: none; background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 8px; padding: 7px 9px; box-shadow: 0 6px 20px rgba(0,0,0,.16); font-size: 11.5px; white-space: nowrap; line-height: 1.65; color: var(--dsw-alias-label-primary,currentColor); }
+/* 环形百分比 */
+.dshc-uring { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+@media (max-width: 560px) { .dshc-uring { grid-template-columns: 1fr; } }
+.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px; text-align: center; min-width: 0; }
+.dshc-uring svg { display: block; margin: 0 auto; }
+.dshc-uring .rv { font-size: 17px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-uring .rl { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-top: 2px; }
+.dshc-uring .track { fill: none; stroke: var(--dsw-alias-bg-layer-2,#f3f4f6); stroke-width: 7; }
+.dshc-uring .arc { fill: none; stroke-width: 7; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+.dshc-uring .arc.ok { stroke: var(--dsw-alias-state-success-primary,#22c55e); }
+.dshc-uring .arc.brand { stroke: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-uring .arc.warn { stroke: var(--dsw-alias-state-warn-primary,#f59e0b); }
+/* Token 结构条 */
+.dshc-ustack { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
+.dshc-ustack > i { display: block; height: 100%; }
+/* 英雄区 */
+.dshc-uhero { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 10px; }
+@media (max-width: 820px) { .dshc-uhero { grid-template-columns: 1fr; } }
+.dshc-ustock { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; min-width: 0; }
+.dshc-ustock .big { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--dsw-alias-state-success-primary,#059669); }
+.dshc-uchans { display: flex; margin-top: 10px; border-top: 1px solid var(--dsw-alias-border-l2,#e5e7eb); padding-top: 8px; }
+.dshc-uchans > div { flex: 1; min-width: 0; text-align: center; border-right: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-uchans > div:last-child { border-right: 0; }
+.dshc-uchans .n { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-uchans .c { font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+/* 占比条 */
+.dshc-ushare { display: inline-block; height: 6px; border-radius: 999px; background: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .85; vertical-align: middle; }
+/* 时段热力 */
+.dshc-uheat { display: grid; gap: 2px; min-width: 0; }
+.dshc-uheat .hl { font-size: 10px; color: var(--dsw-alias-label-tertiary,#8b93a1); line-height: 14px; white-space: nowrap; }
+.dshc-uheat i { height: 14px; border-radius: 2px; background: var(--dsw-alias-brand-primary,#4f6ef7); display: block; }
+.dshc-uheat i.zero { background: var(--dsw-alias-bg-layer-2,#f3f4f6); opacity: 1 !important; }
 `;

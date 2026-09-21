@@ -16,25 +16,39 @@
 
 import { s, tone, FOLD_CSS } from './theme.js';
 import {
+  CHANNEL_LABEL,
   CHANNEL_ORDER,
   GROWTH_CODES,
   SCHEDULE_ITEMS,
   accountState,
   channelResolver,
   codeCoverage,
+  creditBurn,
+  creditStock,
   creditsSummary,
+  formatCredit,
   formatDuration,
   formatNumber,
+  formatPercent,
+  formatTokens,
   groupByChannel,
   healthSummary,
   isZeroTime,
   maxInFlightOf,
+  niceMax,
   qualitySummary,
   realmAvailability,
   relativeTime,
   scheduleHoursText,
   scheduleState,
+  slotLabel,
   summaryCounters,
+  tokenStructure,
+  uptimeText,
+  usageBySlot,
+  usageBySlotAndModel,
+  usageShares,
+  windowHours,
 } from './derive.js';
 import { coerceField, fieldsByGroup, formatFieldValue, getPath } from '../lib/config-spec.js';
 import { AddAccountDialog } from './add-account.js';
@@ -1901,146 +1915,1125 @@ function CheckinOutcomesCard({ task, liveByUid }) {
   );
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   用量 Tab
+   ══════════════════════════════════════════════════════════════════════════
+   三个数据源（全部为 chanhub 真实端点，本设计**不新增任何网关请求**）：
+     A. GET /v1/stats           进程累计（含 models[]；重启清零，无窗口维度）
+     B. GET /v1/stats/buckets   窗口分桶（落盘 data/usage.json；槽粒度混合）
+     C. /status 的 accounts[]   余额存量（与账号池 Tab 同源）
+   口径纪律（写进代码而不是注释里就算）：
+     · A 与 B 是两个口径 —— 分区展示、各自标注，**不相减、不相加、不并排做比较**。
+     · B 的槽分小时槽与日槽，日槽没有小时维度 → 图上分区底纹 + 标签，不平铺进小时轴。
+     · 缺失值显示「—」，绝不编造（倍率缺失显示 — 而不是 x0.00）。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 用量图的指标定义（同一份按槽数据，三种口径）。 */
+const USAGE_METRICS = [
+  { id: 'requests', label: '请求', unit: '请求', pick: (row) => row.requests, bad: (row) => row.failed, fmt: formatNumber, hasFail: true },
+  { id: 'tokens', label: 'Tokens', unit: 'tokens', pick: (row) => row.tokens, bad: () => 0, fmt: formatTokens, hasFail: false },
+  { id: 'credit', label: '积分', unit: '积分', pick: (row) => row.credit, bad: () => 0, fmt: formatCredit, hasFail: false },
+];
+
+/** 分析视图定义（一次只画一个，避免图墙把页面拉到 2600px）。 */
+const USAGE_VIEWS = [
+  { id: 'combo', label: '双轴' },
+  { id: 'burn', label: '燃尽投影' },
+  { id: 'stack', label: '模型堆叠' },
+  { id: 'heat', label: '时段热力' },
+];
+
+/** 归因维度定义。 */
+const USAGE_DIMS = [
+  { id: 'uid', label: '按账号' },
+  { id: 'realm', label: '按域' },
+  { id: 'model', label: '按模型' },
+];
+
+/** 堆叠色序（走 CSS 变量，深浅主题各自解析）。 */
+const USAGE_SEG_COLORS = [
+  'var(--dsw-alias-brand-primary,#4f6ef7)',
+  'var(--dsw-alias-state-success-primary,#22c55e)',
+  'var(--dsw-alias-state-warn-primary,#f59e0b)',
+  'var(--dsw-alias-state-business-primary,#a855f7)',
+  'var(--dsw-alias-button-info-fill,#0ea5e9)',
+  'var(--dsw-alias-label-tertiary,#94a3b8)',
+];
+
 /**
- * 用量 Tab。
+ * 响应式绘图容器：宽度变化才重画。
  *
- * 两个数据源（都是 chanhub 真实端点）：
- *   GET /v1/stats          全局按模型（既有端点，18 字段，响应零变更）
- *   GET /v1/stats/buckets  四维分桶（新增：槽 × 域 × 账号 × 模型）
+ * 两个必须点（原型实测踩出来的）：
+ *   1. 隐藏容器（hidden）`clientWidth === 0` —— 画出来是 0 宽 SVG。
+ *      所以**切到哪个视图才挂载哪个**，而不是一次性全画。
+ *   2. 重复挂载不能叠加 ResizeObserver，用 WeakMap 复用同一个 draw。
  *
- * @param props - `{stats, usage, usageWindow, onWindowChange, onRefresh}`。
+ * @param props - `{render, deps}`：`render(width)` 返回 React 元素；`deps` 变化时重画。
  * @returns React 元素。
  */
-function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh }) {
-  const bucketsAvailable = usage?.available === true;
-  const usageData = usage?.usage;
+const USAGE_FALLBACK_WIDTH = 640;
 
-  return React.createElement(
-    'div',
-    null,
-    React.createElement('div', { style: s.card },
-      React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-        React.createElement('div', { style: s.label }, '用量'),
-        React.createElement(
-          'div',
-          { className: 'dshc-row' },
-          ...USAGE_WINDOWS.map((option) =>
-            React.createElement(
-              'button',
-              {
-                key: option.value,
-                type: 'button',
-                onClick: () => onWindowChange(option.value),
-                style: {
-                  ...s.btnGhost,
-                  height: 26,
-                  padding: '0 10px',
-                  fontSize: 12,
-                  borderColor: usageWindow === option.value ? 'var(--dsw-alias-brand-primary,#4f6ef7)' : undefined,
-                  color: usageWindow === option.value ? 'var(--dsw-alias-brand-primary,#4f6ef7)' : undefined,
-                },
+function UsageChart({ render, deps = [] }) {
+  const boxRef = React.useRef(null);
+  const drawRef = React.useRef(null);
+  const [width, setWidth] = React.useState(USAGE_FALLBACK_WIDTH);
+  const [measured, setMeasured] = React.useState(false);
+
+  // 宽度测量与观察：只在挂载时建立一次。
+  React.useEffect(() => {
+    const node = boxRef.current;
+    if (!node) return undefined;
+    const measure = () => {
+      const next = node.clientWidth;
+      if (next > 0) {
+        setMeasured(true);
+        setWidth((prev) => (next !== prev ? next : prev));
+      }
+    };
+    measure();
+    // 没有 ResizeObserver 时保持测量值/兜底宽度 —— 绝不能因为「量不到宽度」就渲染空白。
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  // 视图切换后 deps 变化 → 重新测量（隐藏时 clientWidth 为 0，显示后要补一次）。
+  React.useEffect(() => {
+    const node = boxRef.current;
+    if (!node) return;
+    const next = node.clientWidth;
+    if (next > 0) {
+      setMeasured(true);
+      setWidth((prev) => (next !== prev ? next : prev));
+    }
+  }, deps);
+
+  drawRef.current = render;
+  // 量不到宽度（首帧 / 无 ResizeObserver / 无布局环境）时用兜底宽度先画出来，
+  // 而不是留一片空白。真实测量一到就自动重画。
+  const effectiveWidth = measured ? width : USAGE_FALLBACK_WIDTH;
+  return React.createElement('div', { className: 'dshc-uchart', ref: boxRef },
+    drawRef.current(effectiveWidth),
+  );
+}
+
+/**
+ * 图表 SVG 定义（渐变）。
+ *
+ * id 必须**每张图独享**：同页多个 SVG 复用同一 id 会串色（原型实测）。
+ * @param props - `{scope}`：图表标识前缀。
+ * @returns defs 元素。
+ */
+function UsageDefs({ scope }) {
+  return React.createElement('defs', null,
+    React.createElement('linearGradient', { id: `${scope}AreaMain`, x1: '0', y1: '0', x2: '0', y2: '1' },
+      React.createElement('stop', { offset: '0', stopColor: 'var(--dsw-alias-brand-primary,#4f6ef7)', stopOpacity: 0.42 }),
+      React.createElement('stop', { offset: '1', stopColor: 'var(--dsw-alias-brand-primary,#4f6ef7)', stopOpacity: 0.02 }),
+    ),
+    React.createElement('linearGradient', { id: `${scope}AreaFail`, x1: '0', y1: '0', x2: '0', y2: '1' },
+      React.createElement('stop', { offset: '0', stopColor: 'var(--dsw-alias-state-error-primary,#dc2626)', stopOpacity: 0.85 }),
+      React.createElement('stop', { offset: '1', stopColor: 'var(--dsw-alias-state-error-primary,#dc2626)', stopOpacity: 0.5 }),
+    ),
+    React.createElement('linearGradient', { id: `${scope}BarMain`, x1: '0', y1: '0', x2: '0', y2: '1' },
+      React.createElement('stop', { offset: '0', stopColor: 'var(--dsw-alias-brand-primary,#4f6ef7)', stopOpacity: 0.85 }),
+      React.createElement('stop', { offset: '1', stopColor: 'var(--dsw-alias-brand-primary,#4f6ef7)', stopOpacity: 0.45 }),
+    ),
+    React.createElement('linearGradient', { id: `${scope}BarBad`, x1: '0', y1: '0', x2: '0', y2: '1' },
+      React.createElement('stop', { offset: '0', stopColor: 'var(--dsw-alias-state-error-primary,#dc2626)', stopOpacity: 0.9 }),
+      React.createElement('stop', { offset: '1', stopColor: 'var(--dsw-alias-state-error-primary,#dc2626)', stopOpacity: 0.5 }),
+    ),
+    React.createElement('linearGradient', { id: `${scope}AreaBurn`, x1: '0', y1: '0', x2: '0', y2: '1' },
+      React.createElement('stop', { offset: '0', stopColor: 'var(--dsw-alias-state-error-primary,#dc2626)', stopOpacity: 0.22 }),
+      React.createElement('stop', { offset: '1', stopColor: 'var(--dsw-alias-state-error-primary,#dc2626)', stopOpacity: 0.01 }),
+    ),
+  );
+}
+
+/** 折线路径（`M` 起手，其余 `L`）。 */
+function usageLine(points) {
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point[0].toFixed(1)},${point[1].toFixed(1)}`).join('');
+}
+
+/**
+ * 折线图 + 面积 + 失败堆叠 + 网格 + 十字线（主图）。
+ *
+ * 关键修正：x 轴按**槽**排布，一行一个槽（由 `usageBySlot` 聚合而来），
+ * 不再是「一行分桶 = 一根柱」—— 那正是旧实现柱数与时间轴对不上的根因。
+ *
+ * @param props - `{rows, metric}`。
+ * @returns React 元素。
+ */
+function UsageAreaChart({ rows, metric }) {
+  const boxRef = React.useRef(null);
+  const [hover, setHover] = React.useState(null);
+  const def = USAGE_METRICS.find((item) => item.id === metric) ?? USAGE_METRICS[0];
+
+  return React.createElement(UsageChart, {
+    deps: [metric, rows.length],
+    render: (width) => {
+      const H = 210;
+      const PL = 46;
+      const PR = 14;
+      const PT = 16;
+      const PB = 26;
+      const innerW = Math.max(10, width - PL - PR);
+      const innerH = H - PT - PB;
+      const n = rows.length;
+      const max = niceMax(Math.max(1, ...rows.map((row) => def.pick(row))));
+      const x = (index) => PL + (n <= 1 ? innerW / 2 : (index / (n - 1)) * innerW);
+      const y = (value) => PT + (1 - value / max) * innerH;
+
+      const top = rows.map((row, index) => [x(index), y(def.pick(row))]);
+      const failTop = rows.map((row, index) => [x(index), y(def.bad(row))]);
+      const areaMain = `${usageLine(top)}L${x(n - 1).toFixed(1)},${(PT + innerH).toFixed(1)}L${x(0).toFixed(1)},${(PT + innerH).toFixed(1)}Z`;
+      const areaFail = `${usageLine(failTop)}L${x(n - 1).toFixed(1)},${(PT + innerH).toFixed(1)}L${x(0).toFixed(1)},${(PT + innerH).toFixed(1)}Z`;
+
+      // 日槽区（无小时维度）底纹 + 分界：避免「日总量」被读成「某小时的量」
+      const firstDay = rows.findIndex((row) => row.kind === 'day');
+      const hasDay = rows.some((row) => row.kind === 'day');
+      const hasHour = rows.some((row) => row.kind === 'hour');
+      const band = firstDay >= 0
+        ? [
+            React.createElement('rect', {
+              key: 'band', className: 'dayband',
+              x: PL, y: PT, width: Math.max(0, x(firstDay) - PL), height: innerH,
+            }),
+            React.createElement('line', {
+              key: 'div', className: 'slotdiv',
+              x1: x(firstDay), x2: x(firstDay), y1: PT, y2: PT + innerH,
+            }),
+            React.createElement('text', {
+              key: 'lt', className: 'axt',
+              x: (PL + x(firstDay)) / 2, y: PT + 11, textAnchor: 'middle',
+            }, '日槽（无小时维度）'),
+            hasHour
+              ? React.createElement('text', {
+                  key: 'rt', className: 'axt',
+                  x: (x(firstDay) + (width - PR)) / 2, y: PT + 11, textAnchor: 'middle',
+                }, '小时槽')
+              : null,
+          ]
+        : null;
+
+      const grid = [0, 0.25, 0.5, 0.75, 1].map((frac) => {
+        const gy = PT + innerH * frac;
+        return React.createElement('g', { key: `g${frac}` },
+          React.createElement('line', { className: 'grid', x1: PL, x2: width - PR, y1: gy, y2: gy }),
+          React.createElement('text', { className: 'axt', x: PL - 6, y: gy + 3.5, textAnchor: 'end' },
+            def.fmt(max * (1 - frac))),
+        );
+      });
+
+      const tickIndexes = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1];
+      const ticks = [...new Set(tickIndexes)].map((index) => {
+        const row = rows[index];
+        const anchor = index === 0 ? 'start' : index === n - 1 ? 'end' : 'middle';
+        return React.createElement('text', {
+          key: `t${index}`, className: 'axt', x: x(index), y: H - 8, textAnchor: anchor,
+        }, slotLabel(row.slot));
+      });
+
+      const peak = Math.max(...rows.map((row) => def.pick(row)));
+      const svg = React.createElement('svg', {
+        viewBox: `0 0 ${width} ${H}`, width, height: H,
+        onMouseMove: (event) => handleHover(event, width, PL, innerW, n, H, x),
+        onMouseLeave: () => setHover(null),
+      },
+        React.createElement(UsageDefs, { scope: 'dshcMain' }),
+        ...grid,
+        band,
+        React.createElement('path', { className: 'area-main', d: areaMain }),
+        def.hasFail ? React.createElement('path', { className: 'area-fail', d: areaFail }) : null,
+        React.createElement('path', { className: 'line-main', d: usageLine(top) }),
+        ...ticks,
+      );
+
+      return React.createElement('div', { ref: boxRef, style: { position: 'relative' } },
+        svg,
+        hover === null
+          ? null
+          : React.createElement(React.Fragment, null,
+              React.createElement('div', { className: 'dshc-ucross', style: { display: 'block', height: innerH, left: hover.px } }),
+              React.createElement('div', { className: 'dshc-udot', style: { display: 'block', left: hover.px, top: hover.py } }),
+              React.createElement('div', {
+                className: 'dshc-utip',
+                style: { display: 'block', left: hover.tipX, top: hover.tipY, maxWidth: width - 8 },
               },
-              option.label,
-            ),
-          ),
-          React.createElement('button', { type: 'button', style: { ...s.btnLink, padding: '0 4px' }, onClick: onRefresh, title: '刷新' },
-            React.createElement(Icons.refresh, null)),
+                React.createElement('div', null, React.createElement('b', null, slotLabel(hover.row.slot))),
+                React.createElement('div', null,
+                  '请求 ', React.createElement('b', null, formatNumber(hover.row.requests)),
+                  hover.row.failed > 0
+                    ? React.createElement('span', { style: { color: tone.err.fg } }, ` · 失败 ${formatNumber(hover.row.failed)}`)
+                    : null,
+                ),
+                React.createElement('div', null,
+                  `tokens ${formatTokens(hover.row.tokens)} · 积分 ${formatCredit(hover.row.credit)}`,
+                ),
+                React.createElement('div', { style: { ...s.muted, fontSize: 11 } },
+                  `延迟 ${Math.round(hover.row.latencyMS)} ms · 占比 ${formatPercent(hover.row.requests / Math.max(1, hover.total))}`,
+                ),
+              ),
         ),
-      ),
-      !bucketsAvailable
-        ? React.createElement('div', { style: { ...s.tip, marginTop: 10 } },
-            usage?.reason ?? '网关未提供分桶端点，需在网关侧支持 GET /v1/stats/buckets。',
-          )
-        : React.createElement(UsageBucketBody, { usage: usageData }),
+        React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
+          def.hasFail ? '红色下段 = 失败请求堆叠' : `单一指标面积（${def.label} 无失败维度）`,
+          ` · 峰值 ${def.fmt(peak)} ${def.unit}/槽`,
+        ),
+      );
+
+      function handleHover(event, boxWidth, padLeft, innerWidth, count, height, xOf) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (rect.width === 0 || count === 0) return;
+        const scale = rect.height / height;
+        const px = event.clientX - rect.left;
+        const index = Math.max(0, Math.min(count - 1,
+          Math.round((((px / rect.width) * boxWidth - padLeft) / innerWidth) * (count - 1))));
+        const row = rows[index];
+        const total = rows.reduce((sum, item) => sum + item.requests, 0);
+        setHover({
+          row,
+          total,
+          px: xOf(index) * scale,
+          py: (PT + (1 - def.pick(row) / max) * innerH) * scale,
+          tipX: Math.min(Math.max(4, xOf(index) * scale + 12), Math.max(4, innerWidth - 4)),
+          tipY: Math.max(2, (PT + (1 - def.pick(row) / max) * innerH) * scale - 76),
+        });
+      }
+    },
+  });
+}
+
+/**
+ * 柱（请求）+ 折线（积分）双轴图。
+ *
+ * @param props - `{rows}`。
+ * @returns React 元素。
+ */
+function UsageComboChart({ rows }) {
+  return React.createElement(UsageChart, {
+    deps: [rows.length],
+    render: (width) => {
+      const H = 160;
+      const PL = 46;
+      const PR = 46;
+      const PT = 12;
+      const PB = 22;
+      const innerW = Math.max(10, width - PL - PR);
+      const innerH = H - PT - PB;
+      const n = rows.length;
+      const maxR = niceMax(Math.max(1, ...rows.map((row) => row.requests)));
+      const maxC = niceMax(Math.max(1, ...rows.map((row) => row.credit)));
+      const x = (index) => PL + (n <= 1 ? innerW / 2 : (index / (n - 1)) * innerW);
+      const yR = (value) => PT + (1 - value / maxR) * innerH;
+      const yC = (value) => PT + (1 - value / maxC) * innerH;
+      const barW = Math.max(2, innerW / Math.max(1, n) - 2);
+
+      const bars = rows.map((row, index) => {
+        const bad = row.requests > 0 && row.failed / row.requests > 0.05;
+        const top = yR(row.requests);
+        return React.createElement('rect', {
+          key: `b${index}`,
+          className: `bar-main${bad ? ' bad' : ''}`,
+          x: (x(index) - barW / 2).toFixed(1),
+          y: top.toFixed(1),
+          width: barW.toFixed(1),
+          height: Math.max(0, PT + innerH - top).toFixed(1),
+        }, React.createElement('title', null, `${slotLabel(row.slot)} · ${formatNumber(row.requests)} 请求`));
+      });
+
+      const creditPoints = rows.map((row, index) => [x(index), yC(row.credit)]);
+      const step = Math.max(1, Math.ceil(n / 8));
+      const dots = rows.map((row, index) => (index % step === 0
+        ? React.createElement('circle', { key: `d${index}`, className: 'dot-credit', cx: x(index).toFixed(1), cy: yC(row.credit).toFixed(1), r: 2.6 })
+        : null));
+
+      const grid = [0, 0.5, 1].map((frac) => {
+        const gy = PT + innerH * frac;
+        return React.createElement('g', { key: `g${frac}` },
+          React.createElement('line', { className: 'grid', x1: PL, x2: width - PR, y1: gy, y2: gy }),
+          React.createElement('text', { className: 'axt', x: PL - 6, y: gy + 3.5, textAnchor: 'end' }, formatTokens(maxR * (1 - frac))),
+          React.createElement('text', { className: 'axt warn', x: width - PR + 6, y: gy + 3.5 }, formatCredit(maxC * (1 - frac))),
+        );
+      });
+
+      return React.createElement('svg', { viewBox: `0 0 ${width} ${H}`, width, height: H },
+        React.createElement(UsageDefs, { scope: 'dshcCombo' }),
+        ...grid,
+        ...bars,
+        React.createElement('path', { className: 'line-credit', d: usageLine(creditPoints) }),
+        ...dots,
+        React.createElement('text', { className: 'axt', x: PL, y: H - 6 }, slotLabel(rows[0].slot)),
+        React.createElement('text', { className: 'axt', x: width - PR, y: H - 6, textAnchor: 'end' }, slotLabel(rows[n - 1].slot)),
+      );
+    },
+  });
+}
+
+/**
+ * 积分燃尽投影：实测存量下降（实线）+ 线性外推（虚线）+ 见底点。
+ *
+ * 两条线必须在图上可区分，且外推明确标注「按窗口速率线性外推，非承诺」。
+ *
+ * @param props - `{rows, stock, windowValue}`。
+ * @returns React 元素。
+ */
+function UsageBurnChart({ rows, stock, windowValue }) {
+  const burn = creditBurn(stock.usable, rows.reduce((sum, row) => sum + row.credit, 0), windowValue);
+  const note = burn === null
+    ? '窗口内无积分消耗或无可用存量 —— 无法外推（显示 — 而不是编一个天数）'
+    : `窗口速率 ${formatCredit(burn.perDay / 24)} 积分/时 · 存量 ${formatNumber(Math.round(stock.usable))} · 预计 ${burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`}后见底`;
+
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', { style: { ...s.muted, marginBottom: 8 } }, note),
+    burn === null
+      ? null
+      : React.createElement(UsageChart, {
+          deps: [rows.length, stock.usable],
+          render: (width) => {
+            const H = 170;
+            const PL = 52;
+            const PR = 16;
+            const PT = 14;
+            const PB = 24;
+            const innerW = Math.max(10, width - PL - PR);
+            const innerH = H - PT - PB;
+            const n = rows.length;
+            // 窗口起点存量 = 当前存量 + 窗口内已消耗（真值只在这里出现一次）
+            const spent = rows.reduce((sum, row) => sum + row.credit, 0);
+            const startStock = stock.usable + spent;
+            const perHour = burn.perDay / 24;
+            const hoursLeft = perHour > 0 ? stock.usable / perHour : 0;
+            const extra = Math.max(2, Math.ceil(hoursLeft));
+            const totalSlots = n + extra;
+            const maxY = niceMax(startStock);
+            const x = (index) => PL + (index / Math.max(1, totalSlots - 1)) * innerW;
+            const y = (value) => PT + (1 - Math.max(0, value) / maxY) * innerH;
+
+            let used = 0;
+            const actual = rows.map((row, index) => {
+              used += row.credit;
+              return [x(index), y(startStock - used)];
+            });
+            const proj = Array.from({ length: extra + 1 }, (_, step) => [
+              x(n - 1 + step), y(stock.usable - perHour * step),
+            ]);
+            // 见底点：投影首次落到 0 的槽
+            let dieIndex = proj.findIndex((point) => point[1] >= PT + innerH - 0.5);
+            if (dieIndex < 0) dieIndex = proj.length - 1;
+            const dieX = proj[dieIndex][0];
+            const dieY = PT + innerH;
+            const daysText = burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`;
+
+            const grid = [0, 0.5, 1].map((frac) => {
+              const gy = PT + innerH * frac;
+              return React.createElement('g', { key: `g${frac}` },
+                React.createElement('line', { className: 'grid', x1: PL, x2: width - PR, y1: gy, y2: gy }),
+                React.createElement('text', { className: 'axt', x: PL - 6, y: gy + 3.5, textAnchor: 'end' }, formatTokens(maxY * (1 - frac))),
+              );
+            });
+
+            return React.createElement('svg', { viewBox: `0 0 ${width} ${H}`, width, height: H },
+              React.createElement(UsageDefs, { scope: 'dshcBurn' }),
+              ...grid,
+              React.createElement('path', {
+                className: 'area-burn',
+                d: `${usageLine(actual)}L${x(n - 1).toFixed(1)},${(PT + innerH).toFixed(1)}L${x(0).toFixed(1)},${(PT + innerH).toFixed(1)}Z`,
+              }),
+              React.createElement('path', { className: 'line-burn', d: usageLine(actual) }),
+              React.createElement('path', { className: 'line-proj', d: usageLine(proj) }),
+              React.createElement('line', {
+                x1: PL, x2: width - PR, y1: dieY, y2: dieY,
+                stroke: tone.err.fg, strokeWidth: 1, opacity: 0.5,
+              }),
+              React.createElement('circle', { className: 'dot-die', cx: dieX.toFixed(1), cy: dieY, r: 4 }),
+              React.createElement('text', {
+                className: 'axt err',
+                x: Math.min(dieX + 8, width - PR - 66), y: dieY - 7,
+              }, `≈ ${daysText}后见底`),
+              React.createElement('line', {
+                x1: x(n - 1).toFixed(1), x2: x(n - 1).toFixed(1), y1: PT, y2: PT + innerH,
+                stroke: tone.idle.fg, strokeWidth: 1, opacity: 0.4,
+              }),
+              React.createElement('text', { className: 'axt', x: x(n - 1).toFixed(1), y: H - 8, textAnchor: 'middle' }, '现在'),
+              React.createElement('text', { className: 'axt', x: PL, y: H - 8 }, '窗口起点'),
+              React.createElement('text', { className: 'axt', x: width - PR, y: H - 8, textAnchor: 'end' }, '外推'),
+            );
+          },
+        }),
+    React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 6, lineHeight: 1.7 } },
+      '实线 = 窗口起点存量按已消耗逐槽回推（**回推值，非逐时实测**）· 虚线 = 按窗口速率线性外推（非承诺）· 圆点 = 预计见底。',
+      '窗口起点存量本身也是推算：当前可用存量 + 窗口内已消耗。存量只算可消耗额度，不含渠道专用池。',
+      '账本只覆盖本网关经手的请求；账号在他处的消耗不在其中，故外推天数偏乐观。',
     ),
   );
 }
 
 /**
- * 分桶视图主体：时序柱 + 三个维度的表格。
- * @param props - `{usage}`。
+ * 模型构成堆叠面积（每槽请求按模型拆分）。
+ *
+ * @param props - `{buckets}`。
  * @returns React 元素。
  */
-function UsageBucketBody({ usage }) {
-  if (!usage) {
-    return React.createElement('div', { style: { ...s.muted, marginTop: 10 } }, '加载中…');
-  }
-  const buckets = usage.buckets ?? [];
-  const maxRequests = Math.max(1, ...buckets.map((bucket) => bucket.requests));
-  const [dim, setDim] = React.useState('uid');
-  const dimRows = usage[`by_${dim}`] ?? [];
-  const dimMeta = {
-    uid: { label: '按账号', columns: ['账号', '请求', '失败', 'Tokens', '扣费', '平均延迟'] },
-    realm: { label: '按域', columns: ['域', '请求', '失败', 'Tokens', '扣费', '平均延迟'] },
-    model: { label: '按模型', columns: ['模型', '请求', '失败', 'Tokens', '扣费', '平均延迟'] },
-  };
+function UsageStackChart({ buckets }) {
+  const data = usageBySlotAndModel(buckets);
+  return React.createElement(React.Fragment, null,
+    React.createElement(UsageChart, {
+      deps: [data.slots.length, data.models.length],
+      render: (width) => {
+        const H = 180;
+        const PL = 46;
+        const PR = 14;
+        const PT = 12;
+        const PB = 24;
+        const innerW = Math.max(10, width - PL - PR);
+        const innerH = H - PT - PB;
+        const n = data.slots.length;
+        const totals = Array.from({ length: n }, (_, index) =>
+          data.models.reduce((sum, model) => sum + model.values[index], 0));
+        const max = niceMax(Math.max(1, ...totals));
+        const x = (index) => PL + (n <= 1 ? innerW / 2 : (index / (n - 1)) * innerW);
+        const y = (value) => PT + (1 - value / max) * innerH;
 
-  return React.createElement(
-    'div',
-    { style: { marginTop: 12 } },
-    // 降级提示必须如实显示
-    usage.degraded
-      ? React.createElement('div', { style: { ...s.warn, marginBottom: 10 } },
-          '⚠️ 分桶键已超出容量上限，网关已降级为「槽 × 域」两维 —— 按账号 / 按模型两个维度将不再细分。',
+        const layers = data.models.map((model, layer) => {
+          const below = (index) => data.models.slice(0, layer).reduce((sum, item) => sum + item.values[index], 0);
+          const upper = model.values.map((value, index) => [x(index), y(below(index) + value)]);
+          const lower = model.values.map((value, index) => [x(index), y(below(index))]).reverse();
+          const d = `${usageLine(upper)}L${lower.map((point) => `${point[0].toFixed(1)},${point[1].toFixed(1)}`).join('L')}Z`;
+          return React.createElement('path', {
+            key: model.key, className: 'seg', d, fill: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length], opacity: 0.82,
+          });
+        });
+
+        const grid = [0, 0.5, 1].map((frac) => {
+          const gy = PT + innerH * frac;
+          return React.createElement('g', { key: `g${frac}` },
+            React.createElement('line', { className: 'grid', x1: PL, x2: width - PR, y1: gy, y2: gy }),
+            React.createElement('text', { className: 'axt', x: PL - 6, y: gy + 3.5, textAnchor: 'end' }, formatTokens(max * (1 - frac))),
+          );
+        });
+
+        return React.createElement('svg', { viewBox: `0 0 ${width} ${H}`, width, height: H },
+          ...grid,
+          ...layers,
+          React.createElement('text', { className: 'axt', x: PL, y: H - 8 }, slotLabel(data.slots[0])),
+          React.createElement('text', { className: 'axt', x: width - PR, y: H - 8, textAnchor: 'end' }, slotLabel(data.slots[n - 1])),
+        );
+      },
+    }),
+    React.createElement('div', { className: 'dshc-row', style: { marginTop: 8 } },
+      ...data.models.slice(0, 8).map((model, layer) =>
+        React.createElement('span', { key: model.key, style: { ...s.tag, display: 'inline-flex', alignItems: 'center', gap: 5 } },
+          React.createElement('i', {
+            style: {
+              display: 'inline-block', width: 9, height: 9, borderRadius: 2,
+              background: USAGE_SEG_COLORS[layer % USAGE_SEG_COLORS.length],
+            },
+          }),
+          `${model.key} `,
+          React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, formatNumber(model.total)),
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * 时段热力（行 = 小时槽覆盖的日期，列 = 小时）。
+ *
+ * **诚实性约束（必须遵守）**：日槽只有日期没有小时，无法还原到小时格子。
+ * 所以这张图**只用小时槽**，并显式报告被排除的日槽 —— 不把日总量画成某小时的量。
+ *
+ * @param props - `{rows}`。
+ * @returns React 元素。
+ */
+function UsageHeatmap({ rows }) {
+  const hourRows = rows.filter((row) => row.kind === 'hour');
+  const dayRows = rows.filter((row) => row.kind === 'day');
+  if (hourRows.length === 0) {
+    return React.createElement('div', { style: s.muted },
+      '该窗口内没有小时槽（小时槽只保留近 48 小时；更早的数据被网关折叠成日槽，无小时维度）。',
+    );
+  }
+
+  const days = [...new Set(hourRows.map((row) => slotLabel(row.slot).slice(0, 5)))];
+  const cells = days.map((day) =>
+    Array.from({ length: 24 }, (_, hour) => hourRows
+      .filter((row) => slotLabel(row.slot).slice(0, 5) === day && new Date(row.at).getHours() === hour)
+      .reduce((sum, row) => sum + row.requests, 0)),
+  );
+  const max = Math.max(1, ...cells.flat());
+  let bestIndex = 0;
+  let bestValue = -1;
+  cells.flat().forEach((value, index) => {
+    if (value > bestValue) {
+      bestValue = value;
+      bestIndex = index;
+    }
+  });
+
+  return React.createElement('div', null,
+    React.createElement('div', {
+      className: 'dshc-uheat',
+      style: { gridTemplateColumns: '26px repeat(24, minmax(0, 1fr))' },
+    },
+      React.createElement('div', null),
+      ...Array.from({ length: 24 }, (_, hour) => React.createElement('div', {
+        key: `h${hour}`, className: 'hl', style: { textAlign: 'center' },
+      }, hour % 3 === 0 ? String(hour) : '')),
+      ...days.flatMap((day, dayIndex) => [
+        React.createElement('div', { key: `d${day}`, className: 'hl' }, day),
+        ...cells[dayIndex].map((value, hour) => {
+          const ratio = value / max;
+          return React.createElement('i', {
+            key: `${day}-${hour}`,
+            className: value === 0 ? 'zero' : '',
+            style: value === 0 ? undefined : { opacity: (0.12 + ratio * 0.88).toFixed(2) },
+            title: `${day} ${hour}:00 · ${formatNumber(value)} 请求 · 相对峰值 ${formatPercent(ratio, 0)}`,
+          });
+        }),
+      ]),
+    ),
+    React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 6, lineHeight: 1.7 } },
+      `峰值 ${days[Math.floor(bestIndex / 24)]} ${bestIndex % 24}:00 · ${formatNumber(bestValue)} 请求。`,
+      '仅覆盖小时槽（近 48h）。',
+      dayRows.length > 0
+        ? `另有 ${days.length > 0 ? '' : ''}${dayRows.length} 个日槽只有当天总量、无小时维度，未上此图（不是丢失数据）。`
+        : '',
+    ),
+  );
+}
+
+/**
+ * 环形百分比（成功率 / 缓存命中率 / 流式占比）。
+ *
+ * 三个环的口径必须分别标注 —— 前两个来自不同端点，混着看会以为同一口径。
+ *
+ * @param props - `{rings}`：`[{value, label, cls, note}]`。
+ * @returns React 元素。
+ */
+function UsageRings({ rings }) {
+  const list = rings.filter(Boolean);
+  if (list.length === 0) return null;
+  return React.createElement('div', { className: 'dshc-uring' },
+    ...list.map((ring) => {
+      const radius = 22;
+      const circumference = 2 * Math.PI * radius;
+      const ratio = Math.max(0, Math.min(1, Number(ring.value) || 0));
+      return React.createElement('div', { key: ring.label },
+        React.createElement('svg', { viewBox: '0 0 60 60', width: 66, height: 66 },
+          React.createElement('circle', { className: 'track', cx: 30, cy: 30, r: radius }),
+          React.createElement('circle', {
+            className: `arc ${ring.cls}`,
+            cx: 30, cy: 30, r: radius,
+            strokeDasharray: `${(circumference * ratio).toFixed(1)} ${circumference.toFixed(1)}`,
+          }),
+        ),
+        React.createElement('div', { className: 'rv' }, formatPercent(ratio, 0)),
+        React.createElement('div', { className: 'rl' }, ring.label),
+        ring.note
+          ? React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, ring.note)
+          : null,
+      );
+    }),
+  );
+}
+
+/**
+ * 英雄总量区：四联 KPI + 存量卡。
+ *
+ * 四联全部来自**窗口分桶**的口径（`usage.total`），存量来自 `/status`。
+ * 两者都标了口径 tag —— 用户要能一眼分清「这个数是窗口内的还是总共的」。
+ *
+ * @param props - `{total, rows, stock, windowValue, accounts, creditsByUid}`。
+ * @returns React 元素。
+ */
+function UsageHero({ total, rows, stock, windowValue }) {
+  const requests = Number(total?.requests) || 0;
+  const failed = Number(total?.failed) || 0;
+  const credit = Number(total?.credit) || 0;
+  const latency = Number(total?.avg_latency_ms) || 0;
+  const structure = tokenStructure(total);
+  const burn = creditBurn(stock.usable, credit, windowValue);
+  const successRate = requests > 0 ? (requests - failed) / requests : 0;
+
+  const cards = [
+    {
+      label: '请求总量',
+      value: formatNumber(requests),
+      sub: `成功 ${formatNumber(requests - failed)} · 失败 ${formatNumber(failed)} · 成功率 ${formatPercent(successRate, 2)}`,
+    },
+    {
+      label: 'Tokens',
+      value: formatTokens(structure.total),
+      sub: `↑${formatTokens(structure.prompt)} / ↓${formatTokens(structure.completion)}`,
+    },
+    {
+      label: '积分消耗',
+      value: formatCredit(credit),
+      sub: `每请求 ${requests > 0 ? formatCredit(credit / requests) : '—'} 积分`,
+      tone: tone.ok.fg,
+    },
+    {
+      label: '平均延迟',
+      value: latency > 0 ? `${Math.round(latency)} ms` : '—',
+      sub: '窗口内按请求加权',
+    },
+  ];
+
+  return React.createElement('div', { className: 'dshc-uhero' },
+    React.createElement('div', { className: 'dshc-kpis' },
+      ...cards.map((card) =>
+        React.createElement('div', { key: card.label, className: 'dshc-kpi', style: { cursor: 'default' } },
+          React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, card.label),
+          React.createElement('div', {
+            style: {
+              fontSize: 21, fontWeight: 600, lineHeight: 1.25,
+              color: card.tone ?? 'var(--dsw-alias-label-primary,currentColor)',
+            },
+          }, card.value),
+          React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 2 } }, card.sub),
+        ),
+      ),
+    ),
+    React.createElement('div', { className: 'dshc-ustock' },
+      React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, '可用积分（存量 · 只算可消耗）'),
+      React.createElement('div', { className: 'dshc-row', style: { alignItems: 'baseline', gap: 8 } },
+        React.createElement('span', { className: 'big' }, formatNumber(Math.round(stock.usable))),
+        stock.unusable > 0
+          ? React.createElement(Tag, { text: `另 ${formatNumber(Math.round(stock.unusable))} 不可消耗`, tone: 'warn' })
+          : null,
+      ),
+      React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
+        burn === null
+          ? '存量趋势：窗口内无消耗或无存量，不做外推'
+          : `按近 ${windowHours(windowValue)} 小时速率（${formatCredit(burn.perDay)} 积分/天）≈ 还可 ${burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`}`,
+      ),
+      React.createElement('div', { className: 'dshc-uchans' },
+        ...stock.byChannel.map((channel) =>
+          React.createElement('div', { key: channel.id },
+            React.createElement('div', { className: 'n' }, CHANNEL_LABEL[channel.id] ?? channel.id),
+            React.createElement('div', { className: 'c' }, channel.count > 0 ? formatNumber(Math.round(channel.usable)) : '—'),
+            React.createElement('div', { className: 'n' }, `${channel.count} 号`),
+          ),
+        ),
+      ),
+      React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
+        '存量与消耗是两个口径：存量是「现在还剩多少」，消耗是「窗口内花了多少」。不可消耗单列，不并入可用。',
+      ),
+    ),
+  );
+}
+
+/**
+ * 归因表（按账号 / 域 / 模型）。
+ *
+ * 账号维度会映射到昵称 + 渠道 + 域 —— 旧实现只显示 `uid.slice(0,8)`，
+ * 运维必须自己回账号池对照才能认出是哪台号。
+ *
+ * @param props - `{rows, dim, total, accounts, channelOf}`。
+ * @returns React 元素。
+ */
+function UsageTables({ rows, dim, total, accounts, channelOf }) {
+  const [sortKey, setSortKey] = React.useState('requests');
+
+  const nameOf = React.useCallback((key) => {
+    if (dim !== 'uid') return null;
+    const account = (accounts ?? []).find((item) => item.uid === key);
+    if (!account) return null;
+    return {
+      name: account.nickname || `${key.slice(0, 8)}…`,
+      channel: CHANNEL_LABEL[channelOf?.(account)] ?? '',
+      realm: account.realm ?? '',
+    };
+  }, [accounts, channelOf, dim]);
+
+  const withShare = React.useMemo(() => usageShares(rows, total), [rows, total]);
+  const sorted = React.useMemo(() => {
+    const list = [...withShare];
+    if (sortKey === 'credit') list.sort((a, b) => (Number(b.credit) || 0) - (Number(a.credit) || 0));
+    else if (sortKey === 'tokens') list.sort((a, b) => (Number(b.total_tokens) || 0) - (Number(a.total_tokens) || 0));
+    else list.sort((a, b) => (Number(b.requests) || 0) - (Number(a.requests) || 0));
+    return list;
+  }, [withShare, sortKey]);
+
+  const headers = [
+    { key: 'name', label: dim === 'uid' ? '账号' : dim === 'realm' ? '域' : '模型', sortable: false },
+    { key: 'share', label: '占比', sortable: false },
+    { key: 'requests', label: '请求', sortable: true },
+    { key: 'success', label: '成功率', sortable: false },
+    { key: 'tokens', label: 'Tokens', sortable: true },
+    { key: 'credit', label: '积分', sortable: true },
+    { key: 'latency', label: '平均延迟', sortable: false },
+  ];
+
+  const header = React.createElement('tr', null,
+    ...headers.map((item) => React.createElement('th', {
+      key: item.key,
+      style: item.sortable ? { cursor: 'pointer', userSelect: 'none' } : undefined,
+      title: item.sortable ? '点击切换排序' : undefined,
+      onClick: item.sortable
+        ? () => setSortKey((prev) => (prev === item.key ? 'requests' : item.key))
+        : undefined,
+    }, `${item.label}${sortKey === item.key && item.sortable ? ' ↓' : ''}`)),
+  );
+
+  const body = sorted.map((row, index) => {
+    const meta = nameOf(row.key);
+    const colorIndex = index % USAGE_SEG_COLORS.length;
+    return React.createElement('tr', { key: row.key ?? index },
+      React.createElement('td', null,
+        React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 } },
+          React.createElement('span', { className: 'dshc-dot', style: { background: USAGE_SEG_COLORS[colorIndex] } }),
+          React.createElement('span', null, meta ? meta.name : (row.key || '—')),
+          meta?.channel ? React.createElement(Tag, { text: meta.channel, tone: 'info' }) : null,
+          meta?.realm ? React.createElement(Tag, { text: meta.realm, tone: 'idle' }) : null,
+        ),
+      ),
+      React.createElement('td', null,
+        React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6 } },
+          React.createElement('span', {
+            className: 'dshc-ushare',
+            style: { width: Math.max(3, Math.round(row.share * 90)) },
+          }),
+          React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, formatPercent(row.share, 1)),
+        ),
+      ),
+      React.createElement('td', null, formatNumber(row.requests ?? 0)),
+      React.createElement('td', {
+        style: row.successRate < 0.97 ? { color: tone.err.fg } : undefined,
+        title: `${formatNumber(row.failed ?? 0)} 次失败`,
+      }, formatPercent(row.successRate, 2)),
+      React.createElement('td', {
+        title: `输入 ${formatNumber(row.prompt_tokens ?? 0)} · 输出 ${formatNumber(row.completion_tokens ?? 0)}`,
+      }, formatTokens(Number(row.total_tokens) || 0)),
+      React.createElement('td', null, formatCredit(Number(row.credit) || 0)),
+      React.createElement('td', null, row.requests > 0 ? `${Math.round(Number(row.avg_latency_ms) || 0)} ms` : '—'),
+    );
+  });
+
+  return React.createElement('div', { className: 'dshc-tblwrap' },
+    React.createElement('table', null,
+      React.createElement('thead', null, header),
+      React.createElement('tbody', null, ...body),
+    ),
+  );
+}
+
+/**
+ * 模型全景（`/v1/stats` 进程累计口径）。
+ *
+ * 这一区在「网关缺分桶端点」时依然可用 —— 是本 Tab 的降级保底。
+ * 口径必须在标题上写死：进程累计、重启清零。
+ *
+ * @param props - `{stats}`。
+ * @returns React 元素。
+ */
+function UsageModelPanel({ stats }) {
+  if (!stats || stats.enabled !== true) {
+    return React.createElement('div', { style: s.muted },
+      '该网关未提供 /v1/stats（进程累计视图不可用）。窗口分桶数据不受影响。',
+    );
+  }
+  const models = Array.isArray(stats.models) ? stats.models : [];
+  const total = stats.total ?? {};
+  const rows = [
+    { label: '合计', row: total, isTotal: true },
+    ...models.map((model) => ({ label: model.model, row: model, isTotal: false })),
+  ];
+
+  return React.createElement('div', { className: 'dshc-tblwrap' },
+    React.createElement('table', null,
+      React.createElement('thead', null,
+        React.createElement('tr', null,
+          ...['模型', '请求', '失败', '吞吐', 'TTFB', '缓存命中', '积分/请求', '倍率', '最近'].map((label) =>
+            React.createElement('th', { key: label }, label)),
+        ),
+      ),
+      React.createElement('tbody', null,
+        ...rows.map(({ label, row, isTotal }) => {
+          const requests = Number(row.requests) || 0;
+          const hitRate = typeof row.cache_hit_rate === 'number' ? row.cache_hit_rate : null;
+          return React.createElement('tr', {
+            key: label,
+            style: isTotal ? { fontWeight: 600 } : undefined,
+          },
+            React.createElement('td', { style: { ...s.code, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' } },
+              label),
+            React.createElement('td', null, formatNumber(requests)),
+            React.createElement('td', null, formatNumber(Number(row.failed) || 0)),
+            React.createElement('td', null,
+              typeof row.tokens_per_sec === 'number' && row.tokens_per_sec > 0
+                ? `${row.tokens_per_sec.toFixed(1)} tok/s`
+                : '—'),
+            React.createElement('td', null,
+              typeof row.avg_ttfb_ms === 'number' && row.avg_ttfb_ms > 0
+                ? `${Math.round(row.avg_ttfb_ms)} ms`
+                : '—'),
+            React.createElement('td', null, hitRate === null ? '—' : formatPercent(hitRate, 0)),
+            React.createElement('td', null, formatCredit(Number(row.credit_per_req) || 0)),
+            // 倍率取上游原文；缺失显示 —（绝不显示 x0.00 —— 缺失 ≠ 免费）
+            React.createElement('td', null, row.credits
+              ? React.createElement(Tag, { text: row.credits, tone: 'idle' })
+              : React.createElement('span', { style: s.muted }, '—')),
+            React.createElement('td', { style: s.muted },
+              row.last_seen ? relativeTime(row.last_seen) : '—'),
+          );
+        }),
+      ),
+    ),
+  );
+}
+
+/**
+ * 用量 Tab。
+ *
+ * 数据源（全部为既有端点，本设计不新增网关请求）：
+ *   GET /v1/stats          进程累计（重启清零，无窗口维度）
+ *   GET /v1/stats/buckets  窗口分桶（落盘；槽粒度混合：小时槽 / 日槽）
+ *   /status accounts[]     余额存量（与账号池 Tab 同源）
+ *
+ * @param props - `{stats, usage, usageWindow, onWindowChange, onRefresh, accounts, channelOf, creditsByUid}`。
+ * @returns React 元素。
+ */
+function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accounts, channelOf, creditsByUid }) {
+  const bucketsAvailable = usage?.available === true;
+  const usageData = usage?.usage;
+  const buckets = Array.isArray(usageData?.buckets) ? usageData.buckets : [];
+  const rows = React.useMemo(() => usageBySlot(buckets), [buckets]);
+  const stock = React.useMemo(
+    () => creditStock(accounts, creditsByUid, channelOf ?? (() => 'workbuddy')),
+    [accounts, creditsByUid, channelOf],
+  );
+
+  const [metric, setMetric] = React.useState('requests');
+  const [dim, setDim] = React.useState('uid');
+  const [view, setView] = React.useState('combo');
+
+  const total = usageData?.total ?? {};
+  const windowText = USAGE_WINDOWS.find((item) => item.value === usageWindow)?.label ?? usageWindow;
+  const processesUptime = stats?.enabled === true ? uptimeText(stats.uptime_sec) : null;
+
+  // 窗口切换后：如果停在时长相关的视图，保持不炸（数据换了，图会因 deps 变化重画）
+  const dimRows = usageData?.[`by_${dim}`] ?? [];
+
+  return React.createElement('div', null,
+    // ── ① 口径条 ────────────────────────────────────────────────────────
+    React.createElement('div', { style: s.card },
+      React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+        React.createElement('div', { className: 'dshc-row' },
+          React.createElement('div', { style: s.label }, '用量'),
+          React.createElement(Tag, { text: `窗口聚合 · 近 ${windowText}`, tone: 'info' }),
+          React.createElement(Tag, { text: '落盘 data/usage.json', tone: 'idle' }),
+        ),
+        React.createElement('div', { className: 'dshc-row' },
+          ...USAGE_WINDOWS.map((option) =>
+            React.createElement('button', {
+              key: option.value,
+              type: 'button',
+              onClick: () => onWindowChange(option.value),
+              style: {
+                ...s.btnGhost, height: 26, padding: '0 10px', fontSize: 12,
+                borderColor: usageWindow === option.value ? 'var(--dsw-alias-brand-primary,#4f6ef7)' : undefined,
+                color: usageWindow === option.value ? 'var(--dsw-alias-brand-primary,#4f6ef7)' : undefined,
+              },
+            }, option.label),
+          ),
+          React.createElement('button', {
+            type: 'button', style: { ...s.btnLink, padding: '0 4px' }, onClick: onRefresh, title: '刷新',
+          }, React.createElement(Icons.refresh, null)),
+        ),
+      ),
+      React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
+        usageData?.since ? `分桶数据起点 ${usageData.since} · ` : '',
+        '槽粒度：近 48 小时为小时槽，更早折叠为日槽（30 天）。',
+        '账本只统计经本网关的请求（旁路流量不在其中）。',
+        processesUptime
+          ? ` 另有「模型全景」为进程累计口径（已运行 ${processesUptime}，重启清零），两者不可混算。`
+          : ' 本网关未提供进程累计口径（/v1/stats）。',
+      ),
+    ),
+
+    // ── 分桶不可用时的降级：不冒充「加载失败」 ──────────────────────────
+    !bucketsAvailable
+      ? React.createElement('div', { style: s.card },
+          React.createElement('div', { style: s.warn },
+            usage?.reason ?? '网关未提供分桶端点，需在网关侧支持 GET /v1/stats/buckets。',
+          ),
+          React.createElement('div', { style: { ...s.muted, marginTop: 10, lineHeight: 1.7 } },
+            '下方「模型全景」使用进程累计端点，不依赖分桶，仍可用。',
+          ),
         )
       : null,
 
-    // 时序柱（渐变柱）
-    buckets.length === 0
-      ? React.createElement('div', { style: { ...s.muted, marginBottom: 12 } },
-          '该窗口内没有请求记录。发起一次对话后即可看到分桶。',
-        )
-      : React.createElement('div', { style: { marginBottom: 14 } },
-          React.createElement('div', { className: 'dshc-bars' },
-            ...buckets.slice(-48).map((bucket, index) =>
-              React.createElement('span', {
-                key: `${bucket.slot}-${bucket.uid}-${bucket.model}-${index}`,
-                className: bucket.failed > 0 ? 'bad' : '',
-                title: `${bucket.slot} · ${bucket.uid ? bucket.uid.slice(0, 8) : '全部账号'} · ${bucket.model || '全部模型'}\n请求 ${bucket.requests} · 失败 ${bucket.failed} · tokens ${bucket.total_tokens}`,
-                style: { height: Math.max(3, Math.round((bucket.requests / maxRequests) * 72)) },
+    // ── ② 英雄总量区 ────────────────────────────────────────────────────
+    bucketsAvailable
+      ? React.createElement('div', { style: s.card },
+          React.createElement(UsageHero, { total, rows, stock, windowValue: usageWindow }),
+          React.createElement('div', { style: { marginTop: 12 } },
+            React.createElement(UsageRings, {
+              rings: [
+                {
+                  value: (Number(total.requests) || 0) > 0
+                    ? ((Number(total.requests) - (Number(total.failed) || 0)) / Number(total.requests))
+                    : 0,
+                  label: '成功率',
+                  cls: 'ok',
+                  note: '窗口口径',
+                },
+                stats?.enabled === true
+                  ? { value: Number(stats.total?.cache_hit_rate) || 0, label: '缓存命中率', cls: 'brand', note: '进程累计口径' }
+                  : null,
+                stats?.enabled === true && (Number(stats.total?.requests) || 0) > 0
+                  ? {
+                      value: (Number(stats.total?.streaming) || 0) / Number(stats.total.requests),
+                      label: '流式请求占比',
+                      cls: 'warn',
+                      note: '进程累计口径',
+                    }
+                  : null,
+              ],
+            }),
+          ),
+          // Token 结构条（窗口口径：只有 prompt / completion 两段）
+          React.createElement('div', { style: { marginTop: 12 } },
+            React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+              React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, 'Token 结构（窗口合计）'),
+              React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
+                `prompt ${formatTokens(tokenStructure(total).prompt)} · completion ${formatTokens(tokenStructure(total).completion)} · 合计 ${formatTokens(tokenStructure(total).total)}`),
+            ),
+            React.createElement('div', { className: 'dshc-ustack', style: { marginTop: 6 } },
+              React.createElement('i', {
+                style: { width: `${(tokenStructure(total).promptShare * 100).toFixed(1)}%`, background: 'var(--dsw-alias-brand-primary,#4f6ef7)' },
+                title: `输入 prompt ${formatNumber(tokenStructure(total).prompt)}`,
+              }),
+              React.createElement('i', {
+                style: {
+                  width: `${(tokenStructure(total).completionShare * 100).toFixed(1)}%`,
+                  background: 'var(--dsw-alias-button-info-fill,#4176e6)',
+                  opacity: 0.55,
+                },
+                title: `输出 completion ${formatNumber(tokenStructure(total).completion)}`,
               }),
             ),
-          ),
-          React.createElement('div', { className: 'dshc-row', style: { marginTop: 6, justifyContent: 'space-between' } },
-            React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
-              `请求 ${formatNumber(usage.total?.requests ?? 0)} · 失败 ${formatNumber(usage.total?.failed ?? 0)} · tokens ${formatNumber(usage.total?.completion_tokens ?? 0)}`),
-          ),
-        ),
-
-    // 维度切换（单表）
-    React.createElement('div', { className: 'dshc-row', style: { marginBottom: 6 } },
-      ...Object.entries(dimMeta).map(([key, meta]) =>
-        segmentButton(key, meta.label, dim, setDim)),
-    ),
-    dimRows.length === 0
-      ? React.createElement('div', { style: s.muted }, '无数据')
-      : React.createElement(
-          'div',
-          { className: 'dshc-tblwrap' },
-          React.createElement('table', null,
-            React.createElement('thead', null,
-              React.createElement('tr', null,
-                ...dimMeta[dim].columns.map((h) => React.createElement('th', { key: h }, h)),
-              ),
+            React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.6 } },
+              '仅窗口口径 —— 分桶只有 prompt / completion 两段；缓存命中率属于进程累计口径，见上方环与「模型全景」，不并入此条。',
             ),
-            React.createElement('tbody', null,
-              ...dimRows.map((row) =>
-                React.createElement('tr', { key: row.key },
-                  React.createElement('td', null, row.key),
-                  React.createElement('td', null, formatNumber(row.requests ?? 0)),
-                  React.createElement('td', null, formatNumber(row.failed ?? 0)),
-                  React.createElement('td', {
-                    title: `Prompt ${formatNumber(row.prompt_tokens ?? 0)} · Completion ${formatNumber(row.completion_tokens ?? 0)}`,
-                  }, formatNumber(row.total_tokens ?? 0)),
-                  React.createElement('td', null, typeof row.credit === 'number' ? row.credit.toFixed(4) : '—'),
-                  React.createElement('td', null, `${(row.avg_latency_ms ?? 0).toFixed(0)} ms`),
+          ),
+        )
+      : null,
+
+    // ── ③ 主图（走势） ──────────────────────────────────────────────────
+    bucketsAvailable
+      ? React.createElement('div', { style: s.card },
+          React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+            React.createElement('div', { className: 'dshc-row' },
+              React.createElement('div', { style: s.label }, '走势'),
+              React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
+                `${rows.length} 个时间槽（按槽聚合，柱数 = 槽数）`),
+            ),
+            React.createElement('div', { className: 'dshc-row' },
+              ...USAGE_METRICS.map((item) => segmentButton(item.id, item.label, metric, setMetric)),
+            ),
+          ),
+          rows.length === 0
+            ? React.createElement('div', { style: { ...s.muted, marginTop: 10 } },
+                '该窗口内没有请求记录。发起一次对话后即可看到分桶。')
+            : React.createElement('div', { style: { marginTop: 10 } },
+                React.createElement(UsageAreaChart, { rows, metric }),
+              ),
+        )
+      : null,
+
+    // ── ④ 分析视图（切换式，避免图墙） ──────────────────────────────────
+    bucketsAvailable && rows.length > 0
+      ? React.createElement('div', { style: s.card },
+          React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between', marginBottom: 10 } },
+            React.createElement('div', { style: s.label }, '分析视图'),
+            React.createElement('div', { className: 'dshc-row' },
+              ...USAGE_VIEWS.map((item) => segmentButton(item.id, item.label, view, setView)),
+            ),
+          ),
+          view === 'combo'
+            ? React.createElement('div', null,
+                React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+                  React.createElement('span', { style: { ...s.muted, fontSize: 11 } },
+                    '柱 = 请求（失败占比 > 5% 转红）· 线 = 积分消耗'),
+                  React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, '双轴 · 左=请求 / 右=积分'),
                 ),
-              ),
+                React.createElement('div', { style: { marginTop: 10 } },
+                  React.createElement(UsageComboChart, { rows }),
+                ),
+              )
+            : null,
+          view === 'burn'
+            ? React.createElement('div', null,
+                React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow }),
+              )
+            : null,
+          view === 'stack'
+            ? React.createElement('div', null,
+                React.createElement('div', { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
+                  '每个槽的请求按模型拆分堆叠（全窗口累计结构）'),
+                React.createElement(UsageStackChart, { buckets }),
+              )
+            : null,
+          view === 'heat'
+            ? React.createElement('div', null,
+                React.createElement('div', { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
+                  '行 = 小时槽覆盖的日期 · 列 = 小时 · 深浅 = 请求量'),
+                React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
+                  React.createElement(UsageHeatmap, { rows }),
+                ),
+              )
+            : null,
+        )
+      : null,
+
+    // ── ⑤ 归因表 ────────────────────────────────────────────────────────
+    bucketsAvailable && dimRows.length > 0
+      ? React.createElement('div', { style: s.card },
+          React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between', marginBottom: 8 } },
+            React.createElement('div', { style: s.label }, '归因'),
+            React.createElement('div', { className: 'dshc-row' },
+              ...USAGE_DIMS.map((item) => segmentButton(item.id, item.label, dim, setDim,
+                item.id === 'uid' ? (usageData?.by_uid ?? []).length : undefined)),
             ),
           ),
-        ),
+          usageData?.degraded
+            ? React.createElement('div', { style: { ...s.warn, marginBottom: 8 } },
+                '⚠️ 分桶键已超出容量上限，网关已降级为「槽 × 域」两维 —— 按账号 / 按模型两个维度将不再细分。')
+            : null,
+          React.createElement(UsageTables, {
+            rows: dimRows, dim, total, accounts, channelOf,
+          }),
+          React.createElement('div', { style: { ...s.muted, fontSize: 11, marginTop: 8, lineHeight: 1.7 } },
+            '占比条 = 该行请求数占窗口总量的比例；点击「请求 / Tokens / 积分」表头可切换排序。',
+          ),
+        )
+      : null,
 
-    React.createElement('div', { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } }, usage.note ?? ''),
+    // ── ⑥ 模型全景（进程累计；分桶不可用时仍可用） ──────────────────────
+    React.createElement('div', { style: s.card },
+      React.createElement(CardHead, {
+        title: '模型全景',
+        extra: React.createElement('span', { className: 'dshc-row' },
+          React.createElement(Tag, { text: '进程累计 · 重启清零', tone: 'idle' }),
+          stats?.enabled === true && stats.since
+            ? React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, `起点 ${stats.since}`)
+            : null,
+        ),
+      }),
+      React.createElement(UsageModelPanel, { stats }),
+    ),
+
+    // ── 数据说明（如实呈现） ────────────────────────────────────────────
+    React.createElement('div', { style: { ...s.card, padding: '12px 16px' } },
+      React.createElement('div', { style: { ...s.muted, fontSize: 11, lineHeight: 1.8 } },
+        usageData?.note ?? '',
+        usageData?.note ? React.createElement('br', null) : null,
+        '「窗口聚合」与「进程累计」是两个独立口径，数值不可相加或相减：前者受窗口与落盘约束，后者重启清零。',
+      ),
+    ),
   );
 }
 
@@ -3243,6 +4236,10 @@ function ChanhubPanel({ rpcCall }) {
           usageWindow,
           onWindowChange: setUsageWindow,
           onRefresh: refresh,
+          // 存量与归因命名都复用账号池同源数据 —— 不新增任何网关请求
+          accounts: data?.status?.accounts ?? [],
+          channelOf,
+          creditsByUid,
         })
       : null,
     activeTab === 'logs'
