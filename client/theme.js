@@ -476,6 +476,23 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-uchans > div:last-child { border-right: 0; }
 .dshc-uchans .n { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 .dshc-uchans .c { font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+/* 构成明细行（占比条列表）：名称行 / 占有条 / 读数行 —— 三段纵排，
+   比 7 列表格更低密度，窄屏不横滑。 */
+.dshc-srow2 { padding: 7px 0; min-width: 0; }
+.dshc-srow2 + .dshc-srow2 { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
+.dshc-srow2-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.dshc-srow2-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--dsw-alias-label-primary,currentColor); font-size: 12.5px; }
+.dshc-srow2-bar { margin: 5px 0 4px; height: 6px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); overflow: hidden; }
+.dshc-srow2-bar > i { display: block; height: 100%; border-radius: 999px; opacity: .85; }
+.dshc-srow2-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; }
+/* 模型全景行（成本优先）：名称行 + 详情行 —— 两段一行，替代 9 列表格。 */
+.dshc-mrow2 { padding: 8px 0; min-width: 0; }
+.dshc-mrow2 + .dshc-mrow2 { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
+.dshc-mrow2-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dshc-mrow2-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace,Menlo,monospace; font-size: 12.5px; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-mrow-detail { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); font-variant-numeric: tabular-nums; }
+.dshc-more { font: inherit; cursor: pointer; border: none; background: none; color: var(--dsw-alias-brand-primary,#4f6ef7); font-size: 11.5px; padding: 6px 0 0; }
+.dshc-more:hover { text-decoration: underline; }
 /* 占比条 */
 .dshc-ushare { display: inline-block; height: 6px; border-radius: 999px; background: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .85; vertical-align: middle; }
 /* 时段热力 */

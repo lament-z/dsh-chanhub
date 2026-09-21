@@ -1939,9 +1939,14 @@ const USAGE_METRICS = [
 ];
 
 /** 分析视图定义（一次只画一个，避免图墙把页面拉到 2600px）。 */
-const USAGE_VIEWS = [
-  { id: 'models', label: '模型占比' },
-  { id: 'combo', label: '双轴' },
+const USAGE_AXES = [
+  { id: 'trend', label: '趋势' },
+  { id: 'compose', label: '构成' },
+];
+
+/** 趋势轴的子视图（一次只画一个）。双轴已删 —— 它是主图两指标的同屏版。 */
+const TREND_VIEWS = [
+  { id: 'area', label: '走势' },
   { id: 'burn', label: '燃尽投影' },
   { id: 'heat', label: '活跃热力' },
 ];
@@ -2202,72 +2207,6 @@ function UsageAreaChart({ rows, metric }) {
           tipY: Math.max(2, (PT + (1 - def.pick(row) / max) * innerH) * scale - 76),
         });
       }
-    },
-  });
-}
-
-/**
- * 柱（请求）+ 折线（积分）双轴图。
- *
- * @param props - `{rows}`。
- * @returns React 元素。
- */
-function UsageComboChart({ rows }) {
-  return React.createElement(UsageChart, {
-    deps: [rows.length],
-    render: (width) => {
-      const H = 160;
-      const PL = 46;
-      const PR = 46;
-      const PT = 12;
-      const PB = 22;
-      const innerW = Math.max(10, width - PL - PR);
-      const innerH = H - PT - PB;
-      const n = rows.length;
-      const maxR = niceMax(Math.max(1, ...rows.map((row) => row.requests)));
-      const maxC = niceMax(Math.max(1, ...rows.map((row) => row.credit)));
-      const x = (index) => PL + (n <= 1 ? innerW / 2 : (index / (n - 1)) * innerW);
-      const yR = (value) => PT + (1 - value / maxR) * innerH;
-      const yC = (value) => PT + (1 - value / maxC) * innerH;
-      const barW = Math.max(2, innerW / Math.max(1, n) - 2);
-
-      const bars = rows.map((row, index) => {
-        const bad = row.requests > 0 && row.failed / row.requests > 0.05;
-        const top = yR(row.requests);
-        return React.createElement('rect', {
-          key: `b${index}`,
-          className: `bar-main${bad ? ' bad' : ''}`,
-          x: (x(index) - barW / 2).toFixed(1),
-          y: top.toFixed(1),
-          width: barW.toFixed(1),
-          height: Math.max(0, PT + innerH - top).toFixed(1),
-        }, React.createElement('title', null, `${slotLabel(row.slot)} · ${formatNumber(row.requests)} 请求`));
-      });
-
-      const creditPoints = rows.map((row, index) => [x(index), yC(row.credit)]);
-      const step = Math.max(1, Math.ceil(n / 8));
-      const dots = rows.map((row, index) => (index % step === 0
-        ? React.createElement('circle', { key: `d${index}`, className: 'dot-credit', cx: x(index).toFixed(1), cy: yC(row.credit).toFixed(1), r: 2.6 })
-        : null));
-
-      const grid = [0, 0.5, 1].map((frac) => {
-        const gy = PT + innerH * frac;
-        return React.createElement('g', { key: `g${frac}` },
-          React.createElement('line', { className: 'grid', x1: PL, x2: width - PR, y1: gy, y2: gy }),
-          React.createElement('text', { className: 'axt', x: PL - 6, y: gy + 3.5, textAnchor: 'end' }, formatTokens(maxR * (1 - frac))),
-          React.createElement('text', { className: 'axt warn', x: width - PR + 6, y: gy + 3.5 }, formatCredit(maxC * (1 - frac))),
-        );
-      });
-
-      return React.createElement('svg', { viewBox: `0 0 ${width} ${H}`, width, height: H },
-        React.createElement(UsageDefs, { scope: 'dshcCombo' }),
-        ...grid,
-        ...bars,
-        React.createElement('path', { className: 'line-credit', d: usageLine(creditPoints) }),
-        ...dots,
-        React.createElement('text', { className: 'axt', x: PL, y: H - 6 }, slotLabel(rows[0].slot)),
-        React.createElement('text', { className: 'axt', x: width - PR, y: H - 6, textAnchor: 'end' }, slotLabel(rows[n - 1].slot)),
-      );
     },
   });
 }
@@ -2813,17 +2752,18 @@ function UsageHero({ total, stock, windowValue }) {
 }
 
 /**
- * 归因表（按账号 / 域 / 模型）。
+ * 构成明细列表（按账号 / 域 / 模型）—— 用「占比条 + 少量读数」代替表格。
  *
- * 账号维度会映射到昵称 + 渠道 + 域 —— 旧实现只显示 `uid.slice(0,8)`，
- * 运维必须自己回账号池对照才能认出是哪台号。
+ * 为什么不沿用表格：
+ *   - 表格 7 列在窄屏要横滑，且读者要逐个数字比大小；占比条是**长度**比较，
+ *     一眼可读（这正是「换一种表达」的目的）。
+ *   - 与 donut 同源同构（都按占比排布），两种视图不再长得完全不一样。
+ *   - 每行只留 3 个读数（请求 / 成功率 / 积分），其余进 title —— 降低信息密度。
  *
  * @param props - `{rows, dim, total, accounts, channelOf}`。
  * @returns React 元素。
  */
-function UsageTables({ rows, dim, total, accounts, channelOf }) {
-  const [sortKey, setSortKey] = React.useState('requests');
-
+function UsageShareList({ rows, dim, total, accounts, channelOf }) {
   const nameOf = React.useCallback((key) => {
     if (dim !== 'uid') return null;
     const account = (accounts ?? []).find((item) => item.uid === key);
@@ -2835,88 +2775,73 @@ function UsageTables({ rows, dim, total, accounts, channelOf }) {
     };
   }, [accounts, channelOf, dim]);
 
-  const withShare = React.useMemo(() => usageShares(rows, total), [rows, total]);
-  const sorted = React.useMemo(() => {
-    const list = [...withShare];
-    if (sortKey === 'credit') list.sort((a, b) => (Number(b.credit) || 0) - (Number(a.credit) || 0));
-    else if (sortKey === 'tokens') list.sort((a, b) => (Number(b.total_tokens) || 0) - (Number(a.total_tokens) || 0));
-    else list.sort((a, b) => (Number(b.requests) || 0) - (Number(a.requests) || 0));
-    return list;
-  }, [withShare, sortKey]);
-
-  const headers = [
-    { key: 'name', label: dim === 'uid' ? '账号' : dim === 'realm' ? '域' : '模型', sortable: false },
-    { key: 'share', label: '占比', sortable: false },
-    { key: 'requests', label: '请求', sortable: true },
-    { key: 'success', label: '成功率', sortable: false },
-    { key: 'tokens', label: 'Tokens', sortable: true },
-    { key: 'credit', label: '积分', sortable: true },
-    { key: 'latency', label: '平均延迟', sortable: false },
-  ];
-
-  const header = React.createElement('tr', null,
-    ...headers.map((item) => React.createElement('th', {
-      key: item.key,
-      style: item.sortable ? { cursor: 'pointer', userSelect: 'none' } : undefined,
-      title: item.sortable ? '点击切换排序' : undefined,
-      onClick: item.sortable
-        ? () => setSortKey((prev) => (prev === item.key ? 'requests' : item.key))
-        : undefined,
-    }, `${item.label}${sortKey === item.key && item.sortable ? ' ↓' : ''}`)),
+  const sorted = React.useMemo(
+    () => usageShares(rows, total).sort((a, b) => (Number(b.requests) || 0) - (Number(a.requests) || 0)),
+    [rows, total],
   );
+  if (sorted.length === 0) {
+    return React.createElement('div', { style: s.muted }, '该维度暂无数据');
+  }
+  const maxShare = Math.max(...sorted.map((row) => row.share), 0.0001);
 
-  const body = sorted.map((row, index) => {
-    const meta = nameOf(row.key);
-    const colorIndex = index % USAGE_SEG_COLORS.length;
-    return React.createElement('tr', { key: row.key ?? index },
-      React.createElement('td', null,
-        React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 } },
-          React.createElement('span', { className: 'dshc-dot', style: { background: USAGE_SEG_COLORS[colorIndex] } }),
-          React.createElement('span', null, meta ? meta.name : (row.key || '—')),
-          meta?.channel ? React.createElement(Tag, { text: meta.channel, tone: 'info' }) : null,
-          meta?.realm ? React.createElement(Tag, { text: meta.realm, tone: 'idle' }) : null,
+  return React.createElement('div', { style: { marginTop: 10 } },
+    ...sorted.map((row, index) => {
+      const meta = nameOf(row.key);
+      const color = USAGE_SEG_COLORS[index % USAGE_SEG_COLORS.length];
+      // 条长按「相对最大值」而不是绝对占比：占比都很小时（如 3 个账号各 33%）
+      // 绝对比例会让所有条一样长、失去比较意义。
+      const width = Math.max(2, Math.round((row.share / maxShare) * 100));
+      const label = meta ? meta.name : (row.key || '—');
+      return React.createElement('div', { key: row.key ?? index, className: 'dshc-srow2' },
+        React.createElement('div', { className: 'dshc-srow2-top' },
+          React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 } },
+            React.createElement('i', { style: { width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 } }),
+            React.createElement('span', {
+              className: 'dshc-srow2-name',
+              title: row.key,
+            }, label),
+            meta?.channel ? React.createElement(Tag, { text: meta.channel, tone: 'info' }) : null,
+            meta?.realm ? React.createElement(Tag, { text: meta.realm, tone: 'idle' }) : null,
+          ),
+          React.createElement('span', { style: { ...s.muted, fontSize: 10.5, flexShrink: 0 } },
+            formatPercent(row.share, 1)),
         ),
-      ),
-      React.createElement('td', null,
-        React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6 } },
+        React.createElement('div', { className: 'dshc-srow2-bar' },
+          React.createElement('i', { style: { width: `${width}%`, background: color } }),
+        ),
+        React.createElement('div', { className: 'dshc-srow2-meta' },
+          React.createElement('span', null, `${formatNumber(row.requests ?? 0)} 请求`),
           React.createElement('span', {
-            className: 'dshc-ushare',
-            style: { width: Math.max(3, Math.round(row.share * 90)) },
-          }),
-          React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, formatPercent(row.share, 1)),
+            style: row.successRate < 0.97 ? { color: tone.err.fg } : undefined,
+            title: `${formatNumber(row.failed ?? 0)} 次失败`,
+          }, formatPercent(row.successRate, 2)),
+          React.createElement('span', { style: { color: tone.ok.fg } }, `${formatCredit(Number(row.credit) || 0)} 积分`),
+          React.createElement('span', {
+            title: `输入 ${formatNumber(row.prompt_tokens ?? 0)} · 输出 ${formatNumber(row.completion_tokens ?? 0)} · 平均延迟 ${Math.round(Number(row.avg_latency_ms) || 0)} ms`,
+          }, formatTokens(Number(row.total_tokens) || 0)),
         ),
-      ),
-      React.createElement('td', null, formatNumber(row.requests ?? 0)),
-      React.createElement('td', {
-        style: row.successRate < 0.97 ? { color: tone.err.fg } : undefined,
-        title: `${formatNumber(row.failed ?? 0)} 次失败`,
-      }, formatPercent(row.successRate, 2)),
-      React.createElement('td', {
-        title: `输入 ${formatNumber(row.prompt_tokens ?? 0)} · 输出 ${formatNumber(row.completion_tokens ?? 0)}`,
-      }, formatTokens(Number(row.total_tokens) || 0)),
-      React.createElement('td', null, formatCredit(Number(row.credit) || 0)),
-      React.createElement('td', null, row.requests > 0 ? `${Math.round(Number(row.avg_latency_ms) || 0)} ms` : '—'),
-    );
-  });
-
-  return React.createElement('div', { className: 'dshc-tblwrap' },
-    React.createElement('table', null,
-      React.createElement('thead', null, header),
-      React.createElement('tbody', null, ...body),
-    ),
+      );
+    }),
   );
 }
 
 /**
- * 模型全景（`/v1/stats` 进程累计口径）。
+ * 模型全景（`/v1/stats` 进程累计口径）—— 成本优先的行式表达。
  *
- * 这一区在「网关缺分桶端点」时依然可用 —— 是本 Tab 的降级保底。
- * 口径必须在标题上写死：进程累计、重启清零。
+ * 为什么不再用 9 列表格：一屏 7 个模型 × 9 列 = 63 个数字，读者要在行列之间
+ * 来回扫才能拼出一句话。改成**每个模型一行两段**，并把「钱」放主位：
+ *   第一行：模型名 + 倍率（为什么贵）+ 请求数
+ *   第二行：积分/请求（花多少）· 缓存命中 · TTFB · 吞吐 · 失败 · 最近
+ * 这样每行都能独立读成一句「这个模型这次花了多少、为什么」。
+ *
+ * 这一区不依赖分桶端点，所以**旧网关缺 /v1/stats/buckets 时它仍可用**。
  *
  * @param props - `{stats}`。
  * @returns React 元素。
  */
 function UsageModelPanel({ stats }) {
+  const [showIdle, setShowIdle] = React.useState(false);
+
   if (!stats || stats.enabled !== true) {
     return React.createElement('div', { style: s.muted },
       '该网关未提供 /v1/stats（进程累计视图不可用）。窗口分桶数据不受影响。',
@@ -2924,50 +2849,86 @@ function UsageModelPanel({ stats }) {
   }
   const models = Array.isArray(stats.models) ? stats.models : [];
   const total = stats.total ?? {};
-  const rows = [
-    { label: '合计', row: total, isTotal: true },
-    ...models.map((model) => ({ label: model.model, row: model, isTotal: false })),
-  ];
 
-  return React.createElement('div', { className: 'dshc-tblwrap' },
-    React.createElement('table', null,
-      React.createElement('thead', null,
-        React.createElement('tr', null,
-          ...['模型', '请求', '失败', '吞吐', 'TTFB', '缓存命中', '积分/请求', '倍率', '最近'].map((label) =>
-            React.createElement('th', { key: label }, label)),
+  // 按积分消耗降序 —— 这一区的主题是「钱花在哪」，不是「谁请求多」。
+  // 没有消耗观测（积分/请求 = 0）的排在后面，并用「展开无消耗模型」收起。
+  const decorated = models.map((model) => ({
+    model,
+    spend: (Number(model.credit_per_req) || 0) * (Number(model.requests) || 0),
+    requests: Number(model.requests) || 0,
+  }));
+  const active = decorated.filter((item) => item.requests > 0).sort((a, b) => b.spend - a.spend);
+  const idle = decorated.filter((item) => item.requests === 0);
+  const visible = showIdle ? [...active, ...idle] : active;
+
+  const ratio = (value, digits = 0) => (typeof value === 'number' && value > 0 ? formatPercent(value, digits) : '—');
+  const ms = (value) => (typeof value === 'number' && value > 0 ? `${Math.round(value)} ms` : '—');
+  const tps = (value) => (typeof value === 'number' && value > 0 ? `${value.toFixed(1)} tok/s` : '—');
+
+  const detail = (model) =>
+    React.createElement('div', { className: 'dshc-mrow-detail' },
+      React.createElement('span', { style: { color: tone.ok.fg } },
+        `${formatCredit(Number(model.credit_per_req) || 0)} / 请求`),
+      React.createElement('span', { title: '前缀缓存命中率：命中 /（命中 + 未命中）' },
+        `缓存 ${ratio(model.cache_hit_rate)}`),
+      React.createElement('span', { title: '首字延迟（无观测显示 —）' }, `TTFB ${ms(model.avg_ttfb_ms)}`),
+      React.createElement('span', { title: '生成吞吐' }, tps(model.tokens_per_sec)),
+      Number(model.failed) > 0
+        ? React.createElement('span', { style: { color: tone.err.fg } }, `失败 ${formatNumber(model.failed)}`)
+        : null,
+      model.last_seen ? React.createElement('span', null, relativeTime(model.last_seen)) : null,
+    );
+
+  if (visible.length === 0 && models.length === 0) {
+    return React.createElement('div', null,
+      React.createElement(UsageRatioStrip, {
+        items: [
+          { label: '缓存命中率', value: ratio(total.cache_hit_rate), scope: '进程累计', title: '来自 /v1/stats（重启清零）' },
+          { label: '平均延迟', value: ms(total.avg_latency_ms), scope: '进程累计', title: '来自 /v1/stats（重启清零）' },
+        ],
+      }),
+      React.createElement('div', { style: { ...s.muted, marginTop: 10 } },
+        `这一程还没有模型请求记录（合计 ${formatNumber(Number(total.requests) || 0)} 次）—— 发起对话后逐模型列出。`),
+    );
+  }
+
+  return React.createElement('div', null,
+    // 合计口径的比率（与下方逐模型同源）
+    React.createElement(UsageRatioStrip, {
+      items: [
+        { label: '缓存命中率', value: ratio(total.cache_hit_rate), scope: '合计 · 进程累计',
+          title: '命中 /（命中 + 未命中），来自 /v1/stats（重启清零）' },
+        (Number(total.requests) || 0) > 0
+          ? { label: '流式占比', value: ratio((Number(total.streaming) || 0) / Number(total.requests)), scope: '合计 · 进程累计',
+              title: '流式请求 / 总请求，来自 /v1/stats（重启清零）' }
+          : null,
+        { label: '平均延迟', value: ms(total.avg_latency_ms), scope: '合计 · 进程累计',
+          title: '端到端耗时均值，来自 /v1/stats（重启清零）' },
+      ],
+    }),
+
+    React.createElement('div', { style: { marginTop: 10 } },
+      ...visible.map(({ model }) =>
+        React.createElement('div', { key: model.model, className: 'dshc-mrow2' },
+          React.createElement('div', { className: 'dshc-mrow2-top' },
+            React.createElement('span', { className: 'dshc-mrow2-name', title: model.model }, model.model),
+            // 倍率取上游原文；缺失显示 —（绝不显示 x0.00 —— 缺失 ≠ 免费）
+            model.credits
+              ? React.createElement(Tag, { text: model.credits, tone: 'idle' })
+              : React.createElement('span', { style: { ...s.muted, fontSize: 10.5 }, title: '上游未下发该模型倍率（缺失 ≠ 免费）' }, '倍率 —'),
+            React.createElement('span', { style: { ...s.muted, fontSize: 10.5, flexShrink: 0 } },
+              `${formatNumber(Number(model.requests) || 0)} 请求`),
+          ),
+          detail(model),
         ),
       ),
-      React.createElement('tbody', null,
-        ...rows.map(({ label, row, isTotal }) => {
-          const requests = Number(row.requests) || 0;
-          const hitRate = typeof row.cache_hit_rate === 'number' ? row.cache_hit_rate : null;
-          return React.createElement('tr', {
-            key: label,
-            style: isTotal ? { fontWeight: 600 } : undefined,
-          },
-            React.createElement('td', { style: { ...s.code, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' } },
-              label),
-            React.createElement('td', null, formatNumber(requests)),
-            React.createElement('td', null, formatNumber(Number(row.failed) || 0)),
-            React.createElement('td', null,
-              typeof row.tokens_per_sec === 'number' && row.tokens_per_sec > 0
-                ? `${row.tokens_per_sec.toFixed(1)} tok/s`
-                : '—'),
-            React.createElement('td', null,
-              typeof row.avg_ttfb_ms === 'number' && row.avg_ttfb_ms > 0
-                ? `${Math.round(row.avg_ttfb_ms)} ms`
-                : '—'),
-            React.createElement('td', null, hitRate === null ? '—' : formatPercent(hitRate, 0)),
-            React.createElement('td', null, formatCredit(Number(row.credit_per_req) || 0)),
-            // 倍率取上游原文；缺失显示 —（绝不显示 x0.00 —— 缺失 ≠ 免费）
-            React.createElement('td', null, row.credits
-              ? React.createElement(Tag, { text: row.credits, tone: 'idle' })
-              : React.createElement('span', { style: s.muted }, '—')),
-            React.createElement('td', { style: s.muted },
-              row.last_seen ? relativeTime(row.last_seen) : '—'),
-          );
-        }),
-      ),
+      idle.length > 0
+        ? React.createElement('button', {
+            type: 'button',
+            className: 'dshc-more',
+            onClick: () => setShowIdle((prev) => !prev),
+          }, showIdle ? `收起无消耗模型（${idle.length}）` : `展开无消耗模型（${idle.length}）`)
+        : null,
     ),
   );
 }
@@ -2995,10 +2956,8 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
 
   const [metric, setMetric] = React.useState('requests');
   const [dim, setDim] = React.useState('uid');
-  const [view, setView] = React.useState('models');
-  // 分析视图是「探索型」控件：默认收起成一个标签，点开才展开四个选项。
-  // 页面上先看到的是数据，而不是一排等我点它的按钮（P3）。
-  const [viewOpen, setViewOpen] = React.useState(false);
+  const [axis, setAxis] = React.useState('trend');
+  const [view, setView] = React.useState('area');
 
   const total = usageData?.total ?? {};
   const windowText = USAGE_WINDOWS.find((item) => item.value === usageWindow)?.label ?? usageWindow;
@@ -3081,85 +3040,73 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         )
       : null,
 
-    // ── ④ 分析视图（切换式，避免图墙） ──────────────────────────────────
+    // ── ④+⑤ 分析（两轴：趋势 / 构成） ──────────────────────────────────
+    // 合并原「分析视图」与「归因表」。为什么两组：切换器里原来把「随时间变化」
+    // 与「什么占比」混在一起（4 个选项里 3 个是时间轴），读者切换时没有可依的
+    // 心理模型。现在按正交维度分组：
+    //   趋势 = 怎么变（走势 / 燃尽投影 / 活跃热力）
+    //   构成 = 是什么（模型 / 账号 / 域，用占比条列表）
+    // 另：删掉原「双轴」—— 它只是主图两个指标的同屏版，功能重叠。
     bucketsAvailable && rows.length > 0
       ? React.createElement('div', { style: s.card },
+          // 第一级：趋势 / 构成
           React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between', marginBottom: 10 } },
-            React.createElement('button', {
-              type: 'button',
-              className: 'dshc-viewpick',
-              'aria-expanded': viewOpen,
-              title: viewOpen ? '收起视图选择' : '切换分析视图',
-              onClick: () => setViewOpen((prev) => !prev),
-            },
-              React.createElement('span', { style: s.label }, '分析视图'),
-              React.createElement('span', { className: 'dshc-viewpick-cur' },
-                USAGE_VIEWS.find((item) => item.id === view)?.label ?? ''),
-              React.createElement('span', { className: 'dshc-viewpick-caret' }, viewOpen ? '▴' : '▾'),
+            React.createElement('div', { className: 'dshc-seg', 'data-seg': 'axis' },
+              ...[['trend', '趋势'], ['compose', '构成']].map(([id, label]) =>
+                React.createElement('button', {
+                  key: id,
+                  type: 'button',
+                  className: axis === id ? 'on' : '',
+                  onClick: () => setAxis(id),
+                }, label),
+              ),
             ),
-            viewOpen
+            // 第二级：随第一级变化的子选项
+            axis === 'trend'
               ? React.createElement('div', { className: 'dshc-seg', 'data-seg': 'views' },
-                  ...USAGE_VIEWS.map((item) =>
+                  ...TREND_VIEWS.map((item) =>
                     React.createElement('button', {
                       key: item.id,
                       type: 'button',
                       className: view === item.id ? 'on' : '',
-                      onClick: () => { setView(item.id); setViewOpen(false); },
+                      onClick: () => setView(item.id),
                     }, item.label),
                   ),
                 )
-              : null,
+              : React.createElement('div', { className: 'dshc-seg', 'data-seg': 'dims' },
+                  ...USAGE_DIMS.map((item) =>
+                    React.createElement('button', {
+                      key: item.id,
+                      type: 'button',
+                      className: dim === item.id ? 'on' : '',
+                      onClick: () => setDim(item.id),
+                    }, item.label),
+                  ),
+                ),
           ),
-          view === 'combo'
-            ? React.createElement('div', null,
-                React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, '柱 = 请求 · 线 = 积分'),
-                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, '左 / 右双轴'),
-                ),
-                React.createElement('div', { style: { marginTop: 10 } },
-                  React.createElement(UsageComboChart, { rows }),
-                ),
-              )
-            : null,
-          view === 'burn'
-            ? React.createElement('div', null,
-                React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow }),
-              )
-            : null,
-          view === 'models'
-            ? React.createElement(UsageModelDonut, { rows: usageData?.by_model ?? [] })
-            : null,
-          view === 'heat'
-            ? React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
-                React.createElement(UsageHeatmap, { rows }),
-              )
-            : null,
-        )
-      : null,
 
-    // ── ⑤ 归因表 ────────────────────────────────────────────────────────
-    bucketsAvailable && dimRows.length > 0
-      ? React.createElement('div', { style: s.card },
-          React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between', marginBottom: 8 } },
-            React.createElement('div', { style: s.label }, '归因'),
-            React.createElement('div', { className: 'dshc-seg', 'data-seg': 'dims' },
-              ...USAGE_DIMS.map((item) =>
-                React.createElement('button', {
-                  key: item.id,
-                  type: 'button',
-                  className: dim === item.id ? 'on' : '',
-                  onClick: () => setDim(item.id),
-                }, item.label),
-              ),
-            ),
-          ),
           usageData?.degraded
             ? React.createElement('div', { style: { ...s.warn, marginBottom: 8 } },
                 '⚠️ 分桶键已超出容量上限，网关已降级为「槽 × 域」两维 —— 按账号 / 按模型两个维度将不再细分。')
             : null,
-          React.createElement(UsageTables, {
-            rows: dimRows, dim, total, accounts, channelOf,
-          }),
+
+          axis === 'trend'
+            ? React.createElement('div', null,
+                view === 'burn'
+                  ? React.createElement(UsageBurnChart, { rows, stock, windowValue: usageWindow })
+                  : null,
+                view === 'heat'
+                  ? React.createElement('div', { style: { overflowX: 'auto', minWidth: 0 } },
+                      React.createElement(UsageHeatmap, { rows }),
+                    )
+                  : null,
+                view === 'area'
+                  ? React.createElement(UsageAreaChart, { rows, metric })
+                  : null,
+              )
+            : React.createElement(UsageShareList, {
+                rows: dimRows, dim, total, accounts, channelOf,
+              }),
         )
       : null,
 
