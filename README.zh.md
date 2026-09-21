@@ -129,8 +129,14 @@ if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
 - **持久化计数已透出** —— `credits_expiring` / `session_dead_fails` / `retry_count`
   此前已落 `state.json` 但面板不可见，现经 `/status` 透出
 - **配置写入支持热生效** —— `POST /admin/config` 与启动同一套 `normalize()` 校验、
-  原子写，可热改字段（`pool.*` / `schedule.*` / `prompt.mode` / `api_key` 等）
-  就地生效；需重启字段在响应里明确列出
+  写盘（`tmp`+rename；`config.json` 是单文件挂载时挂载点无法被 rename 覆盖，
+  退化为原地写），可热改字段（`pool.*` / `schedule.*` / `prompt.mode` /
+  `cooldown.soft_rate` / `features.sanitize_*` / `api_key`）就地生效；需重启字段在
+  响应里明确列出。面板的逐字段「↻ 需重启」角标以**网关热改面**为准，
+  `lib/config-spec.js` 与该清单同步维护
+- **降级不静默** —— 热生效端点不可用（典型：`config.json` 以 `:ro` 挂载）时，
+  面板照旧写宿主上的文件，但会**点名失败原因**、把全部改动标成需重启，
+  并列出「端点修复后本可即时生效」的字段
 - **模型实测上限** —— `scripts/probe_max_tokens.py`（手动执行，耗额度）写
   `data/model_probes.json`；`GET /v1/models/probes` 只读透出。网关绝不自动探测
 - **新增账号** —— `POST /panel/api/login/start` + `GET /panel/api/login/poll?channel=workbuddy`，
@@ -148,7 +154,9 @@ if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
   （旧的 chanhub 网关只支持 traework/qoder）。不满足时面板隐藏入口，其余功能不受影响。
 - 读写网关 `config.json` 要求**插件宿主与网关同机**（账号渠道已由 `/status`
   原生透出，不再依赖同机读取凭证文件）。
-  容器部署若挂载 `./config.json:/app/config.json:ro` 则为只读 —— 需去掉 `:ro` 才能编辑。
+  容器部署若挂载 `./config.json:/app/config.json:ro` 则为只读 —— 必须去掉 `:ro`：
+  否则网关的热生效端点在每次保存时回 `500`（挂载点无法被 rename 覆盖），面板只能
+  降级为宿主文件直写，结果就是「保存成功但仍要手动重启网关」。
 
 ## 配置项（settings 命名空间 `dsh-chanhub`）
 

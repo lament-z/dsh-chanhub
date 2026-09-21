@@ -83,13 +83,22 @@ test('A4 危险语义的四个「0」在表里被显式标注（配错不生效�
   }
 });
 
-test('A5 pool.* 标为可热改，其余标为需重启（与实际 setter 情况一致）', () => {
+test('A5 restart 标记与网关真实热改面一致（drift 会让人误判要不要重启）', () => {
   const byPath = new Map(CONFIG_FIELDS.map((field) => [field.path, field]));
+  // 热改面（internal/server/admin_config.go dispatchHotApply）
   assert.equal(byPath.get('pool.max_in_flight').restart, false, 'pool 有 setter，可热改');
   assert.equal(byPath.get('cooldown.soft_rate').restart, false);
-  assert.equal(byPath.get('schedule.checkin_hours').restart, true, 'chanhub 无 scheduler.Reconfigure');
+  assert.equal(byPath.get('schedule.checkin_hours').restart, false, 'scheduler.Reconfigure 已接线');
+  assert.equal(byPath.get('schedule.checkin_enabled').restart, false);
+  assert.equal(byPath.get('prompt.mode').restart, false, 'prompt.mode 走逐请求读取面');
+  assert.equal(byPath.get('api_key').restart, false);
+  assert.equal(byPath.get('features.sanitize_blacklist_fingerprints').restart, false);
+  // 不可热改：装配期捕获 / 无 setter
+  assert.equal(byPath.get('pool.expiring_soon').restart, true, '网关没有 expiring_soon 的 setter');
+  assert.equal(byPath.get('cooldown.soft_rate_max').restart, true);
   assert.equal(byPath.get('listen').restart, true, '装配期捕获');
   assert.equal(byPath.get('admin.enabled').restart, true);
+  assert.equal(byPath.get('upstream.timeout_seconds').restart, true);
 });
 
 test('A6 coerceField 逐类型行为', () => {
@@ -139,7 +148,10 @@ test('A8 validatePatch 拒绝未知项，并产出需重启清单', () => {
   assert.equal(good.ok, true);
   assert.deepEqual(good.values['pool.max_in_flight'], 5);
   assert.deepEqual(good.values['schedule.checkin_hours'], [9, 21]);
-  assert.deepEqual(good.restartRequired, ['schedule.checkin_hours'], 'pool 可热改，schedule 需重启');
+  assert.deepEqual(good.restartRequired, [], 'pool 与 schedule 都在热改面上');
+
+  const mixed = validatePatch({ 'pool.max_in_flight': '5', 'listen': ':7866' });
+  assert.deepEqual(mixed.restartRequired, ['listen'], '装配期字段仍需重启');
 });
 
 test('A9 getPath / setPath 点分路径', () => {
@@ -196,8 +208,12 @@ test('B2 写入是原子的，且只改 patch 涉及的路径（未知字段原�
   const written = await writeGatewayConfig({ gatewayConfigPath: path }, {}, { 'pool.max_in_flight': 7 });
   assert.equal(written.ok, true);
   assert.deepEqual(written.applied, [{ path: 'pool.max_in_flight', before: 3, after: 7 }]);
-  assert.deepEqual(written.hotApplicable, ['pool.max_in_flight'], 'pool 项应归入可热改');
-  assert.equal(written.restartRequiredCount, 0);
+  // 降级路径（文件直写）一次都热改不了：写盘成功 ≠ 生效，全部如实标需重启。
+  assert.equal(written.viaGateway, false);
+  assert.deepEqual(written.hotApplicable, [], '文件直写没有热应用');
+  assert.deepEqual(written.restartRequired, ['pool.max_in_flight']);
+  assert.equal(written.restartRequiredCount, 1);
+  assert.deepEqual(written.hotCapable, ['pool.max_in_flight'], '端点可用时本可热改（修复方向）');
 
   const onDisk = JSON.parse(await readFile(path, 'utf8'));
   assert.equal(onDisk.pool.max_in_flight, 7);
@@ -293,6 +309,31 @@ test('B8 空 patch 与非法 patch 被拒绝', async (t) => {
   assert.equal((await writeGatewayConfig({ gatewayConfigPath: path }, {}, {})).code, 'bad-request');
   assert.equal((await writeGatewayConfig({ gatewayConfigPath: path }, {}, null)).code, 'bad-request');
   assert.equal((await writeGatewayConfig({ gatewayConfigPath: path }, {}, [])).code, 'bad-request');
+});
+
+test('B9 降级直写如实汇报：全部需重启 + 带上网关失败原因 + hotCapable 修复方向', async (t) => {
+  const { dir, path } = await tempConfig({ pool: { max_in_flight: 3 }, schedule: { checkin_hours: [9, 21] } });
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  const written = await writeGatewayConfig(
+    { gatewayConfigPath: path },
+    {},
+    { 'pool.max_in_flight': 5, 'schedule.checkin_hours': [5] },
+    { gatewayError: { code: 'internal', message: '网关拒绝请求（HTTP 500）：rename config: device or resource busy' } },
+  );
+  assert.equal(written.ok, true);
+  assert.equal(written.viaGateway, false);
+  // 两个字段在网关热改面上，但降级路径没通知网关 → 全部需重启，不能谎报「即时生效」。
+  assert.deepEqual(written.hotApplicable, []);
+  assert.equal(written.restartRequiredCount, 2);
+  assert.deepEqual(written.hotCapable, ['pool.max_in_flight', 'schedule.checkin_hours']);
+  assert.match(written.gatewayError.message, /device or resource busy/, '必须透出网关失败原因');
+  assert.match(written.note, /热生效端点不可用/, 'note 要说清为什么全都需重启');
+  assert.match(written.note, /device or resource busy/);
+  // 写盘本身成功（文件确实改了）。
+  const onDisk = JSON.parse(await readFile(path, 'utf8'));
+  assert.equal(onDisk.pool.max_in_flight, 5);
+  assert.deepEqual(onDisk.schedule.checkin_hours, [5]);
 });
 
 // ---------------------------------------------------------------------------

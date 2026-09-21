@@ -1,5 +1,57 @@
 # Changelog
 
+### 修复：配置「热生效」在真机上从未成功过 —— 单文件 `:ro` 挂载让网关写盘恒 500
+
+用户反馈：保存配置后仍要手动重启网关，怀疑热生效压根没接。**热生效是接了的**
+（`414e646` 起优先走网关 `POST /admin/config`），但你那套部署下这条通道 100% 失败：
+
+- `chanhub/docker-compose.yml` 挂的是 `./config.json:/app/config.json:ro`。单文件
+  bind mount 的挂载点在容器内**无法被 `rename(2)` 覆盖**，实测：
+
+  ```
+  POST /admin/config → HTTP 500 {"code":"internal",
+    "message":"rename config: rename /app/config.json.admin.tmp /app/config.json: device or resource busy"}
+  容器内 `mv` 覆盖挂载点 → Resource busy；直写 → Read-only file system
+  ```
+
+- 插件的 `saveConfigViaGateway` 只把 404/501/admin-disabled 当「降级」，500 直接
+  rethrow → 落到宿主文件直写（`writeGatewayConfig`）→ 返回 `restartRequiredCount`，
+  面板 toast 只剩「已写入 N 项 · N 项需重启网关生效」。**改动确实落盘了，只是网关
+  一次都没被通知**（chanhub 无 fsnotify / 无 SIGHUP），于是每次都得手动重启。
+
+三处一起修：
+
+**网关（`chanhub` 仓）**
+- `internal/server/admin_config.go`：新增 `writeConfigFile()` —— `tmp`+rename 因
+  `EBUSY`/`EXDEV` 失败时退化为「先留 `.bak`、再原地截断写」，并把失败原因写进
+  500 文案（点名「容器部署请去掉 `:ro`」）。`renameFile` 做成可注入变量，
+  单测用 `syscall.EBUSY` 复现挂载点场景。
+- `internal/server/admin_config_merge.go`：合并结果改 `MarshalIndent`（此前
+  `json.Marshal` 会把 config.json 压成一整行）。
+- 真机验证（同一台 Docker Desktop）：单文件挂载上 `rename` 必 EBUSY，而
+  rw 挂载的原地写成功并落到宿主文件 —— 所以「去掉 `:ro` + 原地写回退」才能救活。
+- 测试：`TestAdminConfigFallsBackOnBusyRename`、`TestAdminConfigWriteIsIndented`
+  两例新增；`go test ./internal/server/ -run TestAdminConfig` 11 例全绿
+  （该包另有 5 例 model/stats 用例在 HEAD 上就红，与本改动无关，已用 worktree 对照确认）。
+
+**部署（`chanhub/docker-compose.yml`）**
+- `./config.json:/app/config.json:ro` → `./config.json:/app/config.json`，并在注释里
+  写明「不要加回 `:ro`」的原因（否则热生效端点只会 500）。
+
+**插件**
+- `lib/config-spec.js`：`restart` 标记与网关 `dispatchHotApply` 对齐 ——
+  修掉四处 drift：`schedule.*`（13 项，`scheduler.Reconfigure` 早已接线却仍标需重启）、
+  `prompt.mode`（走逐请求读取面）由「需重启」改为热改；`pool.expiring_soon`、
+  `cooldown.soft_rate_max`（网关没有 setter / 只有基数热改）由「热改」改回需重启。
+- `lib/gateway-config.js`：降级路径不再借用 spec 的热改标记 —— 文件直写**全部**
+  字段标需重启，新增 `viaGateway:false` / `hotCapable` / `gatewayError`，note 说清
+  「写盘成功 ≠ 生效」。
+- `lib/index.js` + `client/index.js`：把网关失败原因透传到返回值与 toast
+  （「⚠ 网关热生效端点不可用（…）· 修复后这 N 项可即时生效」），不再让用户把
+  「N 项需重启」误读成「热生效没接」。
+- 测试：`config-and-auths.test.mjs` 的 A5/A8/B2 按新语义重写，新增 B9（降级如实汇报）；
+  全量 185 例：164 通过 / 0 失败 / 21 跳过。
+
 ### 修复：点「↻ 重启网关」报 `/bin/sh: docker: command not found`
 
 真机现场：Docker.app 装着、`chanhub2api-chanhub2api` 容器跑得好好的，点重启却报

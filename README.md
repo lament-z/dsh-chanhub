@@ -65,9 +65,18 @@ mismatch). The panel renders each area according to what it actually detects.
   `retry_count` are exposed through `/status` (they were persisted in
   `state.json` but invisible to the panel).
 - **Config writes hot-apply** — `POST /admin/config` validates with the same
-  `normalize()` semantics as startup, writes atomically, and applies eligible
-  fields (`pool.*`, `schedule.*`, `prompt.mode`, `api_key`, …) in-place;
-  restart-required fields are listed explicitly in the response.
+  `normalize()` semantics as startup, writes atomically (`tmp` + rename, with an
+  in-place fallback when `config.json` is a single-file bind mount, where rename
+  onto the mount point returns `EBUSY`), and applies eligible
+  fields (`pool.*`, `schedule.*`, `prompt.mode`, `cooldown.soft_rate`,
+  `features.sanitize_*`, `api_key`) in-place; restart-required fields are listed
+  explicitly in the response. The panel's per-field "↻ needs restart" badges mirror
+  that same list — `lib/config-spec.js` is kept in sync with the gateway's
+  `dispatchHotApply`.
+- **Fallback is never silent** — when the hot-apply endpoint is unusable
+  (e.g. `config.json` mounted `:ro`), the panel still writes the file on the host,
+  but reports *why* hot-apply failed, marks every changed field as
+  restart-required, and names the fields that would apply instantly once fixed.
 - **Model measured limits** — `scripts/probe_max_tokens.py` (manual, costs quota)
   writes `data/model_probes.json`; `GET /v1/models/probes` surfaces it read-only.
   The gateway never probes automatically.
@@ -81,7 +90,9 @@ See `.scratch/chanhub-panel/execution-report.md` for the evidence.
 - The plugin host must be able to reach the gateway (default `http://127.0.0.1:7866`).
 - Reading and writing the gateway `config.json` requires the plugin host and the
   gateway to be on the same machine. Container deployments that mount
-  `./config.json:/app/config.json:ro` are read-only — remove `:ro` to allow edits.
+  `./config.json:/app/config.json:ro` are read-only — remove `:ro` to allow edits,
+  otherwise the gateway's hot-apply endpoint answers `500` on every save and the
+  panel must fall back to a host-side file write (everything then needs a restart).
   (Account channels come from `/status` natively; no same-machine credential reading
   is needed for that anymore.)
 
