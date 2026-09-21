@@ -1176,23 +1176,27 @@ function quartileThresholds(values) {
 function heatLevel(value, thresholds) {
   const v = Number(value) || 0;
   if (v <= 0) return 0;
-  const [q1, q2, q3] = thresholds;
+  const [q1, q2, q3, q4] = thresholds;
+  if (q1 === q4) return v >= q4 ? 4 : 1;
   if (v <= q1) return 1;
   if (v <= q2) return 2;
   if (v <= q3) return 3;
   return 4;
 }
-function heatGrid(days) {
+function heatGrid(days, options = {}) {
+  const windowDays = Math.max(1, Number(options.windowDays) || 30);
   const list = (Array.isArray(days) ? days : []).filter((d) => d && typeof d.date === "string");
-  if (list.length === 0) return { weeks: 0, cells: [], monthLabels: [], max: 0 };
   const byDate = new Map(list.map((d) => [d.date, d]));
-  const parsed = list.map((d) => /* @__PURE__ */ new Date(`${d.date}T00:00:00`));
-  const first = parsed[0];
-  const last = parsed[parsed.length - 1];
+  const end = options.end instanceof Date ? new Date(options.end) : /* @__PURE__ */ new Date();
+  end.setHours(0, 0, 0, 0);
+  const first = new Date(end.getTime() - (windowDays - 1) * 864e5);
   const lead = (first.getDay() + 6) % 7;
-  const totalDays = lead + Math.round((last - first) / 864e5) + 1;
-  const weeks = Math.ceil(totalDays / 7);
-  const nonzero = list.filter((d) => d.requests > 0).map((d) => d.requests);
+  const weeks = Math.ceil((lead + windowDays) / 7);
+  const inWindow = list.filter((d) => {
+    const at = (/* @__PURE__ */ new Date(`${d.date}T00:00:00`)).getTime();
+    return at >= first.getTime() && at <= end.getTime();
+  });
+  const nonzero = inWindow.filter((d) => d.requests > 0).map((d) => d.requests);
   const thresholds = quartileThresholds(nonzero);
   const cells = [];
   const monthLabels = [];
@@ -1205,16 +1209,42 @@ function heatGrid(days) {
     for (let r = 0; r < 7; r++) {
       const cur = new Date(monday.getTime() + r * 864e5);
       const key = localDayKey(cur);
+      const beforeWindow = cur.getTime() < first.getTime();
+      const afterWindow = cur.getTime() > end.getTime();
       const rec = byDate.get(key);
-      cells.push(rec ? { date: key, value: rec.requests, level: heatLevel(rec.requests, thresholds), blank: false, week: w } : { date: key, value: 0, level: 0, blank: true, week: w });
+      cells.push(
+        beforeWindow || afterWindow ? { date: key, value: 0, level: 0, blank: true, outside: true, week: w } : {
+          date: key,
+          value: rec ? rec.requests : 0,
+          level: rec ? heatLevel(rec.requests, thresholds) : 0,
+          blank: false,
+          outside: false,
+          week: w
+        }
+      );
     }
   }
   return {
     weeks,
     cells,
     monthLabels,
-    max: nonzero.length > 0 ? Math.max(...nonzero) : 0
+    max: nonzero.length > 0 ? Math.max(...nonzero) : 0,
+    activeDays: nonzero.length,
+    coveredDays: inWindow.length,
+    windowDays
   };
+}
+function hourlyProfile(rows) {
+  const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, requests: 0, tokens: 0, slots: 0 }));
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const at = Number(row?.at);
+    if (!Number.isFinite(at)) continue;
+    const bucket = buckets[new Date(at).getHours()];
+    bucket.requests += Number(row.requests) || 0;
+    bucket.tokens += Number(row.tokens) || 0;
+    bucket.slots += 1;
+  }
+  return buckets;
 }
 function modelShares(rows, limit = 5) {
   const list = (Array.isArray(rows) ? rows : []).map((row) => ({ key: row?.key || "\u2014", tokens: Number(row?.total_tokens) || 0 })).filter((row) => row.tokens > 0).sort((a, b) => b.tokens - a.tokens);
@@ -3728,26 +3758,21 @@ function UsageBurnChart({ rows, stock, windowValue }) {
     )
   );
 }
+var HEAT_WINDOW_DAYS = 30;
 function UsageHeatmap({ rows }) {
   const days = React.useMemo(() => usageByDay(rows), [rows]);
-  const grid = React.useMemo(() => heatGrid(days), [days]);
-  if (grid.weeks === 0 || grid.max === 0) {
-    return React.createElement(
-      "div",
-      { style: s.muted },
-      "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u53EF\u7EDF\u8BA1\u7684\u7528\u91CF"
-    );
-  }
+  const grid = React.useMemo(() => heatGrid(days, { windowDays: HEAT_WINDOW_DAYS }), [days]);
+  const hours = React.useMemo(() => hourlyProfile(rows), [rows]);
   const weekdayLabels = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D", "\u65E5"];
-  const hoursCount = days.filter((day) => day.hours > 0).length;
-  const daysCount = days.filter((day) => day.days > 0).length;
+  const hasDayData = grid.activeDays > 0;
+  const hasHourData = hours.some((item) => item.requests > 0);
+  const sparseDays = grid.activeDays < 3;
   return React.createElement(
     "div",
     null,
     React.createElement(
       "div",
       { className: "dshc-heat-wrap" },
-      // 左侧星期列（只标 一/三/五，和 GitHub 一致，避免 7 行都塞字）
       React.createElement(
         "div",
         { className: "dshc-heat-days" },
@@ -3764,9 +3789,7 @@ function UsageHeatmap({ rows }) {
             className: "dshc-heat-months",
             style: { gridTemplateColumns: `repeat(${grid.weeks}, 11px)` }
           },
-          ...grid.monthLabels.map(
-            (label, index) => React.createElement("span", { key: `m${index}` }, label)
-          )
+          ...grid.monthLabels.map((label, index) => React.createElement("span", { key: `m${index}` }, label))
         ),
         React.createElement(
           "div",
@@ -3777,9 +3800,9 @@ function UsageHeatmap({ rows }) {
           ...grid.cells.map(
             (cell) => React.createElement("i", {
               key: cell.date,
-              className: `${cell.blank ? "blank" : `h${cell.level} anim`}`,
+              className: cell.blank ? "blank" : `h${cell.level} anim`,
               style: cell.blank ? void 0 : { animationDelay: `${(cell.week * 0.018).toFixed(3)}s` },
-              title: cell.blank ? `${cell.date}\uFF08\u7A97\u53E3\u5916\uFF09` : `${cell.date} \xB7 ${formatNumber(cell.value)} \u8BF7\u6C42`
+              title: cell.outside ? `${cell.date}\uFF08\u7A97\u53E3\u5916\uFF09` : cell.value > 0 ? `${cell.date} \xB7 ${formatNumber(cell.value)} \u8BF7\u6C42` : `${cell.date} \xB7 \u65E0\u8BB0\u5F55`
             })
           )
         )
@@ -3791,20 +3814,59 @@ function UsageHeatmap({ rows }) {
       React.createElement(
         "span",
         { style: { ...s.muted, fontSize: 10.5 } },
-        `\u6D3B\u8DC3 ${days.filter((day) => day.requests > 0).length} \u5929 \xB7 \u5CF0\u503C ${formatNumber(grid.max)} \u8BF7\u6C42/\u5929`
+        hasDayData ? `\u8FD1 ${HEAT_WINDOW_DAYS} \u5929\u6D3B\u8DC3 ${grid.activeDays} \u5929 \xB7 \u5CF0\u503C ${formatNumber(grid.max)} \u8BF7\u6C42/\u5929` : `\u8FD1 ${HEAT_WINDOW_DAYS} \u5929\u6682\u65E0\u6309\u5929\u8BB0\u5F55`
       ),
       React.createElement(
         "span",
         {
           className: "dshc-heat-legend",
-          title: `\u8986\u76D6 ${days.length} \u5929\uFF1B\u5176\u4E2D ${hoursCount} \u5929\u6765\u81EA\u5C0F\u65F6\u69FD\u3001${daysCount} \u5929\u6765\u81EA\u65E5\u69FD\uFF08\u7F51\u5173\u69FD\u7C92\u5EA6\u6DF7\u5408\uFF0C\u6309\u5929\u5408\u5E76\uFF09`
+          title: "\u8272\u9636\u4E3A\u5206\u4F4D\u6CD5\uFF08\u5BF9\u975E\u96F6\u65E5\u53D6 4 \u5206\u4F4D\uFF09\uFF1B\u957F\u5C3E\u5206\u5E03\u4E0B\u7EBF\u6027\u6620\u5C04\u4F1A\u584C\u6210\u4E00\u7247\u6D45\u8272"
         },
         React.createElement("span", null, "\u5C11"),
-        ...["h0", "h1", "h2", "h3", "h4"].map(
-          (cls) => React.createElement("i", { key: cls, className: cls })
-        ),
+        ...["h0", "h1", "h2", "h3", "h4"].map((cls) => React.createElement("i", { key: cls, className: cls })),
         React.createElement("span", null, "\u591A")
       )
+    ),
+    // 数据太稀疏时补一张按小时的分布（这才是当前真实有数据的维度）
+    sparseDays && hasHourData ? React.createElement(
+      "div",
+      { style: { marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--dsw-alias-border-l2,#e5e6eb)" } },
+      React.createElement(
+        "div",
+        { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
+        hasDayData ? `\u6309\u5929\u8BB0\u5F55\u53EA\u6709 ${grid.activeDays} \u5929\uFF08\u7F51\u5173\u5C0F\u65F6\u69FD\u53EA\u4FDD 48 \u5C0F\u65F6\u3001\u65E5\u69FD\u8981\u8DE8\u5929\u624D\u4EA7\u751F\uFF09\u2014\u2014 \u6309\u5C0F\u65F6\u770B\u66F4\u6E05\u695A\uFF1A` : "\u8FD1 30 \u5929\u6CA1\u6709\u6309\u5929\u8BB0\u5F55 \u2014\u2014 \u6309\u5C0F\u65F6\u770B\u5F53\u524D\u8FD9\u6BB5\uFF1A"
+      ),
+      React.createElement(UsageHourProfile, { hours })
+    ) : null
+  );
+}
+function UsageHourProfile({ hours }) {
+  const max = Math.max(1, ...hours.map((item) => item.requests));
+  return React.createElement(
+    "div",
+    null,
+    React.createElement(
+      "div",
+      { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 56 } },
+      ...hours.map(
+        (item) => React.createElement("span", {
+          key: item.hour,
+          title: `${String(item.hour).padStart(2, "0")}:00 \xB7 ${formatNumber(item.requests)} \u8BF7\u6C42`,
+          style: {
+            flex: "1 1 0",
+            minWidth: 0,
+            height: `${Math.max(item.requests > 0 ? 6 : 2, Math.round(item.requests / max * 100))}%`,
+            borderRadius: "2px 2px 0 0",
+            background: item.requests > 0 ? "var(--dsw-alias-brand-primary,#4f6ef7)" : "var(--dsw-alias-border-l2,#e5e6eb)",
+            opacity: item.requests > 0 ? 0.85 : 0.6
+          }
+        })
+      )
+    ),
+    React.createElement(
+      "div",
+      { style: { display: "flex", justifyContent: "space-between", marginTop: 4 } },
+      ...["00", "06", "12", "18", "23"].map((label) => React.createElement("span", { key: label, style: { ...s.muted, fontSize: 10.5 } }, label))
     )
   );
 }

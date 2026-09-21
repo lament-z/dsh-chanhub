@@ -34,6 +34,7 @@ import {
   groupByChannel,
   heatGrid,
   healthSummary,
+  hourlyProfile,
   isZeroTime,
   modelShares,
   maxInFlightOf,
@@ -2371,35 +2372,38 @@ function UsageBurnChart({ rows, stock, windowValue }) {
   );
 }
 
+/** 热力图窗口天数：固定 30 天骨架。 */
+const HEAT_WINDOW_DAYS = 30;
+
 /**
- * 近 30 天活跃热力图（GitHub contribution 布局：周为列、周一→周日为行）。
+ * 活跃热力图（GitHub contribution 布局：周为列、周一→周日为行）。
  *
- * 数据：把混合槽折叠到「日历日」（`usageByDay`）—— 小时槽（<48h）与日槽
- * （>48h）同属窗口分桶，按天相加合法；**不再**把日槽硬塞进「日期×小时」网格
- * （那会凭空造出不存在的小时分布，是 v1 的实现缺陷）。
+ * 两个修过的真实问题：
+ *   1. **固定窗口骨架**：网格恒为 `HEAT_WINDOW_DAYS` 天，不随「有数据的天数」
+ *      伸缩。原先按实际天数推宽度，只有 1 天数据时只画 1 列 —— 屏幕上是个
+ *      11px 方块，用户以为「没有热力图」。现在形状先立住：有功能、只是没记录。
+ *   2. **数据太少自动降级**：网关小时槽只保 48h、日槽要跨天才产生，所以早期
+ *      「近 30 天」几乎无数据。此时按**小时**（真实有数据的维度）给一张分布图，
+ *      回答同一个问题（什么时候在用），而不是留一块空网格。
  *
- * 视觉：分位色阶 h0..h4（长尾分布下线性映射会退化成一片浅色）、顶部月份标签、
- * 左侧星期列、右下角图例、按周列延迟的入场淡入（尊重 prefers-reduced-motion）。
- *
- * @param props - `{rows, now}`。
+ * @param props - `{rows, end}`。
  * @returns React 元素。
  */
 function UsageHeatmap({ rows }) {
   const days = React.useMemo(() => usageByDay(rows), [rows]);
-  const grid = React.useMemo(() => heatGrid(days), [days]);
-
-  if (grid.weeks === 0 || grid.max === 0) {
-    return React.createElement('div', { style: s.muted },
-      '该窗口内没有可统计的用量');
-  }
+  const grid = React.useMemo(() => heatGrid(days, { windowDays: HEAT_WINDOW_DAYS }), [days]);
+  const hours = React.useMemo(() => hourlyProfile(rows), [rows]);
 
   const weekdayLabels = ['一', '二', '三', '四', '五', '六', '日'];
-  const hoursCount = days.filter((day) => day.hours > 0).length;
-  const daysCount = days.filter((day) => day.days > 0).length;
+  const hasDayData = grid.activeDays > 0;
+  const hasHourData = hours.some((item) => item.requests > 0);
+  // 「数据太稀疏」的判据是**活跃天数太少**，不是「完全没有按天数据」——
+  // 后者在本数据源下不会发生（有小时槽就必然有当天记录），拿它当条件是死代码。
+  // 活跃天数 < 3 时，30 天骨架基本是空的，按小时分布才答得出「什么时候在用」。
+  const sparseDays = grid.activeDays < 3;
 
   return React.createElement('div', null,
     React.createElement('div', { className: 'dshc-heat-wrap' },
-      // 左侧星期列（只标 一/三/五，和 GitHub 一致，避免 7 行都塞字）
       React.createElement('div', { className: 'dshc-heat-days' },
         ...weekdayLabels.map((label, index) =>
           React.createElement('span', { key: label, style: { visibility: index % 2 === 0 ? 'visible' : 'hidden' } }, label),
@@ -2410,9 +2414,7 @@ function UsageHeatmap({ rows }) {
           className: 'dshc-heat-months',
           style: { gridTemplateColumns: `repeat(${grid.weeks}, 11px)` },
         },
-          ...grid.monthLabels.map((label, index) =>
-            React.createElement('span', { key: `m${index}` }, label),
-          ),
+          ...grid.monthLabels.map((label, index) => React.createElement('span', { key: `m${index}` }, label)),
         ),
         React.createElement('div', {
           className: 'dshc-heat',
@@ -2421,9 +2423,13 @@ function UsageHeatmap({ rows }) {
           ...grid.cells.map((cell) =>
             React.createElement('i', {
               key: cell.date,
-              className: `${cell.blank ? 'blank' : `h${cell.level} anim`}`,
+              className: cell.blank ? 'blank' : `h${cell.level} anim`,
               style: cell.blank ? undefined : { animationDelay: `${(cell.week * 0.018).toFixed(3)}s` },
-              title: cell.blank ? `${cell.date}（窗口外）` : `${cell.date} · ${formatNumber(cell.value)} 请求`,
+              title: cell.outside
+                ? `${cell.date}（窗口外）`
+                : cell.value > 0
+                  ? `${cell.date} · ${formatNumber(cell.value)} 请求`
+                  : `${cell.date} · 无记录`,
             }),
           ),
         ),
@@ -2431,17 +2437,62 @@ function UsageHeatmap({ rows }) {
     ),
     React.createElement('div', { className: 'dshc-row', style: { marginTop: 8, gap: 12 } },
       React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
-        `活跃 ${days.filter((day) => day.requests > 0).length} 天 · 峰值 ${formatNumber(grid.max)} 请求/天`),
+        hasDayData
+          ? `近 ${HEAT_WINDOW_DAYS} 天活跃 ${grid.activeDays} 天 · 峰值 ${formatNumber(grid.max)} 请求/天`
+          : `近 ${HEAT_WINDOW_DAYS} 天暂无按天记录`),
       React.createElement('span', {
         className: 'dshc-heat-legend',
-        title: `覆盖 ${days.length} 天；其中 ${hoursCount} 天来自小时槽、${daysCount} 天来自日槽（网关槽粒度混合，按天合并）`,
+        title: '色阶为分位法（对非零日取 4 分位）；长尾分布下线性映射会塌成一片浅色',
       },
         React.createElement('span', null, '少'),
-        ...['h0', 'h1', 'h2', 'h3', 'h4'].map((cls) =>
-          React.createElement('i', { key: cls, className: cls }),
-        ),
+        ...['h0', 'h1', 'h2', 'h3', 'h4'].map((cls) => React.createElement('i', { key: cls, className: cls })),
         React.createElement('span', null, '多'),
       ),
+    ),
+
+    // 数据太稀疏时补一张按小时的分布（这才是当前真实有数据的维度）
+    sparseDays && hasHourData
+      ? React.createElement('div', { style: { marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--dsw-alias-border-l2,#e5e6eb)' } },
+          React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
+            hasDayData
+              ? `按天记录只有 ${grid.activeDays} 天（网关小时槽只保 48 小时、日槽要跨天才产生）—— 按小时看更清楚：`
+              : '近 30 天没有按天记录 —— 按小时看当前这段：'),
+          React.createElement(UsageHourProfile, { hours }),
+        )
+      : null,
+  );
+}
+
+/**
+ * 按小时分布条（24 根）—— 小时槽不足一天时的替代视图。
+ *
+ * @param props - `{hours}`：`hourlyProfile()` 的输出。
+ * @returns React 元素。
+ */
+function UsageHourProfile({ hours }) {
+  const max = Math.max(1, ...hours.map((item) => item.requests));
+  return React.createElement('div', null,
+    React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 3, height: 56 } },
+      ...hours.map((item) =>
+        React.createElement('span', {
+          key: item.hour,
+          title: `${String(item.hour).padStart(2, '0')}:00 · ${formatNumber(item.requests)} 请求`,
+          style: {
+            flex: '1 1 0',
+            minWidth: 0,
+            height: `${Math.max(item.requests > 0 ? 6 : 2, Math.round((item.requests / max) * 100))}%`,
+            borderRadius: '2px 2px 0 0',
+            background: item.requests > 0
+              ? 'var(--dsw-alias-brand-primary,#4f6ef7)'
+              : 'var(--dsw-alias-border-l2,#e5e6eb)',
+            opacity: item.requests > 0 ? 0.85 : 0.6,
+          },
+        }),
+      ),
+    ),
+    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: 4 } },
+      ...['00', '06', '12', '18', '23'].map((label) =>
+        React.createElement('span', { key: label, style: { ...s.muted, fontSize: 10.5 } }, label)),
     ),
   );
 }

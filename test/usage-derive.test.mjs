@@ -17,6 +17,7 @@ import {
   formatPercent,
   formatTokens,
   heatGrid,
+  hourlyProfile,
   heatLevel,
   modelShares,
   niceMax,
@@ -237,23 +238,46 @@ test('U15 usageByDay：混合槽按天合并（小时槽 + 日槽）', () => {
   assert.deepEqual(usageByDay(undefined), []);
 });
 
-test('U16 heatGrid：周为列 × 周一→周日为行，格数 = 周数 × 7', () => {
-  const days = [
-    { date: '2026-09-21', requests: 30 }, // 周一
-    { date: '2026-09-22', requests: 10 },
-    { date: '2026-09-23', requests: 0 },
-  ];
-  const grid = heatGrid(days);
-  assert.equal(grid.cells.length, grid.weeks * 7, '格数必须是周的整数倍');
-  assert.equal(grid.cells[0].date, '2026-09-21', '首格应为窗口第一天');
-  const byDate = Object.fromEntries(grid.cells.map((c) => [c.date, c]));
-  assert.equal(byDate['2026-09-21'].level, 4, '最大值应为最深档');
-  assert.equal(byDate['2026-09-23'].level, 0, '零用量为 0 档');
-  assert.equal(grid.max, 30);
-  assert.deepEqual(heatGrid([]).cells, []);
+test('U16 heatGrid：固定 30 天骨架（不随有数据的天数伸缩）', () => {
+  // 真实场景回归：网关早期只有 1 天数据。旧实现按实际天数推宽度 → 只画 1 列，
+  // 屏幕上是个 11px 方块，用户以为「没有热力图」。现在骨架恒为 windowDays。
+  const oneDay = [{ date: '2026-09-20', requests: 30 }];
+  const grid = heatGrid(oneDay, { windowDays: 30, end: new Date('2026-09-20T12:00:00') });
+  assert.equal(grid.windowDays, 30);
+  assert.equal(grid.weeks, 5, '30 天 + 周一前置 → 5 周');
+  assert.equal(grid.cells.length, grid.weeks * 7, '格数必须 = 周数 × 7');
+  assert.equal(grid.cells.filter((c) => !c.blank).length, 30, '窗口内 30 天都应有格子');
+  assert.equal(grid.activeDays, 1, '只有 1 天有记录');
+  // 有数据那天必须是最深档
+  const hit = grid.cells.find((c) => c.date === '2026-09-20');
+  assert.equal(hit.value, 30);
+  assert.equal(hit.level, 4);
+  assert.equal(hit.blank, false);
+  // 窗口前的格子标记 outside（用于「窗口外」tooltip，不画成「无记录」）
+  assert.ok(grid.cells.some((c) => c.outside), '首周前置格应为窗口外');
+  // 空数据也必须给出完整骨架
+  const empty = heatGrid([], { windowDays: 30, end: new Date('2026-09-20T12:00:00') });
+  assert.equal(empty.cells.filter((c) => !c.blank).length, 30, '无数据也要有完整 30 天骨架');
+  assert.equal(empty.activeDays, 0);
 });
 
-test('U17 分位色阶：长尾分布下不塌成一片浅色', () => {
+test('U17 hourlyProfile：24 小时分布（数据不足一天时的替代视图）', () => {
+  const buckets = [
+    { at: Date.parse('2026-09-20T18:00:00'), requests: 10, tokens: 100 },
+    { at: Date.parse('2026-09-20T18:30:00'), requests: 5, tokens: 50 },
+    { at: Date.parse('2026-09-20T21:00:00'), requests: 3, tokens: 30 },
+  ];
+  const hours = hourlyProfile(buckets);
+  assert.equal(hours.length, 24, '恒定 24 项（含空档，便于画柱）');
+  assert.equal(hours[18].requests, 15, '同一小时的多槽应合并');
+  assert.equal(hours[18].slots, 2);
+  assert.equal(hours[21].requests, 3);
+  assert.equal(hours[0].requests, 0);
+  assert.ok(hours.every((h) => typeof h.hour === 'number'));
+  assert.deepEqual(hourlyProfile(undefined).length, 24);
+});
+
+test('U18 分位色阶：长尾分布下不塌成一片浅色', () => {
   // 典型长尾：多数很小、个别极大。线性映射会让 90% 格子落最浅档。
   const values = [1, 1, 2, 2, 3, 4, 5, 900];
   const q = quartileThresholds(values);
@@ -264,7 +288,7 @@ test('U17 分位色阶：长尾分布下不塌成一片浅色', () => {
   assert.deepEqual(quartileThresholds([]), [0, 0, 0, 0]);
 });
 
-test('U18 modelShares：按 token 占比降序，长尾合并为「其他」', () => {
+test('U19 modelShares：按 token 占比降序，长尾合并为「其他」', () => {
   const rows = [
     { key: 'a', total_tokens: 60 },
     { key: 'b', total_tokens: 25 },
@@ -299,7 +323,7 @@ test('U16 creditsFreshness：无时间戳不谎报「刚刚更新」', () => {
   assert.equal(stale.stale, true, '超过 1 小时标记为陈旧');
 });
 
-test('U17 格式化：缺失值显示 — 而不是 0 或 NaN', () => {
+test('U20 格式化：缺失值显示 — 而不是 0 或 NaN', () => {
   assert.equal(formatTokens(412300), '412.3k');
   assert.equal(formatTokens(11680000), '11.68M');
   assert.equal(formatTokens(0), '0');
@@ -313,7 +337,7 @@ test('U17 格式化：缺失值显示 — 而不是 0 或 NaN', () => {
   assert.equal(formatPercent(undefined), '—');
 });
 
-test('U18 niceMax：刻度上限取整，且对极端输入安全', () => {
+test('U21 niceMax：刻度上限取整，且对极端输入安全', () => {
   assert.equal(niceMax(137), 150);
   assert.equal(niceMax(9), 9);
   assert.equal(niceMax(0), 1);
@@ -322,7 +346,7 @@ test('U18 niceMax：刻度上限取整，且对极端输入安全', () => {
   assert.ok(niceMax(4321) >= 4321);
 });
 
-test('U19 uptimeText：进程累计时长，中文可读', () => {
+test('U22 uptimeText：进程累计时长，中文可读', () => {
   assert.equal(uptimeText(0), '0 秒');
   assert.equal(uptimeText(45), '45 秒');
   assert.equal(uptimeText(11520), '3 小时 12 分');

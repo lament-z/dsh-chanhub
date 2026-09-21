@@ -2038,6 +2038,47 @@ test('渲染用量：卡片浮起层级 + 模型占比环形图', { skip }, asyn
   }
 });
 
+test('渲染用量：热力图为固定 30 天骨架（真实稀疏数据回归）', { skip }, async () => {
+  // 真实场景：网关早期只有 1 天的小时槽。旧实现按实际天数推宽度 → 只画 1 列
+  // （11px 方块），用户以为「没有热力图」。现在骨架恒为 30 天。
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    if (endpoint !== 'getUsage') return base(endpoint, payload);
+    const value = (await base(endpoint, payload)).value;
+    // 只留 1 天、1 个槽
+    const sparse = {
+      ...value.usage,
+      buckets: [{
+        slot: 'h:2026-09-21T10', realm: 'cn', uid: 'uid-1', model: 'cn:glm-5.2',
+        requests: 7, failed: 0, streaming: 0,
+        prompt_tokens: 70, completion_tokens: 35, total_tokens: 105,
+        credit: 0.1, avg_latency_ms: 200, last_seen: new Date().toISOString(),
+      }],
+    };
+    return { ok: true, value: { available: true, usage: sparse } };
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    const app = await openUsage(document);
+    const pick = () => app.querySelector('.dshc-viewpick');
+    await React.act(async () => { pick().dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+    const btn = [...app.querySelectorAll('[data-seg="views"] button')].find((b) => b.textContent.trim() === '活跃热力');
+    await React.act(async () => { btn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
+
+    const cells = [...app.querySelectorAll('.dshc-heat > i')];
+    assert.ok(cells.length >= 28, `骨架应接近 30 格，实际 ${cells.length}`);
+    assert.equal(cells.length % 7, 0, '格数应为 7 的整数倍');
+    // 只有 1 天有数据，但骨架完整 → 有值格 1 个、其余为空（不是整块消失）
+    const valued = cells.filter((c) => /h[1-4]/.test(c.className));
+    assert.equal(valued.length, 1, `只应有 1 个有值格，实际 ${valued.length}`);
+    assert.match(app.innerHTML, /近 30 天活跃 1 天/, '缺活跃天数说明');
+    // 数据不足时给出按小时的替代视图
+    assert.ok(document.querySelector('.dshc-uchart, [style*="height: 56px"]'), '缺小时分布降级视图');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('渲染用量：不含横向滚动溢出容器（移动端不撑破）', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {

@@ -861,7 +861,10 @@ export function quartileThresholds(values) {
 export function heatLevel(value, thresholds) {
   const v = Number(value) || 0;
   if (v <= 0) return 0;
-  const [q1, q2, q3] = thresholds;
+  const [q1, q2, q3, q4] = thresholds;
+  // 样本过少时四分位会塌成同一个值（如只有 1 天数据 → 4 个阈值都等于它），
+  // 此时「最大值」必须仍显示为最深档，否则整张图只剩最浅色、看不出强弱。
+  if (q1 === q4) return v >= q4 ? 4 : 1;
   if (v <= q1) return 1;
   if (v <= q2) return 2;
   if (v <= q3) return 3;
@@ -869,31 +872,42 @@ export function heatLevel(value, thresholds) {
 }
 
 /**
- * 构建热力图网格（周为列、周一→周日为行）。
+ * 构建热力图网格（周为列、周一→周日为行）—— **固定窗口骨架**。
  *
- * @param days - `usageByDay()` 的输出。
- * @returns `{weeks, cells, monthLabels, max}`；`cells` 为按列优先的
- *   `[{date, value, level, blank}]`，长度 = weeks × 7。
+ * 设计要点（修的是真实数据下的退化）：网格宽度由 `windowDays` 决定，
+ * **不随「有数据的天数」伸缩**。原先按实际天数推 weeks，于是只有 1 天数据时
+ * 只画 1 列 —— 屏幕上就是一个 11px 方块，用户以为「没有热力图」。
+ * 现在无论有没有数据，骨架都是完整的 30 天：形状先立住，让人看出
+ * 「功能在，只是这段没记录」，而不是以为功能缺失。
+ *
+ * @param days - `usageByDay()` 的输出（用于取值）。
+ * @param options - `{windowDays, end}`：窗口天数（默认 30）与窗口结束日。
+ * @returns `{weeks, cells, monthLabels, max, activeDays, coveredDays}`。
  */
-export function heatGrid(days) {
+export function heatGrid(days, options = {}) {
+  const windowDays = Math.max(1, Number(options.windowDays) || 30);
   const list = (Array.isArray(days) ? days : []).filter((d) => d && typeof d.date === 'string');
-  if (list.length === 0) return { weeks: 0, cells: [], monthLabels: [], max: 0 };
-
   const byDate = new Map(list.map((d) => [d.date, d]));
-  const parsed = list.map((d) => new Date(`${d.date}T00:00:00`));
-  const first = parsed[0];
-  const last = parsed[parsed.length - 1];
-  // 周一为一周之始（参考实现用 UTC 的 weekdayIndex；本地时区下用同样的对齐）
-  const lead = (first.getDay() + 6) % 7;
-  const totalDays = lead + Math.round((last - first) / 86400e3) + 1;
-  const weeks = Math.ceil(totalDays / 7);
 
-  const nonzero = list.filter((d) => d.requests > 0).map((d) => d.requests);
+  // 窗口结束日：默认今天（本地时区），截断到当天 0 点
+  const end = options.end instanceof Date ? new Date(options.end) : new Date();
+  end.setHours(0, 0, 0, 0);
+  const first = new Date(end.getTime() - (windowDays - 1) * 86400e3);
+
+  // 周一为一周之始；窗口起点之前的格子留空（GitHub 同款处理）
+  const lead = (first.getDay() + 6) % 7;
+  const weeks = Math.ceil((lead + windowDays) / 7);
+
+  const inWindow = list.filter((d) => {
+    const at = new Date(`${d.date}T00:00:00`).getTime();
+    return at >= first.getTime() && at <= end.getTime();
+  });
+  const nonzero = inWindow.filter((d) => d.requests > 0).map((d) => d.requests);
   const thresholds = quartileThresholds(nonzero);
+
   const cells = [];
   const monthLabels = [];
   let prevMonth = -1;
-
   for (let w = 0; w < weeks; w++) {
     const monday = new Date(first.getTime() + (w * 7 - lead) * 86400e3);
     const month = monday.getMonth();
@@ -902,18 +916,56 @@ export function heatGrid(days) {
     for (let r = 0; r < 7; r++) {
       const cur = new Date(monday.getTime() + r * 86400e3);
       const key = localDayKey(cur);
+      const beforeWindow = cur.getTime() < first.getTime();
+      const afterWindow = cur.getTime() > end.getTime();
       const rec = byDate.get(key);
-      cells.push(rec
-        ? { date: key, value: rec.requests, level: heatLevel(rec.requests, thresholds), blank: false, week: w }
-        : { date: key, value: 0, level: 0, blank: true, week: w });
+      cells.push(
+        beforeWindow || afterWindow
+          ? { date: key, value: 0, level: 0, blank: true, outside: true, week: w }
+          : {
+              date: key,
+              value: rec ? rec.requests : 0,
+              level: rec ? heatLevel(rec.requests, thresholds) : 0,
+              blank: false,
+              outside: false,
+              week: w,
+            },
+      );
     }
   }
+
   return {
     weeks,
     cells,
     monthLabels,
     max: nonzero.length > 0 ? Math.max(...nonzero) : 0,
+    activeDays: nonzero.length,
+    coveredDays: inWindow.length,
+    windowDays,
   };
+}
+
+/**
+ * 按「一天中的第几小时」汇总（0–23）—— 数据不足以画「按天」热力图时的替代视图。
+ *
+ * 为什么需要：网关的小时槽只保留 48 小时，所以「近 30 天热力图」在早期
+ * 几乎无数据可画。此时按「小时」反而是**真实有数据**的那个维度，
+ * 能回答同一个问题（什么时候在用），而不是留一块空网格。
+ *
+ * @param rows - `usageBySlot()` 的输出。
+ * @returns 24 项 `[{hour, requests, tokens, slots}]`。
+ */
+export function hourlyProfile(rows) {
+  const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, requests: 0, tokens: 0, slots: 0 }));
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const at = Number(row?.at);
+    if (!Number.isFinite(at)) continue;
+    const bucket = buckets[new Date(at).getHours()];
+    bucket.requests += Number(row.requests) || 0;
+    bucket.tokens += Number(row.tokens) || 0;
+    bucket.slots += 1;
+  }
+  return buckets;
 }
 
 /**
