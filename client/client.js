@@ -336,11 +336,8 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
-/* \u6E20\u9053\u4E09\u5361 */
+/* \u6E20\u9053\u4E09\u5361\uFF08\u5F53\u524D\u53EF\u7528\u79EF\u5206\uFF1AWB / Trae / Qoder\uFF09 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-/* \u72EC\u5360\u4E00\u884C\u7684\u5361\uFF08\u8D5A\u5F97\u79EF\u5206\uFF09\uFF1A\u5B83\u662F\u7D2F\u8BA1\u53E3\u5F84\uFF0C\u4E0E\u4E0B\u9762\u4E09\u4E2A\u300C\u5F53\u524D\u53EF\u7528\u300D\u4E0D\u662F\u540C\u4E00\u7C7B\u6570\uFF0C
-   \u4E0D\u7ED9\u5B83\u5E76\u6392\u662F\u4E3A\u4E86\u907F\u514D\u88AB\u8BFB\u6210\u300C\u4E09\u9879\u4E4B\u548C\u300D\u3002 */
-.dshc-chancards.one { grid-template-columns: 1fr; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
 .dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
 .dshc-chancard.dim { opacity: 0.55; }
@@ -3738,15 +3735,31 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
   const grouped = groupByChannel(status?.accounts ?? [], channelOf);
   const maxRealm = Math.max(1, ...realms.map((realm) => realm.total));
   const earnTitle = earned ? `\u8D5A\u5F97\u79EF\u5206 = \u5404\u8D26\u53F7\u9010\u5957\u9910\u660E\u7EC6\u7684\u989D\u5EA6\u603B\u91CF\u4E4B\u548C\uFF08\u542B\u5DF2\u6D88\u8017\u6389\u7684\uFF09\uFF0C\u6DB5\u76D6\u7B7E\u5230 / \u6D3B\u52A8 / \u62C9\u65B0\u7B49\u6765\u6E90\u3002\u5DF2\u6D88\u8017 ${formatNumber(Math.round(earned.used))} \xB7 \u5269\u4F59 ${formatNumber(Math.round(earned.remain))}\u3002\u5DF2\u8FC7\u671F\u4E14\u4E0A\u6E38\u4E0D\u518D\u4E0B\u53D1\u7684\u5957\u9910\u4E0D\u8BA1\u5165 \u2014\u2014 \u56E0\u6B64\u662F\u4E0B\u754C\u3002` + (earned.missing > 0 ? `\u53E6\u6709 ${earned.missing} \u4E2A\u8D26\u53F7\u672A\u53D6\u5230\u660E\u7EC6\uFF0C\u672A\u8BA1\u5165\u3002` : "") : "";
+  const earnValue = earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : "\u2014";
+  const earnSub = earned ? earned.covered > 0 ? `\u5DF2\u6D88\u8017 ${formatCompact(Math.round(earned.used))} \xB7 \u8986\u76D6 ${earned.covered}/${earned.count} \u4E2A\u8D26\u53F7` : `${earned.count} \u4E2A\u8D26\u53F7\u5747\u672A\u53D6\u5230\u5957\u9910\u660E\u7EC6` : "\u52A0\u8F7D\u4E2D\u2026";
+  const earnCounter = {
+    key: "earned",
+    label: "\u8D5A\u5F97\u79EF\u5206",
+    value: earnValue,
+    tone: "ok",
+    title: earnTitle,
+    valueTitle: earned && earned.covered > 0 ? `\u7CBE\u786E\u503C ${formatNumber(Math.round(earned.total))}` : void 0,
+    sub: earnSub
+  };
+  const stickyIdx = counters.findIndex((c) => c.key === "sticky");
+  const ordered = stickyIdx >= 0 ? [...counters.slice(0, stickyIdx + 1), earnCounter, ...counters.slice(stickyIdx + 1)] : [...counters, earnCounter];
   return React.createElement(
     "div",
     { style: s.card },
-    // KPI 行：账号总数（点击展开渠道分布）+ 健康/冷却/在途满
+    // KPI 行：账号总数（点击展开渠道分布）+ 健康/冷却/在途满 + 粘性会话 + 赚得积分。
+    // 赚得积分紧贴粘性会话右侧，与粘性会话同处一行（insert 在 sticky 之后）。
     React.createElement(
       "div",
       { className: "dshc-kpis" },
-      ...counters.map((counter) => {
+      ...ordered.map((counter) => {
         const clickable = counter.key === "total";
+        const valueTitle = counter.valueTitle;
+        const sub = counter.sub;
         return React.createElement(
           "button",
           {
@@ -3754,7 +3767,7 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
             type: "button",
             className: "dshc-kpi",
             onClick: clickable ? onToggleDistribution : void 0,
-            title: clickable ? "\u70B9\u51FB\u67E5\u770B\u6E20\u9053\u5206\u5E03" : void 0,
+            title: counter.title ?? (clickable ? "\u70B9\u51FB\u67E5\u770B\u6E20\u9053\u5206\u5E03" : void 0),
             style: { ...s.kpi, cursor: clickable ? "pointer" : "default" }
           },
           React.createElement(
@@ -3765,9 +3778,13 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
           ),
           React.createElement(
             "div",
-            { style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg } },
+            {
+              style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg },
+              title: valueTitle
+            },
             String(counter.value)
-          )
+          ),
+          sub ? React.createElement("div", { style: { ...s.muted, fontSize: 10.5, marginTop: 2 } }, sub) : null
         );
       })
     ),
@@ -3783,36 +3800,8 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
         })
       )
     ) : null,
-    // 赚得积分（累计获得过的额度；口径见 earnedCredits 的说明）
-    React.createElement(
-      "div",
-      { className: "dshc-chancards one", style: { marginTop: 10 } },
-      React.createElement(
-        "div",
-        { className: "dshc-chancard", title: earnTitle },
-        React.createElement(
-          "div",
-          { className: "dshc-row", style: { justifyContent: "space-between" } },
-          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "\u8D5A\u5F97\u79EF\u5206"),
-          React.createElement("span", { style: { ...s.muted, fontSize: 10.5, cursor: "help" } }, "\u7D2F\u8BA1\u83B7\u5F97 \xB7 \u542B\u5DF2\u6D88\u8017")
-        ),
-        React.createElement(
-          "div",
-          {
-            style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: tone.ok.fg, marginTop: 2 },
-            title: earned ? `\u7CBE\u786E\u503C ${formatNumber(Math.round(earned.total))}` : void 0
-          },
-          earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : "\u2014"
-        ),
-        React.createElement(
-          "div",
-          { style: { ...s.muted, fontSize: 10.5 } },
-          earned ? earned.covered > 0 ? `\u5DF2\u6D88\u8017 ${formatCompact(Math.round(earned.used))} \xB7 \u8986\u76D6 ${earned.covered}/${earned.count} \u4E2A\u8D26\u53F7` : `${earned.count} \u4E2A\u8D26\u53F7\u5747\u672A\u53D6\u5230\u5957\u9910\u660E\u7EC6` : "\u52A0\u8F7D\u4E2D\u2026"
-        )
-      )
-    ),
     // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）—— 这是**当前可用**，
-    // 与上面的「累计赚得」是两个数，别读成一个。
+    // 与 KPI 行里的「累计赚得」是两个数，别读成一个。
     React.createElement(
       "div",
       { className: "dshc-chancards", style: { marginTop: 10 } },
@@ -5405,6 +5394,7 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
   const validation = React.useMemo(() => {
     const errors = {};
     const restart = /* @__PURE__ */ new Set();
+    const values = {};
     const byPath = /* @__PURE__ */ new Map();
     for (const group of groups) for (const field of group.fields) byPath.set(field.path, field);
     for (const [path, raw] of Object.entries(draft)) {
@@ -5412,9 +5402,10 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
       if (!field) continue;
       const result = coerceField(field, raw);
       if (!result.ok) errors[path] = result.message;
+      else values[path] = result.value;
       if (field.restart !== false) restart.add(path);
     }
-    return { errors, restart };
+    return { errors, restart, values };
   }, [draft, groups]);
   const errorCount = Object.keys(validation.errors).length;
   if (configInfo && configInfo.ok === false) {
@@ -5557,7 +5548,7 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
               type: "button",
               style: { ...s.btnPri, opacity: errorCount > 0 || !editable ? 0.5 : 1 },
               disabled: errorCount > 0 || !editable || dirty.length === 0 || saving,
-              onClick: () => onSave(draft)
+              onClick: () => onSave(validation.values)
             },
             saving ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58"
           )

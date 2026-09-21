@@ -134,15 +134,43 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
       + (earned.missing > 0 ? `另有 ${earned.missing} 个账号未取到明细，未计入。` : '')
     : '';
 
+  // 赚得积分做成 KPI 格，紧跟「粘性会话」右侧、与其同行（见下方 ordered 插入逻辑）。
+  // 之前的版本它是独占一行的 .dshc-chancards.one 卡，与粘性会话不在同一行、视觉上被读成
+  // 另一个区块；现在归到 KPI 行、紧贴粘性会话，符合「同行、在右」的布局要求。
+  const earnValue = earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : '—';
+  const earnSub = earned
+    ? (earned.covered > 0
+        ? `已消耗 ${formatCompact(Math.round(earned.used))} · 覆盖 ${earned.covered}/${earned.count} 个账号`
+        : `${earned.count} 个账号均未取到套餐明细`)
+    : '加载中…';
+  const earnCounter = {
+    key: 'earned',
+    label: '赚得积分',
+    value: earnValue,
+    tone: 'ok',
+    title: earnTitle,
+    valueTitle: earned && earned.covered > 0 ? `精确值 ${formatNumber(Math.round(earned.total))}` : undefined,
+    sub: earnSub,
+  };
+  // 粘性会话（status.sticky_sessions 为数字时出现）紧跟其后、再接赚得积分 ——
+  // 两者同处一行、赚得在右。网关无粘性会话时不强行插空位，直接追加到末尾。
+  const stickyIdx = counters.findIndex((c) => c.key === 'sticky');
+  const ordered = stickyIdx >= 0
+    ? [...counters.slice(0, stickyIdx + 1), earnCounter, ...counters.slice(stickyIdx + 1)]
+    : [...counters, earnCounter];
+
   return React.createElement(
     'div',
     { style: s.card },
-    // KPI 行：账号总数（点击展开渠道分布）+ 健康/冷却/在途满
+    // KPI 行：账号总数（点击展开渠道分布）+ 健康/冷却/在途满 + 粘性会话 + 赚得积分。
+    // 赚得积分紧贴粘性会话右侧，与粘性会话同处一行（insert 在 sticky 之后）。
     React.createElement(
       'div',
       { className: 'dshc-kpis' },
-      ...counters.map((counter) => {
+      ...ordered.map((counter) => {
         const clickable = counter.key === 'total';
+        const valueTitle = counter.valueTitle;
+        const sub = counter.sub;
         return React.createElement(
           'button',
           {
@@ -150,16 +178,20 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
             type: 'button',
             className: 'dshc-kpi',
             onClick: clickable ? onToggleDistribution : undefined,
-            title: clickable ? '点击查看渠道分布' : undefined,
+            title: counter.title ?? (clickable ? '点击查看渠道分布' : undefined),
             style: { ...s.kpi, cursor: clickable ? 'pointer' : 'default' },
           },
           React.createElement('div', { style: { ...s.muted, fontSize: 11 } },
             counter.label, clickable ? ' ▾' : ''),
           React.createElement(
             'div',
-            { style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg } },
+            {
+              style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg },
+              title: valueTitle,
+            },
             String(counter.value),
           ),
+          sub ? React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 2 } }, sub) : null,
         );
       }),
     ),
@@ -179,39 +211,8 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
         )
       : null,
 
-    // 赚得积分（累计获得过的额度；口径见 earnedCredits 的说明）
-    React.createElement(
-      'div',
-      { className: 'dshc-chancards one', style: { marginTop: 10 } },
-      React.createElement(
-        'div',
-        { className: 'dshc-chancard', title: earnTitle },
-        React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
-          React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, '赚得积分'),
-          React.createElement('span', { style: { ...s.muted, fontSize: 10.5, cursor: 'help' } }, '累计获得 · 含已消耗'),
-        ),
-        React.createElement(
-          'div',
-          {
-            style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: tone.ok.fg, marginTop: 2 },
-            title: earned ? `精确值 ${formatNumber(Math.round(earned.total))}` : undefined,
-          },
-          earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : '—',
-        ),
-        React.createElement(
-          'div',
-          { style: { ...s.muted, fontSize: 10.5 } },
-          earned
-            ? (earned.covered > 0
-                ? `已消耗 ${formatCompact(Math.round(earned.used))} · 覆盖 ${earned.covered}/${earned.count} 个账号`
-                : `${earned.count} 个账号均未取到套餐明细`)
-            : '加载中…',
-        ),
-      ),
-    ),
-
     // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）—— 这是**当前可用**，
-    // 与上面的「累计赚得」是两个数，别读成一个。
+    // 与 KPI 行里的「累计赚得」是两个数，别读成一个。
     React.createElement(
       'div',
       { className: 'dshc-chancards', style: { marginTop: 10 } },
@@ -1922,10 +1923,11 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
   const setField = (path, value) => setDraft((prev) => ({ ...prev, [path]: value }));
   const dirty = Object.keys(draft);
 
-  /** 校验当前 draft，得到逐字段错误与「需重启」清单。 */
+  /** 校验当前 draft，得到逐字段错误、「需重启」清单，以及**已按规格表收敛的提交值**。 */
   const validation = React.useMemo(() => {
     const errors = {};
     const restart = new Set();
+    const values = {};
     const byPath = new Map();
     for (const group of groups) for (const field of group.fields) byPath.set(field.path, field);
     for (const [path, raw] of Object.entries(draft)) {
@@ -1933,9 +1935,12 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
       if (!field) continue;
       const result = coerceField(field, raw);
       if (!result.ok) errors[path] = result.message;
+      // 输入框交上来的是字符串（"0" / "8, 21"），网关 normalize 是强类型的 ——
+      // 提交收敛后的值，不是原始文本（宿主侧还有同样的收敛兜底，见 lib/index.js saveConfig）。
+      else values[path] = result.value;
       if (field.restart !== false) restart.add(path);
     }
-    return { errors, restart };
+    return { errors, restart, values };
   }, [draft, groups]);
 
   const errorCount = Object.keys(validation.errors).length;
@@ -2073,7 +2078,7 @@ function ConfigTab({ configInfo, onSave, saving, onServiceControl, serviceContro
               type: 'button',
               style: { ...s.btnPri, opacity: errorCount > 0 || !editable ? 0.5 : 1 },
               disabled: errorCount > 0 || !editable || dirty.length === 0 || saving,
-              onClick: () => onSave(draft),
+              onClick: () => onSave(validation.values),
             },
             saving ? '保存中…' : '保存',
           ),

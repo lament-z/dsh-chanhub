@@ -1,5 +1,49 @@
 # Changelog
 
+### 修复：面板保存恒 400「cannot unmarshal string into []int」—— 送网关前没做类型收敛
+
+上一版修好挂载/写盘后，真机第一次保存就撞到第二个 bug：
+
+```
+已写入 1 项 · 1 项需重启网关生效 ·
+⚠ 网关热生效端点不可用（网关拒绝请求（HTTP 400）：
+  parse config: json: cannot unmarshal string into Go struct field
+  Schedule.schedule.cat_hours of type []int）
+```
+
+根因：面板输入框交上来的一律是**字符串**（`"0"` / `"8, 21"` / `"false"`），而网关的
+`normalize()` 是强类型的（Go `[]int` / `int` / `bool`）。`lib/index.js` 之前把草稿
+**原样**发给 `POST /admin/config` → 网关在**校验期**（合并后写临时文件再走 `Load`）
+就 400，于是 hours / int / float / duration / enum 这些「输入框来的」字段**一个都热改
+不了**，全部掉进降级路径（写盘成功 + 需重启）。降级直写本来就会转换类型，所以磁盘上的
+值一直是对的 —— 坏的只有「热生效」这一段。
+
+改动：
+
+- `lib/config-spec.js`：新增 `coercePatchTypes()` —— 用与面板**同一张**规格表把草稿
+  收敛成网关要求的 JSON 类型；表外路径原样透传（认不认由网关决定，保住前向兼容）；
+  表内字段值不合法则返回逐字段错误。与 `validatePatch` 的分工写进了注释。
+- `lib/index.js`：`saveConfig` 送网关前先收敛；不合法就在宿主侧以 `validation-failed`
+  收场（**不打网关、不写盘**，附带逐字段错误）。网关成功路径回包带 `viaGateway: true`。
+- `client/index.js`：保存按钮改传 `onSave(validation.values)`（校验时已收敛的值），
+  不再把输入框原始文本直接发出去 —— 「你校验过的就是你提交的」。
+
+测试：`config-and-auths.test.mjs` 新增 A10（收敛单测：类型、表外透传、非法值、幂等）、
+B10（真机 400 的回归锁：面板同形字符串 patch → 断言送网关的是 `[0]` / `4`）、
+B11（不合法拦在宿主侧，不打网关不写盘）、B12（bool / hours 两类控件形态）。
+全量 189 例：168 通过 / 0 失败 / 21 跳过。
+
+真机验证（dsh 重启后走插件真实 RPC 通道 `/dsh-chanhub/saveConfig`）：
+
+```
+{"patch":{"schedule.cat_hours":"0","schedule.checkin_enabled":"true","pool.max_in_flight":"3"}}
+→ {ok:true, viaGateway:true, hot_applied:[三个字段]}
+{"patch":{"pool.max_in_flight":"abc"}}
+→ {ok:false, code:'validation-failed', message:'配置校验未通过：pool.max_in_flight 必须是整数'}
+```
+
+修复前第一条正是本条目开头那段 400 toast。
+
 ### 面板迭代：8 项可用性修正（加号即刷 · 到期可见 · 用量维度 · 赚得积分 · 紧凑数字）
 
 用户逐条反馈，逐条落实：

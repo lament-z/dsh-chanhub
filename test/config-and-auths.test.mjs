@@ -19,6 +19,7 @@ import {
   CONFIG_FIELDS,
   DURATION_PATTERN,
   coerceField,
+  coercePatchTypes,
   fieldsByGroup,
   formatFieldValue,
   getPath,
@@ -27,6 +28,8 @@ import {
 } from '../lib/config-spec.js';
 import { locateGatewayConfig, readGatewayConfig, writeGatewayConfig } from '../lib/gateway-config.js';
 import { parseAuthFile, readAuthAccounts } from '../lib/auths.js';
+import { ENDPOINTS, createHandler } from '../lib/index.js';
+import { ChanhubClient } from '../lib/chanhub-client.js';
 
 // ---------------------------------------------------------------------------
 // A. 配置项规格表
@@ -163,6 +166,45 @@ test('A9 getPath / setPath 点分路径', () => {
   assert.deepEqual(object.schedule, { checkin_hours: [9] });
   setPath(object, 'pool.max_in_flight', 9);
   assert.equal(object.pool.max_in_flight, 9);
+});
+
+test('A10 coercePatchTypes 把输入框字符串收敛成网关要求的 JSON 类型', () => {
+  // 真机现场：面板输入框交上来的是字符串，网关 normalize 是强类型的
+  // （Go []int / int）→ merge 后校验期 400
+  // 「cannot unmarshal string into Go struct field Schedule.schedule.cat_hours of type []int」，
+  // 于是 hours/int/float 这些字段永远热改不了。收敛必须发生在送网关之前。
+  const result = coercePatchTypes({
+    'schedule.cat_hours': '0',
+    'schedule.checkin_hours': '8, 21',
+    'pool.max_in_flight': '4',
+    'pool.idle_weight_per_hour': '0.5',
+    'cooldown.soft_rate': '600s',
+    'prompt.mode': 'append',
+    'features.sanitize_blacklist_fingerprints': 'false',
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.values['schedule.cat_hours'], [0], 'hours 必须是数组，不是字符串');
+  assert.deepEqual(result.values['schedule.checkin_hours'], [8, 21]);
+  assert.equal(result.values['pool.max_in_flight'], 4);
+  assert.equal(result.values['pool.idle_weight_per_hour'], 0.5);
+  assert.equal(result.values['cooldown.soft_rate'], '600s');
+  assert.equal(result.values['prompt.mode'], 'append');
+  assert.equal(result.values['features.sanitize_blacklist_fingerprints'], false);
+
+  // 表外路径原样透传（认不认由网关决定，保住前向兼容）。
+  const forward = coercePatchTypes({ 'logs.enabled': true, 'whatever.key': 'x' });
+  assert.equal(forward.ok, true);
+  assert.deepEqual(forward.values, { 'logs.enabled': true, 'whatever.key': 'x' });
+
+  // 表内字段值不合法 → 宿主侧拦下（附字段名，便于面板/日志定位）。
+  const bad = coercePatchTypes({ 'pool.max_in_flight': 'abc', 'schedule.cat_hours': '24,1' });
+  assert.equal(bad.ok, false);
+  assert.deepEqual(bad.errors.map((item) => item.path), ['pool.max_in_flight', 'schedule.cat_hours']);
+  assert.match(bad.errors[1].message, /0–23/);
+
+  // 已是目标类型 → 幂等（宿主收敛后重跑不出错）。
+  const idempotent = coercePatchTypes({ 'schedule.cat_hours': [0], 'pool.max_in_flight': 4 });
+  assert.deepEqual(idempotent.values, { 'schedule.cat_hours': [0], 'pool.max_in_flight': 4 });
 });
 
 // ---------------------------------------------------------------------------
@@ -336,10 +378,116 @@ test('B9 降级直写如实汇报：全部需重启 + 带上网关失败原因 +
   assert.deepEqual(onDisk.schedule.checkin_hours, [5]);
 });
 
+test('B10 saveConfig 送网关前收敛类型（真机 400 cannot unmarshal string into []int 的回归锁）', async (t) => {
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), body: init?.body === undefined ? undefined : JSON.parse(init.body) });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        path: '/app/config.json',
+        applied: ['schedule.cat_hours', 'pool.max_in_flight'],
+        hot_applied: ['schedule.cat_hours', 'pool.max_in_flight'],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const config = { baseURL: 'http://127.0.0.1:1', apiKey: 'k', gatewayConfigPath: '/tmp/dshc-not-used.json' };
+  const handle = createHandler({
+    client: new ChanhubClient({ resolveConfig: () => config }),
+    resolveConfig: () => config,
+    readSettings: () => ({}),
+  });
+
+  // 面板交上来的就是这个形状：全是字符串。
+  const result = await handle(ENDPOINTS.saveConfig, {
+    patch: { 'schedule.cat_hours': '0', 'pool.max_in_flight': '4' },
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.value.viaGateway, true, '必须走网关热生效路径，而不是降级直写');
+
+  const sent = calls.find((call) => call.url.includes('/admin/config'));
+  assert.ok(sent, '必须打网关 /admin/config');
+  assert.deepEqual(
+    sent.body.patch,
+    { 'schedule.cat_hours': [0], 'pool.max_in_flight': 4 },
+    '送网关的必须是收敛后的 JSON 类型，否则网关强类型 normalize 会 400',
+  );
+});
+
+test('B11 saveConfig 值不合法时宿主侧拦下：不打网关、不写盘、逐字段报错', async (t) => {
+  let gatewayCalls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    gatewayCalls += 1;
+    return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const { dir, path } = await tempConfig({ pool: { max_in_flight: 3 } });
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  const config = { baseURL: 'http://127.0.0.1:1', apiKey: 'k', gatewayConfigPath: path };
+  const handle = createHandler({
+    client: new ChanhubClient({ resolveConfig: () => config }),
+    resolveConfig: () => config,
+    readSettings: () => ({}),
+  });
+
+  const result = await handle(ENDPOINTS.saveConfig, { patch: { 'pool.max_in_flight': 'abc' } });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'validation-failed');
+  assert.match(result.error.message, /pool\.max_in_flight/);
+  assert.equal(gatewayCalls, 0, '值不合法就别打网关');
+  assert.equal(JSON.parse(await readFile(path, 'utf8')).pool.max_in_flight, 3, '也不许写盘');
+});
+
+test('B12 saveConfig 的 patch 类型收敛对 bool / hours 都生效（面板控件两类形态）', async (t) => {
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), body: init?.body === undefined ? undefined : JSON.parse(init.body) });
+    return new Response(JSON.stringify({ ok: true, applied: [], hot_applied: [] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const config = { baseURL: 'http://127.0.0.1:1', apiKey: 'k', gatewayConfigPath: '/tmp/dshc-not-used.json' };
+  const handle = createHandler({
+    client: new ChanhubClient({ resolveConfig: () => config }),
+    resolveConfig: () => config,
+    readSettings: () => ({}),
+  });
+
+  await handle(ENDPOINTS.saveConfig, {
+    patch: {
+      'schedule.checkin_enabled': 'false',
+      'schedule.checkin_hours': '8, 21',
+      'features.sanitize_blacklist_fingerprints': 'true',
+    },
+  });
+  const sent = calls.find((call) => call.url.includes('/admin/config'));
+  assert.deepEqual(sent.body.patch, {
+    'schedule.checkin_enabled': false,
+    'schedule.checkin_hours': [8, 21],
+    'features.sanitize_blacklist_fingerprints': true,
+  });
+});
+
 // ---------------------------------------------------------------------------
 // C. 凭证读取（渠道判定的唯一来源）
 // ---------------------------------------------------------------------------
-
 test('C1 解析嵌套形凭证（{auth, account}）', () => {
   const info = parseAuthFile(
     JSON.stringify({
