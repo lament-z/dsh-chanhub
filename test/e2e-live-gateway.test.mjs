@@ -368,11 +368,17 @@ test('真机：用量 Tab 渲染真实分桶数据', { skip: finalSkip }, async 
     const html = await waitForText(document, /用量统计[\s\S]*窗口口径/);
     assert.ok(html.includes('窗口口径'), '缺窗口口径标注');
     assert.ok(html.includes('data/usage.json'), '缺落盘路径标注');
-    // KPI 4 卡
+    // KPI 6 卡（两行 × 三列：消耗三件套 + 效率三件套）
     assert.equal(
       document.querySelectorAll('.dshc-ust-kpi').length,
-      4,
-      'KPI 应为 4 卡',
+      6,
+      'KPI 应为 6 卡',
+    );
+    // 六张卡的键序即排布：第一行 消耗、第二行 效率
+    assert.deepEqual(
+      [...document.querySelectorAll('.dshc-ust-kpi')].map((card) => card.getAttribute('data-kpi')),
+      ['tokens', 'credit', 'stock', 'requests', 'cache', 'latency'],
+      'KPI 键序不符（第一行应为消耗三件套）',
     );
     // 六张卡 + 两个折叠区
     for (const id of ['heat', 'daily', 'accounts', 'channels', 'models']) {

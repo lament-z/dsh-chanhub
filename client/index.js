@@ -34,12 +34,15 @@ import {
   CHANNEL_ORDER,
   GROWTH_CODES,
   SCHEDULE_ITEMS,
+  accountExpiry,
   accountState,
   channelResolver,
   codeCoverage,
   creditBurn,
   creditStock,
   creditsSummary,
+  earnedCredits,
+  formatCompact,
   formatCredit,
   formatDuration,
   formatNumber,
@@ -113,14 +116,23 @@ const TABS = [
  *   渠道间 1px 竖线。**`.row` 用 center 而不是 baseline** —— 竖排块较高，
  *   baseline 会错位（实测 20px，坑 3）。
  *
- * @param props - `{status, channelOf, showDistribution, onToggleDistribution}`。
+ * @param props - `{status, channelOf, showDistribution, onToggleDistribution, earned}`。
+ *   `earned` 是 `earnedCredits()` 的输出（赚得积分：逐套餐明细额度总量之和）。
  * @returns React 元素。
  */
-function OverviewCard({ status, channelOf, showDistribution, onToggleDistribution }) {
+function OverviewCard({ status, channelOf, showDistribution, onToggleDistribution, earned }) {
   const counters = summaryCounters(status);
   const realms = realmAvailability(status?.realm_totals);
   const grouped = groupByChannel(status?.accounts ?? [], channelOf);
   const maxRealm = Math.max(1, ...realms.map((realm) => realm.total));
+  // 赚得积分的覆盖度必须显式写出来：拿不到明细的账号不计入，只报「已覆盖 N/M」
+  // 而不是拿池内余额去凑一个看起来完整的总数。
+  const earnTitle = earned
+    ? '赚得积分 = 各账号逐套餐明细的额度总量之和（含已消耗掉的），涵盖签到 / 活动 / 拉新等来源。'
+      + `已消耗 ${formatNumber(Math.round(earned.used))} · 剩余 ${formatNumber(Math.round(earned.remain))}。`
+      + '已过期且上游不再下发的套餐不计入 —— 因此是下界。'
+      + (earned.missing > 0 ? `另有 ${earned.missing} 个账号未取到明细，未计入。` : '')
+    : '';
 
   return React.createElement(
     'div',
@@ -160,14 +172,46 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
           ...grouped.channels.map((channel) =>
             React.createElement(Tag, {
               key: channel.id,
-              text: `${channel.label} ${channel.count} 号`,
+              text: `${channel.label} ${channel.count} 个账号`,
               tone: channel.count > 0 ? 'info' : 'idle',
             }),
           ),
         )
       : null,
 
-    // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）
+    // 赚得积分（累计获得过的额度；口径见 earnedCredits 的说明）
+    React.createElement(
+      'div',
+      { className: 'dshc-chancards one', style: { marginTop: 10 } },
+      React.createElement(
+        'div',
+        { className: 'dshc-chancard', title: earnTitle },
+        React.createElement('div', { className: 'dshc-row', style: { justifyContent: 'space-between' } },
+          React.createElement('span', { style: { ...s.muted, fontSize: 11 } }, '赚得积分'),
+          React.createElement('span', { style: { ...s.muted, fontSize: 10.5, cursor: 'help' } }, '累计获得 · 含已消耗'),
+        ),
+        React.createElement(
+          'div',
+          {
+            style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: tone.ok.fg, marginTop: 2 },
+            title: earned ? `精确值 ${formatNumber(Math.round(earned.total))}` : undefined,
+          },
+          earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : '—',
+        ),
+        React.createElement(
+          'div',
+          { style: { ...s.muted, fontSize: 10.5 } },
+          earned
+            ? (earned.covered > 0
+                ? `已消耗 ${formatCompact(Math.round(earned.used))} · 覆盖 ${earned.covered}/${earned.count} 个账号`
+                : `${earned.count} 个账号均未取到套餐明细`)
+            : '加载中…',
+        ),
+      ),
+    ),
+
+    // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）—— 这是**当前可用**，
+    // 与上面的「累计赚得」是两个数，别读成一个。
     React.createElement(
       'div',
       { className: 'dshc-chancards', style: { marginTop: 10 } },
@@ -178,10 +222,13 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
           React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, channel.label),
           React.createElement(
             'div',
-            { style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg } },
-            channel.count > 0 ? formatNumber(channel.credits) : '—',
+            {
+              style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg },
+              title: `精确值 ${formatNumber(channel.credits)}`,
+            },
+            channel.count > 0 ? formatCompact(channel.credits) : '—',
           ),
-          React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} 号`),
+          React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} 个账号`),
         ),
       ),
     ),
@@ -647,15 +694,20 @@ function rateLimitedNotice(list) {
  * POST /admin/tasks/{name}（与「任务」Tab 同一数据面）。五类手动可触发；
  * 触发后经「刷新」看 /admin/tasks/status 的逐号结果。
  *
- * @param props - `{status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove}`。
+ * @param props - `{status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts}`。
  * @returns React 元素。
  */
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove }) {
+function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts }) {
   const [filter, setFilter] = React.useState('all');
   const [view, setView] = React.useState('card');
   const [showDistribution, setShowDistribution] = React.useState(false);
   const [detailAccount, setDetailAccount] = React.useState(null);
   const accounts = status?.accounts ?? [];
+  // 赚得积分：逐套餐明细求和（口径见 derive.earnedCredits）。
+  const earned = React.useMemo(
+    () => earnedCredits(accounts, creditsByUid),
+    [accounts, creditsByUid],
+  );
 
   const counts = React.useMemo(() => {
     const map = new Map();
@@ -681,6 +733,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
       channelOf,
       showDistribution,
       onToggleDistribution: () => setShowDistribution((v) => !v),
+      earned,
     }),
 
     // 渠道 / 域筛选 + 视图切换 + 账号列表
@@ -710,6 +763,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                     maxInFlight,
                     channel: channelOf(account),
                     liveCredits: creditsByUid?.[account.uid],
+                    authAccounts,
                     onOpen: () => setDetailAccount(account),
                   }),
                 ),
@@ -718,18 +772,26 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                 React.createElement('table', null,
                   React.createElement('thead', null,
                     React.createElement('tr', null,
-                      ...['账号', '渠道', '状态', '积分', '在途', '成功/失败'].map((h) =>
+                      ...['账号', '渠道', '状态', '积分', '到期', '在途', '成功/失败'].map((h) =>
                         React.createElement('th', { key: h }, h))),
                   ),
                   React.createElement('tbody', null,
                     ...filtered.map((account) => {
                       const st = accountState(account, maxInFlight);
+                      const exp = accountExpiry({
+                        account,
+                        authAccounts,
+                        creditsDetail: creditsByUid?.[account.uid],
+                      });
                       return React.createElement('tr', { key: account.uid },
                         React.createElement('td', null, account.nickname || account.uid.slice(0, 8)),
                         React.createElement('td', null, channelLabel(channelOf(account)) || '—'),
                         React.createElement('td', null,
                           React.createElement(Tag, { text: st.label, tone: st.tone, title: st.detail || undefined })),
                         React.createElement('td', null, formatNumber(account.credits ?? 0)),
+                        React.createElement('td', null, exp
+                          ? React.createElement(ExpiryChip, { expiry: exp })
+                          : '—'),
                         React.createElement('td', null, `${account.in_flight ?? 0}/${maxInFlight ?? '—'}`),
                         React.createElement('td', null, `${account.success_count ?? 0}/${account.err_total ?? 0}`),
                       );
@@ -813,10 +875,13 @@ function ViewToggle({ view, setView }) {
 
 /**
  * 账号卡片（一行最主要有用的信息；点开抽屉看全部明细）。
- * @param props - `{account, maxInFlight, channel, onOpen}`。
+ * @param props - `{account, maxInFlight, channel, onOpen, liveCredits, authAccounts}`。
  */
-function AccountCard({ account, maxInFlight, channel, onOpen }) {
+function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authAccounts }) {
   const state = accountState(account, maxInFlight);
+  // 到期：凭证到期优先（账号整体失效的时刻），不可读时降级为「最早一批积分到期」。
+  // 两者都没有 → 不渲染（不编造「永不过期」）。
+  const expiry = accountExpiry({ account, authAccounts, creditsDetail: liveCredits });
   // 积分一律取 account.credits —— 刷新时网关已先把余额写回池（见 host 的
   // refreshStatus），所以它就是最新的。不再做「实时值 vs 缓存值」双源显示。
   const credits = account.credits ?? 0;
@@ -876,10 +941,11 @@ function AccountCard({ account, maxInFlight, channel, onOpen }) {
         )
       : null,
 
-    // 底行：渠道 · 域 · 成败 —— 从 11px 右下小字改为独立一行，字号可读
+    // 底行：渠道 · 域 · 到期 · 成败 —— 从 11px 右下小字改为独立一行，字号可读
     React.createElement('div', { className: 'dshc-acctcard-foot' },
       React.createElement('span', { className: 'dshc-chip' }, channelLabel(channel) || '—'),
       account.realm ? React.createElement('span', { className: 'dshc-chip' }, account.realm === 'global' ? '国际版' : '国内版') : null,
+      expiry ? React.createElement(ExpiryChip, { expiry }) : null,
       // 成败比：新网关恒透出（零值也写），旧网关缺字段时退回在途数、不编造。
       hasOutcome
         ? React.createElement('span', { className: 'dshc-chip' },
@@ -893,6 +959,33 @@ function AccountCard({ account, maxInFlight, channel, onOpen }) {
         : null,
     ),
   );
+}
+
+/**
+ * 到期小标签。
+ *
+ * 文案刻意带**语义前缀**（「到期」vs「积分到期」）：账号整体失效与「一批
+ * 积分要作废」是两件事，混成一个「到期」会让人以为号要没了。
+ * 近 3 天内（含已过期）转警示色 —— 这是唯一需要抢注意力的情形。
+ *
+ * @param props - `{expiry}`：`accountExpiry()` 的输出。
+ * @returns React 元素。
+ */
+function ExpiryChip({ expiry }) {
+  const date = new Date(expiry.at);
+  const pad = (value) => String(value).padStart(2, '0');
+  const dayText = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const prefix = expiry.kind === 'credential' ? '到期' : '积分到期';
+  const left = expiry.days;
+  const urgent = expiry.expired || left <= 3;
+  const title = expiry.kind === 'credential'
+    ? `登录凭证到期：${formatAbsolute(new Date(expiry.at).toISOString())}${expiry.expired ? '（已过期）' : `（还有 ${left} 天）`}`
+    : `最早一批积分到期：${dayText}${expiry.expired ? '（已过期）' : `（还有 ${left} 天）`}`
+      + ' —— 凭证到期时间未能读取（宿主与网关不同机时读不到 auths 目录）';
+  return React.createElement('span', {
+    className: `dshc-chip${urgent ? ' dshc-chip-warn' : ' dshc-chip-dim'}`,
+    title,
+  }, `${prefix} ${dayText}${expiry.expired ? ' · 已过期' : left <= 0 ? ' · 今天' : ` · ${left} 天`}`);
 }
 
 /** 分段筛选按钮。 */
@@ -1811,8 +1904,10 @@ function ReactLogSection() {
 /**
  * 配置 Tab：53 项分组折叠 + 危险语义标注 + 时长校验 + 服务控制。
  *
- * 写入走宿主直接改网关 config.json（若 host（宿主）与网关同机且文件可写）。
- * chanhub **没有配置热加载** —— 面板如实标注「需重启」，不做假的立即生效。
+ * 保存优先走网关端点 `POST /admin/config`（写盘 + 字段级热应用，见 lib/index.js）；
+ * 网关端点不可用时降级为宿主直写 config.json。角标「↻ 需重启」来自
+ * config-spec.js 的 `restart` 字段 —— 那是**网关热改面**的镜像，
+ * 过期会让标注与真实结局打架，故与网关同步维护。
  *
  * @param props - `{configInfo, onSave, saving, onServiceControl, serviceControlResult, serviceBusy}`。
  * @returns React 元素。
@@ -2438,6 +2533,13 @@ function ChanhubPanel({ rpcCall }) {
             : 0;
           if (hot > 0) parts.push(`${hot} 项已即时生效`);
           if (restart > 0) parts.push(`${restart} 项需重启网关生效`);
+          // 降级（网关端点失败）必须点名原因：否则「N 项需重启」会被读成「热生效没接」。
+          // hotCapable = 端点恢复后本可即时生效的项数，给一个可执行的修复方向。
+          if (value.viaGateway === false) {
+            const capable = Array.isArray(value.hotCapable) ? value.hotCapable.length : 0;
+            parts.push(`⚠ 网关热生效端点不可用（${value.gatewayError?.message ?? '已降级为文件直写'}）`);
+            if (capable > 0) parts.push(`修复后这 ${capable} 项可即时生效`);
+          }
           if (value.api_key_hint) parts.push(value.api_key_hint);
           showToast(parts.join(' · '), 8000);
           await refresh();
@@ -2841,6 +2943,8 @@ function ChanhubPanel({ rpcCall }) {
           creditsByUid,
           scheduleConfig: configInfo?.config?.schedule,
           onRemove: onRemoveAccount,
+          // 凭证盘点（只读、不含 token）：账号卡片的「到期」取它。
+          authAccounts: authInfo?.ok ? authInfo.accounts : [],
         })
       : null,
     activeTab === 'tasks'
@@ -2911,7 +3015,13 @@ function ChanhubPanel({ rpcCall }) {
           onStart: onLoginStart,
           onPoll: onLoginPoll,
           onCallback: onLoginCallback,
-          onClose: () => setAddOpen(false),
+          // 关弹窗也刷一次：登录成功那条路径由 onDone 触发，但「粘贴回调后直接
+          // 关掉」「登录中途放弃」等路径同样可能已经改变了池状态，让账号池
+          // 停在上一次快照上是不可接受的。刷新是幂等的读操作，多一次无副作用。
+          onClose: () => {
+            setAddOpen(false);
+            void refresh();
+          },
           onDone: refresh,
         })
       : null,

@@ -207,6 +207,36 @@ export function formatNumber(value) {
 }
 
 /**
+ * 紧凑数字（K / W / M / B 量级）。
+ *
+ * 为什么分两套梯子（这是「灵活判断」的落点，改口径请看这里）：
+ *   · 计数类（积分 / 请求数）走**中文量级**：万 → 亿。真机上一屏同时出现
+ *     570,027 积分与 25,940 积分，全写千分位会把卡片撑开、且读不出量级。
+ *   · Token 走**国际量级**：K / M / B —— token 数天然是英文单位习惯
+ *     （1.92B tokens 比「19.2 亿」更贴近这个领域的读法）。
+ *
+ * 精确值不丢：所有用本函数的 UI 都把原值挂在 `title` 上，鼠标悬停可见。
+ *
+ * @param value - 数字。
+ * @returns 如 `3,844` / `2.59W` / `1.23亿`。
+ */
+export function formatCompact(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  const abs = Math.abs(value);
+  if (abs >= 1e12) return `${trimUnit(value / 1e12)}万亿`;
+  if (abs >= 1e8) return `${trimUnit(value / 1e8)}亿`;
+  if (abs >= 1e4) return `${trimUnit(value / 1e4)}W`;
+  return formatNumber(Math.round(value));
+}
+
+/** 单位数值：保留 1–2 位小数并去掉无意义的 `0`。 */
+function trimUnit(value) {
+  const abs = Math.abs(value);
+  const text = abs >= 100 ? value.toFixed(0) : abs >= 10 ? value.toFixed(1) : value.toFixed(2);
+  return text.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+}
+
+/**
  * 从账号列表按渠道分组，产出「总积分 + 各渠道积分与号数」。
  *
  * 语义要点（ui-design.md §5.1）：**不可消耗积分不并入总数**，
@@ -238,6 +268,107 @@ export function groupByChannel(accounts, channelOf = () => 'workbuddy') {
     total: channels.reduce((sum, bucket) => sum + bucket.credits, 0),
     creditsTotal: channels.reduce((sum, bucket) => sum + bucket.creditsTotal, 0),
     channels,
+  };
+}
+
+/**
+ * 赚得积分（累计获得过的额度总量）。
+ *
+ * 口径（**必须先说清楚，网关没有这个字段**）：
+ *   chanhub 不存在「累计获得积分」端点，所以这里是**逐套餐明细求和**：
+ *   `Σ 各套餐 total`（= 已用 + 剩余）。套餐明细里躺着的就是签到、活动、
+ *   拉新、体验包这些来源发的额度包（真机实测：每日签到 ×31、每月登录 ×1、
+ *   裂变包 ×56、拉新权益包 ×49），所以「赚得」确实涵盖签到与各类活动积分。
+ *
+ * 两条必须如实标注的边界：
+ *   1. 拿不到明细的账号**不计入**（返回 `covered`/`missing` 让 UI 标出来），
+ *      绝不拿池内余额去猜 —— 那是「还剩多少」，不是「拿过多少」。
+ *   2. 已过期且上游不再下发的套餐会从这个列表里消失，因此结果是**下界**。
+ *      真机 5 号实测：赚得 25,940 = 已用 16,282 + 剩余 9,658（剩余与池内
+ *      credits 合计逐号对齐，可交叉验证）。
+ *
+ * @param accounts - `/status` 的 accounts。
+ * @param creditsByUid - `{uid: {available, credits:{items}}}`，逐套餐明细。
+ * @returns `{total, used, remain, covered, missing, count}`。
+ */
+export function earnedCredits(accounts = [], creditsByUid = {}) {
+  let total = 0;
+  let used = 0;
+  let remain = 0;
+  let covered = 0;
+  let missing = 0;
+  for (const account of Array.isArray(accounts) ? accounts : []) {
+    const wrap = creditsByUid?.[account?.uid];
+    const items = wrap?.available === true ? wrap?.credits?.items : undefined;
+    if (!Array.isArray(items)) {
+      missing += 1;
+      continue;
+    }
+    covered += 1;
+    for (const item of items) {
+      const itemTotal = Number(item?.total) || 0;
+      const itemUsed = Number(item?.used) || 0;
+      const itemRemain = Number(item?.remain);
+      total += itemTotal;
+      used += itemUsed;
+      remain += Number.isFinite(itemRemain) ? itemRemain : Math.max(0, itemTotal - itemUsed);
+    }
+  }
+  return {
+    total, used, remain, covered, missing, count: Array.isArray(accounts) ? accounts.length : 0,
+  };
+}
+
+/**
+ * 账号「什么时候到期」。
+ *
+ * 两个真实来源，按可信度取先者：
+ *   1. **凭证到期**（`auths/*.json` 的 `expiresAt`，宿主只读盘点透出）——
+ *      这才是「账号什么时候到期」：登录态过期后该号整体失效。
+ *   2. **积分到期**（逐套餐明细里最近的 `expire_at`，只取还有余额的）——
+ *      凭证不可读（插件与网关不同机）时的降级来源，语义是「最早一批积分作废」。
+ *
+ * 两个都没有 → 返回 `null`：由 UI 显示「—」或干脆不渲染，不编造「永不过期」。
+ *
+ * @param props - `{account, authAccounts, creditsDetail, now}`。
+ *   `creditsDetail` 是 `creditsByUid[uid]`（含 `{available, credits:{items}}`）。
+ * @returns `{at, kind, days, expired}` 或 `null`。
+ */
+export function accountExpiry({ account, authAccounts = [], creditsDetail, now = Date.now() }) {
+  const uid = account?.uid;
+
+  // ① 凭证到期：expiresAt 是 Unix **秒**（真机实测 1792591200）；个别网关可能
+  //    给毫秒，按量级判定而不是硬乘 1000。
+  const auth = (Array.isArray(authAccounts) ? authAccounts : []).find((entry) => entry?.uid === uid);
+  const raw = Number(auth?.expiresAt);
+  if (Number.isFinite(raw) && raw > 0) {
+    const at = raw < 1e12 ? raw * 1000 : raw;
+    return decorateExpiry(at, 'credential', now);
+  }
+
+  // ② 积分到期：最近的、还有余额的套餐到期日
+  const items = creditsDetail?.available === true ? creditsDetail?.credits?.items : undefined;
+  if (Array.isArray(items)) {
+    let nearest = NaN;
+    for (const item of items) {
+      if ((Number(item?.remain) || 0) <= 0) continue;
+      const at = Date.parse(item?.expire_at ?? '');
+      if (!Number.isFinite(at) || at <= 0) continue;
+      if (!Number.isFinite(nearest) || at < nearest) nearest = at;
+    }
+    if (Number.isFinite(nearest)) return decorateExpiry(nearest, 'package', now);
+  }
+  return null;
+}
+
+/** 到期信息补上剩余天数与过期标记。 */
+function decorateExpiry(at, kind, now) {
+  return {
+    at,
+    kind,
+    // 剩余天数按「还剩几个自然日」算：今天到期 = 0 天，昨天到期 = 已过期。
+    days: Math.floor((at - now) / 86400e3),
+    expired: at <= now,
   };
 }
 
@@ -470,6 +601,7 @@ export function resolveChannel(explicit, domain) {
 /** 单位换算常量（token 展示用）。 */
 const K = 1000;
 const M = 1000 * 1000;
+const B = 1000 * 1000 * 1000;
 
 /**
  * 槽类型：网关 `bucketSlot()` 的镜像判定。
@@ -682,14 +814,20 @@ export function creditsFreshness(accounts, now = Date.now()) {
 }
 
 /**
- * Token 数量紧凑格式化（k / M）。
+ * Token 数量紧凑格式化（K / M / B）。
+ *
+ * B 是这一版补的：真机 30 天窗口实测 19.18 亿 tokens，旧实现会写成
+ * `1917.97M` —— 一个比原始数还难读的字符串。1e9 以上走 B。
+ *
  * @param value - 数字。
- * @returns 如 `412.3k` / `11.68M`。
+ * @returns 如 `412.3K` / `11.68M` / `1.92B`。
  */
 export function formatTokens(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
-  if (Math.abs(value) >= M) return `${(value / M).toFixed(2)}M`;
-  if (Math.abs(value) >= K) return `${(value / K).toFixed(1)}k`;
+  const abs = Math.abs(value);
+  if (abs >= B) return `${(value / B).toFixed(2)}B`;
+  if (abs >= M) return `${(value / M).toFixed(2)}M`;
+  if (abs >= K) return `${(value / K).toFixed(1)}K`;
   return String(Math.round(value));
 }
 
@@ -1144,6 +1282,42 @@ export function dailyByModel(rows, buckets, days, metric = 'tokens') {
 }
 
 /**
+ * 排行维度的定义（账号用量 / 渠道用量共用）。
+ *
+ * 为什么加维度：请求数多 ≠ 用得多 —— 真机上「谁在烧钱」要看 Tokens / 积分。
+ * 三个维度共用同一份 `by_uid`，只是取的字段不同，不存在跨口径混算。
+ */
+export const RANK_METRICS = [
+  { id: 'tokens', field: 'total_tokens', label: 'Tokens', format: formatTokens },
+  { id: 'requests', field: 'requests', label: '请求', format: formatNumber },
+  { id: 'credit', field: 'credit', label: '积分', format: formatCredit },
+];
+
+/** 默认维度：**按用量（Tokens）** —— 「谁在用」的第一答案就是量，不是次数。 */
+export const DEFAULT_RANK_METRIC = 'tokens';
+
+/** 取维度定义（未知 id 回落默认维度，不抛错）。 */
+export function rankMetric(id) {
+  return RANK_METRICS.find((item) => item.id === id) ?? RANK_METRICS[0];
+}
+
+/**
+ * 某维度的总量：优先用响应里的 `total`，缺失时才回落到行求和
+ * （与 `usageShares` 同款兜底，避免网关漏给 total 时全表占比为 0）。
+ *
+ * @param total - `by_uid` 同响应的 total。
+ * @param rows - 已装饰的行。
+ * @param metric - 维度 id。
+ * @returns 数值（可能为 0）。
+ */
+function metricGrandTotal(total, rows, metric) {
+  const field = rankMetric(metric).field;
+  const fromTotal = Number(total?.[field]);
+  if (Number.isFinite(fromTotal) && fromTotal > 0) return fromTotal;
+  return rows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
+}
+
+/**
  * 按账号归因（账号排行用）：`by_uid` + 昵称/渠道解析 + 相对最大值归一。
  *
  * 相对最大值归一的理由：各项接近时（33/33/33）用绝对占比会让所有条一样长、
@@ -1153,11 +1327,13 @@ export function dailyByModel(rows, buckets, days, metric = 'tokens') {
  * @param total - 同响应里的 `total`。
  * @param accounts - `/status` 的 accounts（用于映射昵称）。
  * @param channelOf - `channelResolver()` 的产物。
- * @returns `[{key, name, channel, requests, tokens, credit, share, successRate, barShare}]`。
+ * @param metric - 排行维度（默认 `tokens` = 按用量）。
+ * @returns `[{key, name, channel, requests, tokens, credit, share, successRate, barShare, value}]`。
  */
-export function accountShares(rows, total, accounts = [], channelOf = () => 'workbuddy') {
+export function accountShares(rows, total, accounts = [], channelOf = () => 'workbuddy', metric = DEFAULT_RANK_METRIC) {
   const shares = usageShares(rows, total);
   const byUid = new Map((Array.isArray(accounts) ? accounts : []).map((a) => [a?.uid, a]));
+  const field = rankMetric(metric).field;
   const decorated = shares.map((row) => {
     const account = byUid.get(row.key);
     return {
@@ -1166,10 +1342,19 @@ export function accountShares(rows, total, accounts = [], channelOf = () => 'wor
       channel: account ? (channelOf(account) ?? 'workbuddy') : '',
       tokens: Number(row.total_tokens) || 0,
       credit: Number(row.credit) || 0,
+      value: Number(row[field]) || 0,
     };
   });
-  const max = Math.max(...decorated.map((row) => Number(row.requests) || 0), 1);
-  return decorated.map((row) => ({ ...row, barShare: (Number(row.requests) || 0) / max }));
+  const grand = metricGrandTotal(total, decorated, metric);
+  const max = Math.max(...decorated.map((row) => row.value), 1);
+  return decorated
+    .map((row) => ({
+      ...row,
+      share: grand > 0 ? row.value / grand : 0,
+      barShare: row.value / max,
+    }))
+    // 排行按**当前维度**降序 —— 切到 Tokens 时顺序必须跟着变，否则「排行」名不副实。
+    .sort((a, b) => b.value - a.value);
 }
 
 /**
@@ -1183,16 +1368,17 @@ export function accountShares(rows, total, accounts = [], channelOf = () => 'wor
  * @param total - 同响应里的 `total`。
  * @param accounts - `/status` 的 accounts。
  * @param channelOf - `channelResolver()` 的产物。
- * @returns 按请求数降序的渠道行（含 `share` / `barShare`）。
+ * @param metric - 排行维度（默认 `tokens` = 按用量）。
+ * @returns 按当前维度降序的渠道行（含 `share` / `barMax`）。
  */
-export function channelShares(rows, total, accounts = [], channelOf = () => 'workbuddy') {
-  const accountsRows = accountShares(rows, total, accounts, channelOf);
+export function channelShares(rows, total, accounts = [], channelOf = () => 'workbuddy', metric = DEFAULT_RANK_METRIC) {
+  const accountsRows = accountShares(rows, total, accounts, channelOf, metric);
   const table = new Map();
   for (const row of accountsRows) {
     const key = row.channel || 'unknown';
     if (!table.has(key)) {
       table.set(key, {
-        key, requests: 0, tokens: 0, credit: 0, failed: 0, success: 0, accounts: 0,
+        key, requests: 0, tokens: 0, credit: 0, failed: 0, success: 0, accounts: 0, value: 0,
       });
     }
     const entry = table.get(key);
@@ -1201,27 +1387,35 @@ export function channelShares(rows, total, accounts = [], channelOf = () => 'wor
     entry.credit += row.credit;
     entry.failed += Number(row.failed) || 0;
     entry.success += Number(row.success) || 0;
+    entry.value += row.value;
     entry.accounts += 1;
   }
-  const grand = Number(total?.requests) || [...table.values()].reduce((s, e) => s + e.requests, 0);
-  const list = [...table.values()].map((entry) => ({
+  const list = [...table.values()].sort((a, b) => b.value - a.value);
+  const grand = metricGrandTotal(total, accountsRows, metric);
+  const max = Math.max(...list.map((entry) => entry.value), 1);
+  return list.map((entry) => ({
     ...entry,
-    share: grand > 0 ? entry.requests / grand : 0,
-  })).sort((a, b) => b.requests - a.requests);
-  const max = Math.max(...list.map((entry) => entry.requests), 1);
-  return list.map((entry) => ({ ...entry, barMax: entry.requests / max }));
+    share: grand > 0 ? entry.value / grand : 0,
+    barMax: entry.value / max,
+  }));
 }
 
 /**
- * 概览 KPI 卡（参考实现的 4 卡布局：主数字 + 次级文字）。
+ * 概览 KPI 卡（6 张，两行 × 三列）。
  *
- * 映射取舍（详见 `.scratch/chanhub-panel/usage-v4-plan.md` §4）：
+ * 排布（用户指定，顺序即展示顺序）：
+ *   第一行 Tokens消耗 · 积分消耗 · 可用积分 —— 「花了多少 / 还剩多少」；
+ *   第二行 请求数 · 缓存命中 · 平均延迟   —— 「怎么花的」。
+ *
+ * 口径纪律：六张卡**全部来自窗口分桶 `total`**（缓存三段与 avg_latency_ms
+ * 都是网关这一版补进分桶的），所以不存在跨口径并排。进程累计口径的
+ * 命中率仍在折叠区单独展示 —— 那两个数不可混算。
+ *
+ * 参考实现的取舍（详见 `.scratch/chanhub-panel/usage-v4-plan.md` §4）：
  *   - 参考的「会话数」→ 我们只有**请求数**（网关无会话概念，不编造）。
- *   - 参考的「缓存命中率」卡 → 我们放**可用积分**（存量），因为窗口分桶
- *     与进程口径的命中率口径不同，混在一排会误导；命中率归入折叠区。
  *
  * @param props - `{total, stock, days, burn}`。
- * @returns 4 项 `[{key, label, value, detail, tone, title}]`。
+ * @returns 6 项 `[{key, label, value, detail, tone, title, raw, kind}]`。
  */
 export function kpiCards({ total, stock, days, burn }) {
   const requests = Number(total?.requests) || 0;
@@ -1231,44 +1425,37 @@ export function kpiCards({ total, stock, days, burn }) {
   const usable = Math.round(Number(stock?.usable) || 0);
   const list = Array.isArray(days) ? days : [];
   const active = list.filter((day) => (Number(day.requests) || 0) > 0);
+  const hit = hitRate(total);
+  const latency = Number(total?.avg_latency_ms);
 
   return [
     {
       key: 'tokens',
-      label: 'Tokens',
+      label: 'Tokens消耗',
       value: formatTokens(structure.total),
       // raw + kind：KPI 卡对**原始数**做入场动效、再按同一格式化器回写。
       // 对已格式化字符串反解（"18.9k" → 18.9）会把单位当数量级，动效会显示 0k。
       raw: structure.total,
       kind: 'tokens',
       detail: `输入 ${formatTokens(structure.prompt)} · 输出 ${formatTokens(structure.completion)}`,
-      title: '窗口内 prompt + completion 合计（两段互斥，相加不重复计）',
+      title: `窗口内 prompt + completion 合计 ${formatNumber(structure.total)}（两段互斥，相加不重复计）`,
     },
     {
       key: 'credit',
       label: '积分消耗',
-      value: formatCredit(credit),
+      value: formatCompact(credit),
       raw: credit,
-      kind: 'credit',
+      kind: 'compact',
       detail: requests > 0 ? `每请求 ${formatCredit(credit / requests)}` : '窗口内无请求',
       tone: 'ok',
-      title: '窗口内真实扣费合计（网关账本口径）',
-    },
-    {
-      key: 'requests',
-      label: '请求数',
-      value: formatNumber(requests),
-      raw: requests,
-      kind: 'count',
-      detail: `成功 ${formatNumber(requests - failed)} · 失败 ${formatNumber(failed)}`,
-      title: '网关无会话概念，故这里如实给请求数（不编造「会话数」）',
+      title: `窗口内真实扣费合计 ${formatCredit(credit)}（网关账本口径）`,
     },
     {
       key: 'stock',
       label: '可用积分',
-      value: formatNumber(usable),
+      value: formatCompact(usable),
       raw: usable,
-      kind: 'count',
+      kind: 'compact',
       detail: burn
         ? `≈ 还可 ${burnDaysText(burn.days)}`
         : `活跃 ${active.length} 天`,
@@ -1277,7 +1464,44 @@ export function kpiCards({ total, stock, days, burn }) {
         ? tryBurn(burn, stock)
         : `只算可消耗额度，不含渠道专用池。窗口内 ${list.length} 天中有 ${active.length} 天有请求`,
     },
+    {
+      key: 'requests',
+      label: '请求数',
+      value: formatCompact(requests),
+      raw: requests,
+      kind: 'compact',
+      detail: `成功 ${formatNumber(requests - failed)} · 失败 ${formatNumber(failed)}`,
+      title: '网关无会话概念，故这里如实给请求数（不编造「会话数」）',
+    },
+    {
+      key: 'cache',
+      label: '缓存命中',
+      // 「没有观测」与「命中率为 0」是两件事：无观测显示 —，不显示 0%。
+      value: hit === null ? '—' : formatPercent(hit, 1),
+      raw: hit ?? 0,
+      kind: 'percent',
+      detail: hit === null
+        ? '窗口内无缓存观测'
+        : `命中 ${formatTokens(Number(total?.cache_hit_tokens) || 0)} · 未命中 ${formatTokens(Number(total?.cache_miss_tokens) || 0)}`,
+      title: '窗口分桶口径：命中 /（命中 + 未命中），写入不计入分母。进程累计口径的命中率见下方折叠区（两者不可混算）',
+    },
+    {
+      key: 'latency',
+      label: '平均延迟',
+      value: Number.isFinite(latency) && latency > 0 ? latencyText(latency) : '—',
+      raw: Number.isFinite(latency) ? latency : 0,
+      kind: 'ms',
+      detail: requests > 0 ? `按请求数加权 · ${formatNumber(requests)} 次` : '窗口内无请求',
+      title: '窗口分桶口径：逐槽均值按请求数加权后的端到端耗时（与 /v1/stats 的进程累计均值是两个口径）',
+    },
   ];
+}
+
+/** 延迟可读文本：≥1s 用秒，否则用毫秒。 */
+export function latencyText(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value <= 0) return '—';
+  return value >= 1000 ? `${(value / 1000).toFixed(1)} s` : `${Math.round(value)} ms`;
 }
 
 /**

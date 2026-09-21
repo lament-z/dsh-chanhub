@@ -338,6 +338,9 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
 /* \u6E20\u9053\u4E09\u5361 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+/* \u72EC\u5360\u4E00\u884C\u7684\u5361\uFF08\u8D5A\u5F97\u79EF\u5206\uFF09\uFF1A\u5B83\u662F\u7D2F\u8BA1\u53E3\u5F84\uFF0C\u4E0E\u4E0B\u9762\u4E09\u4E2A\u300C\u5F53\u524D\u53EF\u7528\u300D\u4E0D\u662F\u540C\u4E00\u7C7B\u6570\uFF0C
+   \u4E0D\u7ED9\u5B83\u5E76\u6392\u662F\u4E3A\u4E86\u907F\u514D\u88AB\u8BFB\u6210\u300C\u4E09\u9879\u4E4B\u548C\u300D\u3002 */
+.dshc-chancards.one { grid-template-columns: 1fr; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
 .dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
 .dshc-chancard.dim { opacity: 0.55; }
@@ -372,6 +375,8 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-acctcard-foot { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; margin-top: auto; padding-top: 7px; border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
 .dshc-chip { font-size: 11px; line-height: 1.5; padding: 1px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); color: var(--dsw-alias-label-secondary,#6b7280); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .dshc-chip-dim { color: var(--dsw-alias-label-tertiary,#9ca3af); }
+/* \u5230\u671F\u4E34\u8FD1 / \u5DF2\u8FC7\u671F\uFF1A\u552F\u4E00\u9700\u8981\u62A2\u6CE8\u610F\u529B\u7684\u5143\u4FE1\u606F\uFF0C\u6545\u7528\u8B66\u793A\u5E95\u800C\u975E\u7070\u5E95 */
+.dshc-chip-warn { background: var(--dsw-alias-state-warn-tertiary,#fffbeb); color: var(--dsw-alias-state-warn-primary,#b45309); }
 /* \u9010\u8D26\u53F7\u660E\u7EC6\u884C\uFF1A**\u7F51\u683C\u56FA\u5B9A\u5217**\uFF0C\u4FDD\u8BC1\u540C\u4E00\u5217\u5728\u6BCF\u884C\u4F4D\u7F6E\u4E00\u81F4\u3002
    \u80CC\u666F\uFF1A\u5F00\u5B66\u5B63\u6709 5 \u884C\u4F46\u300C\u6BCF\u65E5\u300D\u6807\u7B7E\u53EA 4 \u884C\u6709\u3001\u6210\u957F\u4EFB\u52A1 22 \u884C\u91CC\u51FA\u73B0 3/4/5 \u4E2A\u5B50\u5143\u7D20
    \u4E09\u79CD\u5F62\u6001 \u2014\u2014 \u7528 flex \u81EA\u7136\u6392\u7248\u65F6\u7F3A\u4E00\u5217\u5C31\u4F1A\u8BA9\u540E\u7EED\u5217\u5DE6\u79FB\uFF0C\u89C6\u89C9\u4E0A\u300C\u9519\u4F4D\u300D\u3002 */
@@ -490,10 +495,13 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-ust-scope { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .dshc-ust-scope-tag { font-size: 10px; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); color: var(--dsw-alias-label-secondary,#6b7280); flex-shrink: 0; }
 
-/* \u2500\u2500 \u2460 KPI 4 \u5361\uFF1A\u4E3B\u6570\u5B57 + \u4E00\u884C\u6B21\u7EA7\u6587\u5B57 \u2500\u2500
+/* \u2500\u2500 \u2460 KPI 6 \u5361\uFF1A\u4E3B\u6570\u5B57 + \u4E00\u884C\u6B21\u7EA7\u6587\u5B57 \u2500\u2500
    \u53C2\u8003\u5B9E\u73B0\u7684 kpi \u5361\uFF1A\u6570\u503C 19px/700/\u8D1F\u5B57\u8DDD/\u7B49\u5BBD\u6570\u4F4D\uFF0C\u6B21\u7EA7\u6587\u5B57 11px\u3002
-   \u6805\u683C auto-fit \u8BA9\u7A84\u5C4F\u81EA\u52A8\u6362\u884C\uFF0C\u800C\u4E0D\u662F\u786C\u538B 4 \u5217\u3002 */
-.dshc-ust-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+   \u56FA\u5B9A 3 \u5217\uFF08auto-fit \u4F1A\u5728\u5BBD\u5C4F\u6392\u6210 4 \u5217\uFF0C\u628A\u300C\u4E09\u6D88\u8017 + \u4E09\u6548\u7387\u300D\u7684\u4E24\u884C\u8BED\u4E49
+   \u5207\u6210 4+2\uFF0C\u8BFB\u7684\u65F6\u5019\u5C31\u4E0D\u6210\u7EC4\u4E86\uFF09\uFF1B\u7A84\u5C4F\u964D 2 \u5217\u3001\u518D\u7A84 1 \u5217\u3002 */
+.dshc-ust-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .dshc-ust-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .dshc-ust-kpis { grid-template-columns: 1fr; } }
 .dshc-ust-kpi { background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; padding: 13px 15px; min-width: 0; }
 .dshc-ust-kpi-k { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dshc-ust-kpi-v { margin-top: 7px; font-size: 19px; font-weight: 700; line-height: 1.2; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -876,8 +884,8 @@ var CONFIG_FIELDS = (
       label: "\u5FEB\u8FC7\u671F\u79EF\u5206\u7A97\u53E3",
       type: "duration",
       default: "168h",
-      restart: false,
-      note: "0 \u6216\u8D1F = \u7981\u7528\u5FEB\u8FC7\u671F\u5206\u6876\uFF08\u5408\u6CD5\u503C\uFF0C\u4E0D\u662F\u56DE\u843D\uFF09",
+      restart: true,
+      note: "0 \u6216\u8D1F = \u7981\u7528\u5FEB\u8FC7\u671F\u5206\u6876\uFF08\u5408\u6CD5\u503C\uFF0C\u4E0D\u662F\u56DE\u843D\uFF09\uFF1B\u65E0\u70ED\u6539 setter \u2014\u2014 \u53EA\u5199\u76D8\uFF0C\u9700\u91CD\u542F\u7F51\u5173\u624D\u6539\u7A97\u53E3",
       danger: true
     },
     {
@@ -889,31 +897,38 @@ var CONFIG_FIELDS = (
       note: "0 = \u5173\u505C\u63A2\u7D22\uFF08\u5408\u6CD5\u503C\uFF0C\u4E0D\u56DE\u843D\u9ED8\u8BA4\uFF09",
       danger: true
     },
-    // ---- schedule（13 项；chanhub 无 Reconfigure → 需重启）----
-    { path: "schedule.checkin_hours", label: "\u7B7E\u5230\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: true },
-    { path: "schedule.travel_hours", label: "\u732B\u732B\u65C5\u884C\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: true },
-    { path: "schedule.activity_hours", label: "\u6D3B\u8DC3\u5730\u56FE\u5C0F\u65F6", type: "hours", default: "[10]", restart: true },
-    { path: "schedule.keepalive_hours", label: "token \u4FDD\u6D3B\u5C0F\u65F6", type: "hours", default: "[22]", restart: true },
-    { path: "schedule.school_hours", label: "\u5F00\u5B66\u5B63\u5C0F\u65F6", type: "hours", default: "[12]", restart: true },
-    { path: "schedule.cat_hours", label: "\u591C\u732B\u5B50\u5C0F\u65F6", type: "hours", default: "[1]", restart: true, note: "\u7A97\u53E3 23:00\u201308:00 CST" },
-    { path: "schedule.checkin_enabled", label: "\u542F\u7528\u7B7E\u5230", type: "bool", default: "true", restart: true },
-    { path: "schedule.travel_enabled", label: "\u542F\u7528\u65C5\u884C", type: "bool", default: "true", restart: true },
-    { path: "schedule.activity_enabled", label: "\u542F\u7528\u6D3B\u8DC3\u4E0A\u62A5", type: "bool", default: "true", restart: true },
-    { path: "schedule.keepalive_enabled", label: "\u542F\u7528\u4FDD\u6D3B", type: "bool", default: "true", restart: true },
-    { path: "schedule.school_enabled", label: "\u542F\u7528\u5F00\u5B66\u5B63", type: "bool", default: "true", restart: true },
-    { path: "schedule.cat_enabled", label: "\u542F\u7528\u591C\u732B\u5B50", type: "bool", default: "true", restart: true },
+    // ---- schedule（13 项；scheduler.Reconfigure 已接线 → 可热改）----
+    { path: "schedule.checkin_hours", label: "\u7B7E\u5230\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: false, note: "\u70ED\u6539\u7ECF scheduler.Reconfigure\uFF08\u4E0B\u8F6E\u6392\u7A0B\u751F\u6548\uFF09" },
+    { path: "schedule.travel_hours", label: "\u732B\u732B\u65C5\u884C\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: false },
+    { path: "schedule.activity_hours", label: "\u6D3B\u8DC3\u5730\u56FE\u5C0F\u65F6", type: "hours", default: "[10]", restart: false },
+    { path: "schedule.keepalive_hours", label: "token \u4FDD\u6D3B\u5C0F\u65F6", type: "hours", default: "[22]", restart: false },
+    { path: "schedule.school_hours", label: "\u5F00\u5B66\u5B63\u5C0F\u65F6", type: "hours", default: "[12]", restart: false },
+    { path: "schedule.cat_hours", label: "\u591C\u732B\u5B50\u5C0F\u65F6", type: "hours", default: "[1]", restart: false, note: "\u7A97\u53E3 23:00\u201308:00 CST" },
+    { path: "schedule.checkin_enabled", label: "\u542F\u7528\u7B7E\u5230", type: "bool", default: "true", restart: false },
+    { path: "schedule.travel_enabled", label: "\u542F\u7528\u65C5\u884C", type: "bool", default: "true", restart: false },
+    { path: "schedule.activity_enabled", label: "\u542F\u7528\u6D3B\u8DC3\u4E0A\u62A5", type: "bool", default: "true", restart: false },
+    { path: "schedule.keepalive_enabled", label: "\u542F\u7528\u4FDD\u6D3B", type: "bool", default: "true", restart: false },
+    { path: "schedule.school_enabled", label: "\u542F\u7528\u5F00\u5B66\u5B63", type: "bool", default: "true", restart: false },
+    { path: "schedule.cat_enabled", label: "\u542F\u7528\u591C\u732B\u5B50", type: "bool", default: "true", restart: false },
     {
       path: "schedule.activity_report_count",
       label: "\u6BCF\u6B21\u4E0A\u62A5\u6761\u6570",
       type: "int",
       default: "5",
-      restart: true,
+      restart: false,
       note: "\u7F3A\u7701 5\uFF1B\u663E\u5F0F 0 \u2192 \u53D8\u4E3A 1\uFF08\u4E24\u6761\u8DEF\u5F84\u4E0D\u5408\u5E76\uFF0C\u662F\u523B\u610F\u7684\uFF09",
       danger: true
     },
     // ---- cooldown（2 项）----
-    { path: "cooldown.soft_rate", label: "\u8F6F\u9650\u6D41\u51B7\u5374\u57FA\u6570", type: "duration", default: "600s", restart: false },
-    { path: "cooldown.soft_rate_max", label: "\u8F6F\u51B7\u5374\u9000\u907F\u5C01\u9876", type: "duration", default: "2h", restart: false },
+    { path: "cooldown.soft_rate", label: "\u8F6F\u9650\u6D41\u51B7\u5374\u57FA\u6570", type: "duration", default: "600s", restart: false, note: "\u70ED\u6539\u7ECF handler.SoftCooldown\uFF08429/6004 \u8DEF\u5F84\u9010\u8BF7\u6C42\u8BFB\u53D6\uFF09" },
+    {
+      path: "cooldown.soft_rate_max",
+      label: "\u8F6F\u51B7\u5374\u9000\u907F\u5C01\u9876",
+      type: "duration",
+      default: "2h",
+      restart: true,
+      note: "\u7F51\u5173\u53EA\u70ED\u6539\u57FA\u6570\uFF08soft_rate\uFF09\uFF0C\u5C01\u9876\u4ECD\u5728\u88C5\u914D\u671F\u8BFB\u53D6 \u2014\u2014 \u6539\u5B83\u5FC5\u987B\u91CD\u542F"
+    },
     // ---- session_sticky（3 项）----
     { path: "session_sticky.enabled", label: "\u542F\u7528\u7C98\u6027\u4F1A\u8BDD", type: "bool", default: "true", restart: true },
     { path: "session_sticky.ttl", label: "\u7ED1\u5B9A TTL", type: "duration", default: "30m", restart: true, note: "\u6EDA\u52A8\u7EED\u671F" },
@@ -934,7 +949,7 @@ var CONFIG_FIELDS = (
     { path: "global.chat_base", label: "chat base \u8986\u76D6", type: "string", default: "", restart: true },
     { path: "global.billing_base", label: "billing base \u8986\u76D6", type: "string", default: "", restart: true },
     // ---- prompt（2 项）----
-    { path: "prompt.mode", label: "\u63D0\u793A\u8BCD\u6A21\u5F0F", type: "enum", enumValues: "passthrough,custom,append", default: "passthrough", restart: true, note: "\u975E\u6CD5\u503C\u4F1A\u5BFC\u81F4\u7F51\u5173\u542F\u52A8\u62A5\u9519" },
+    { path: "prompt.mode", label: "\u63D0\u793A\u8BCD\u6A21\u5F0F", type: "enum", enumValues: "passthrough,custom,append", default: "passthrough", restart: false, note: "\u975E\u6CD5\u503C\u4F1A\u5BFC\u81F4\u7F51\u5173\u542F\u52A8\u62A5\u9519\uFF1B\u70ED\u6539\u7ECF\u9010\u8BF7\u6C42\u8BFB\u53D6\u9762" },
     { path: "prompt.file", label: "\u63D0\u793A\u8BCD\u6587\u4EF6", type: "string", default: "", restart: true, note: "custom/append \u4E0B\u975E\u7A7A\u4F46\u4E0D\u53EF\u8BFB \u2192 \u542F\u52A8\u62A5\u9519" },
     // ---- upstash（2 项）----
     { path: "upstash.url", label: "Redis URL", type: "string", default: "", restart: true, note: "\u7A7A = \u7EAF\u5185\u5B58" },
@@ -1157,6 +1172,19 @@ function formatNumber(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
   return value.toLocaleString("en-US");
 }
+function formatCompact(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
+  const abs = Math.abs(value);
+  if (abs >= 1e12) return `${trimUnit(value / 1e12)}\u4E07\u4EBF`;
+  if (abs >= 1e8) return `${trimUnit(value / 1e8)}\u4EBF`;
+  if (abs >= 1e4) return `${trimUnit(value / 1e4)}W`;
+  return formatNumber(Math.round(value));
+}
+function trimUnit(value) {
+  const abs = Math.abs(value);
+  const text = abs >= 100 ? value.toFixed(0) : abs >= 10 ? value.toFixed(1) : value.toFixed(2);
+  return text.replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+}
 function groupByChannel(accounts, channelOf = () => "workbuddy") {
   const buckets = /* @__PURE__ */ new Map();
   for (const id of CHANNEL_ORDER) {
@@ -1177,6 +1205,68 @@ function groupByChannel(accounts, channelOf = () => "workbuddy") {
     total: channels.reduce((sum, bucket) => sum + bucket.credits, 0),
     creditsTotal: channels.reduce((sum, bucket) => sum + bucket.creditsTotal, 0),
     channels
+  };
+}
+function earnedCredits(accounts = [], creditsByUid = {}) {
+  let total = 0;
+  let used = 0;
+  let remain = 0;
+  let covered = 0;
+  let missing = 0;
+  for (const account of Array.isArray(accounts) ? accounts : []) {
+    const wrap = creditsByUid?.[account?.uid];
+    const items = wrap?.available === true ? wrap?.credits?.items : void 0;
+    if (!Array.isArray(items)) {
+      missing += 1;
+      continue;
+    }
+    covered += 1;
+    for (const item of items) {
+      const itemTotal = Number(item?.total) || 0;
+      const itemUsed = Number(item?.used) || 0;
+      const itemRemain = Number(item?.remain);
+      total += itemTotal;
+      used += itemUsed;
+      remain += Number.isFinite(itemRemain) ? itemRemain : Math.max(0, itemTotal - itemUsed);
+    }
+  }
+  return {
+    total,
+    used,
+    remain,
+    covered,
+    missing,
+    count: Array.isArray(accounts) ? accounts.length : 0
+  };
+}
+function accountExpiry({ account, authAccounts = [], creditsDetail, now = Date.now() }) {
+  const uid = account?.uid;
+  const auth = (Array.isArray(authAccounts) ? authAccounts : []).find((entry) => entry?.uid === uid);
+  const raw = Number(auth?.expiresAt);
+  if (Number.isFinite(raw) && raw > 0) {
+    const at = raw < 1e12 ? raw * 1e3 : raw;
+    return decorateExpiry(at, "credential", now);
+  }
+  const items = creditsDetail?.available === true ? creditsDetail?.credits?.items : void 0;
+  if (Array.isArray(items)) {
+    let nearest = NaN;
+    for (const item of items) {
+      if ((Number(item?.remain) || 0) <= 0) continue;
+      const at = Date.parse(item?.expire_at ?? "");
+      if (!Number.isFinite(at) || at <= 0) continue;
+      if (!Number.isFinite(nearest) || at < nearest) nearest = at;
+    }
+    if (Number.isFinite(nearest)) return decorateExpiry(nearest, "package", now);
+  }
+  return null;
+}
+function decorateExpiry(at, kind, now) {
+  return {
+    at,
+    kind,
+    // 剩余天数按「还剩几个自然日」算：今天到期 = 0 天，昨天到期 = 已过期。
+    days: Math.floor((at - now) / 864e5),
+    expired: at <= now
   };
 }
 function realmAvailability(realmTotals) {
@@ -1297,6 +1387,7 @@ function resolveChannel(explicit, domain) {
 }
 var K = 1e3;
 var M = 1e3 * 1e3;
+var B = 1e3 * 1e3 * 1e3;
 function slotKind(slot) {
   if (typeof slot !== "string" || slot.length < 2) return "unknown";
   if (slot.startsWith("h:")) return "hour";
@@ -1420,8 +1511,10 @@ function windowHours(value) {
 }
 function formatTokens(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "\u2014";
-  if (Math.abs(value) >= M) return `${(value / M).toFixed(2)}M`;
-  if (Math.abs(value) >= K) return `${(value / K).toFixed(1)}k`;
+  const abs = Math.abs(value);
+  if (abs >= B) return `${(value / B).toFixed(2)}B`;
+  if (abs >= M) return `${(value / M).toFixed(2)}M`;
+  if (abs >= K) return `${(value / K).toFixed(1)}K`;
   return String(Math.round(value));
 }
 function formatCredit(value) {
@@ -1593,9 +1686,25 @@ function dailyByModel(rows, buckets, days, metric = "tokens") {
   const series = [...table.values()].sort((a, b) => b.total - a.total);
   return { dates, series, field };
 }
-function accountShares(rows, total, accounts = [], channelOf = () => "workbuddy") {
+var RANK_METRICS = [
+  { id: "tokens", field: "total_tokens", label: "Tokens", format: formatTokens },
+  { id: "requests", field: "requests", label: "\u8BF7\u6C42", format: formatNumber },
+  { id: "credit", field: "credit", label: "\u79EF\u5206", format: formatCredit }
+];
+var DEFAULT_RANK_METRIC = "tokens";
+function rankMetric(id) {
+  return RANK_METRICS.find((item) => item.id === id) ?? RANK_METRICS[0];
+}
+function metricGrandTotal(total, rows, metric) {
+  const field = rankMetric(metric).field;
+  const fromTotal = Number(total?.[field]);
+  if (Number.isFinite(fromTotal) && fromTotal > 0) return fromTotal;
+  return rows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
+}
+function accountShares(rows, total, accounts = [], channelOf = () => "workbuddy", metric = DEFAULT_RANK_METRIC) {
   const shares = usageShares(rows, total);
   const byUid = new Map((Array.isArray(accounts) ? accounts : []).map((a) => [a?.uid, a]));
+  const field = rankMetric(metric).field;
   const decorated = shares.map((row) => {
     const account = byUid.get(row.key);
     return {
@@ -1603,14 +1712,20 @@ function accountShares(rows, total, accounts = [], channelOf = () => "workbuddy"
       name: account?.nickname || (row.key ? `${String(row.key).slice(0, 8)}\u2026` : "\uFF08\u672A\u9009\u53F7\uFF09"),
       channel: account ? channelOf(account) ?? "workbuddy" : "",
       tokens: Number(row.total_tokens) || 0,
-      credit: Number(row.credit) || 0
+      credit: Number(row.credit) || 0,
+      value: Number(row[field]) || 0
     };
   });
-  const max = Math.max(...decorated.map((row) => Number(row.requests) || 0), 1);
-  return decorated.map((row) => ({ ...row, barShare: (Number(row.requests) || 0) / max }));
+  const grand = metricGrandTotal(total, decorated, metric);
+  const max = Math.max(...decorated.map((row) => row.value), 1);
+  return decorated.map((row) => ({
+    ...row,
+    share: grand > 0 ? row.value / grand : 0,
+    barShare: row.value / max
+  })).sort((a, b) => b.value - a.value);
 }
-function channelShares(rows, total, accounts = [], channelOf = () => "workbuddy") {
-  const accountsRows = accountShares(rows, total, accounts, channelOf);
+function channelShares(rows, total, accounts = [], channelOf = () => "workbuddy", metric = DEFAULT_RANK_METRIC) {
+  const accountsRows = accountShares(rows, total, accounts, channelOf, metric);
   const table = /* @__PURE__ */ new Map();
   for (const row of accountsRows) {
     const key = row.channel || "unknown";
@@ -1622,7 +1737,8 @@ function channelShares(rows, total, accounts = [], channelOf = () => "workbuddy"
         credit: 0,
         failed: 0,
         success: 0,
-        accounts: 0
+        accounts: 0,
+        value: 0
       });
     }
     const entry = table.get(key);
@@ -1631,15 +1747,17 @@ function channelShares(rows, total, accounts = [], channelOf = () => "workbuddy"
     entry.credit += row.credit;
     entry.failed += Number(row.failed) || 0;
     entry.success += Number(row.success) || 0;
+    entry.value += row.value;
     entry.accounts += 1;
   }
-  const grand = Number(total?.requests) || [...table.values()].reduce((s2, e) => s2 + e.requests, 0);
-  const list = [...table.values()].map((entry) => ({
+  const list = [...table.values()].sort((a, b) => b.value - a.value);
+  const grand = metricGrandTotal(total, accountsRows, metric);
+  const max = Math.max(...list.map((entry) => entry.value), 1);
+  return list.map((entry) => ({
     ...entry,
-    share: grand > 0 ? entry.requests / grand : 0
-  })).sort((a, b) => b.requests - a.requests);
-  const max = Math.max(...list.map((entry) => entry.requests), 1);
-  return list.map((entry) => ({ ...entry, barMax: entry.requests / max }));
+    share: grand > 0 ? entry.value / grand : 0,
+    barMax: entry.value / max
+  }));
 }
 function kpiCards({ total, stock, days, burn }) {
   const requests = Number(total?.requests) || 0;
@@ -1649,48 +1767,81 @@ function kpiCards({ total, stock, days, burn }) {
   const usable = Math.round(Number(stock?.usable) || 0);
   const list = Array.isArray(days) ? days : [];
   const active = list.filter((day) => (Number(day.requests) || 0) > 0);
+  const hit = hitRate(total);
+  const latency = Number(total?.avg_latency_ms);
   return [
     {
       key: "tokens",
-      label: "Tokens",
+      label: "Tokens\u6D88\u8017",
       value: formatTokens(structure.total),
       // raw + kind：KPI 卡对**原始数**做入场动效、再按同一格式化器回写。
       // 对已格式化字符串反解（"18.9k" → 18.9）会把单位当数量级，动效会显示 0k。
       raw: structure.total,
       kind: "tokens",
       detail: `\u8F93\u5165 ${formatTokens(structure.prompt)} \xB7 \u8F93\u51FA ${formatTokens(structure.completion)}`,
-      title: "\u7A97\u53E3\u5185 prompt + completion \u5408\u8BA1\uFF08\u4E24\u6BB5\u4E92\u65A5\uFF0C\u76F8\u52A0\u4E0D\u91CD\u590D\u8BA1\uFF09"
+      title: `\u7A97\u53E3\u5185 prompt + completion \u5408\u8BA1 ${formatNumber(structure.total)}\uFF08\u4E24\u6BB5\u4E92\u65A5\uFF0C\u76F8\u52A0\u4E0D\u91CD\u590D\u8BA1\uFF09`
     },
     {
       key: "credit",
       label: "\u79EF\u5206\u6D88\u8017",
-      value: formatCredit(credit),
+      value: formatCompact(credit),
       raw: credit,
-      kind: "credit",
+      kind: "compact",
       detail: requests > 0 ? `\u6BCF\u8BF7\u6C42 ${formatCredit(credit / requests)}` : "\u7A97\u53E3\u5185\u65E0\u8BF7\u6C42",
       tone: "ok",
-      title: "\u7A97\u53E3\u5185\u771F\u5B9E\u6263\u8D39\u5408\u8BA1\uFF08\u7F51\u5173\u8D26\u672C\u53E3\u5F84\uFF09"
-    },
-    {
-      key: "requests",
-      label: "\u8BF7\u6C42\u6570",
-      value: formatNumber(requests),
-      raw: requests,
-      kind: "count",
-      detail: `\u6210\u529F ${formatNumber(requests - failed)} \xB7 \u5931\u8D25 ${formatNumber(failed)}`,
-      title: "\u7F51\u5173\u65E0\u4F1A\u8BDD\u6982\u5FF5\uFF0C\u6545\u8FD9\u91CC\u5982\u5B9E\u7ED9\u8BF7\u6C42\u6570\uFF08\u4E0D\u7F16\u9020\u300C\u4F1A\u8BDD\u6570\u300D\uFF09"
+      title: `\u7A97\u53E3\u5185\u771F\u5B9E\u6263\u8D39\u5408\u8BA1 ${formatCredit(credit)}\uFF08\u7F51\u5173\u8D26\u672C\u53E3\u5F84\uFF09`
     },
     {
       key: "stock",
       label: "\u53EF\u7528\u79EF\u5206",
-      value: formatNumber(usable),
+      value: formatCompact(usable),
       raw: usable,
-      kind: "count",
+      kind: "compact",
       detail: burn ? `\u2248 \u8FD8\u53EF ${burnDaysText(burn.days)}` : `\u6D3B\u8DC3 ${active.length} \u5929`,
       tone: "ok",
       title: burn ? tryBurn(burn, stock) : `\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF0C\u4E0D\u542B\u6E20\u9053\u4E13\u7528\u6C60\u3002\u7A97\u53E3\u5185 ${list.length} \u5929\u4E2D\u6709 ${active.length} \u5929\u6709\u8BF7\u6C42`
+    },
+    {
+      key: "requests",
+      label: "\u8BF7\u6C42\u6570",
+      value: formatCompact(requests),
+      raw: requests,
+      kind: "compact",
+      detail: `\u6210\u529F ${formatNumber(requests - failed)} \xB7 \u5931\u8D25 ${formatNumber(failed)}`,
+      title: "\u7F51\u5173\u65E0\u4F1A\u8BDD\u6982\u5FF5\uFF0C\u6545\u8FD9\u91CC\u5982\u5B9E\u7ED9\u8BF7\u6C42\u6570\uFF08\u4E0D\u7F16\u9020\u300C\u4F1A\u8BDD\u6570\u300D\uFF09"
+    },
+    {
+      key: "cache",
+      label: "\u7F13\u5B58\u547D\u4E2D",
+      // 「没有观测」与「命中率为 0」是两件事：无观测显示 —，不显示 0%。
+      value: hit === null ? "\u2014" : formatPercent(hit, 1),
+      raw: hit ?? 0,
+      kind: "percent",
+      detail: hit === null ? "\u7A97\u53E3\u5185\u65E0\u7F13\u5B58\u89C2\u6D4B" : `\u547D\u4E2D ${formatTokens(Number(total?.cache_hit_tokens) || 0)} \xB7 \u672A\u547D\u4E2D ${formatTokens(Number(total?.cache_miss_tokens) || 0)}`,
+      title: "\u7A97\u53E3\u5206\u6876\u53E3\u5F84\uFF1A\u547D\u4E2D /\uFF08\u547D\u4E2D + \u672A\u547D\u4E2D\uFF09\uFF0C\u5199\u5165\u4E0D\u8BA1\u5165\u5206\u6BCD\u3002\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\u7684\u547D\u4E2D\u7387\u89C1\u4E0B\u65B9\u6298\u53E0\u533A\uFF08\u4E24\u8005\u4E0D\u53EF\u6DF7\u7B97\uFF09"
+    },
+    {
+      key: "latency",
+      label: "\u5E73\u5747\u5EF6\u8FDF",
+      value: Number.isFinite(latency) && latency > 0 ? latencyText(latency) : "\u2014",
+      raw: Number.isFinite(latency) ? latency : 0,
+      kind: "ms",
+      detail: requests > 0 ? `\u6309\u8BF7\u6C42\u6570\u52A0\u6743 \xB7 ${formatNumber(requests)} \u6B21` : "\u7A97\u53E3\u5185\u65E0\u8BF7\u6C42",
+      title: "\u7A97\u53E3\u5206\u6876\u53E3\u5F84\uFF1A\u9010\u69FD\u5747\u503C\u6309\u8BF7\u6C42\u6570\u52A0\u6743\u540E\u7684\u7AEF\u5230\u7AEF\u8017\u65F6\uFF08\u4E0E /v1/stats \u7684\u8FDB\u7A0B\u7D2F\u8BA1\u5747\u503C\u662F\u4E24\u4E2A\u53E3\u5F84\uFF09"
     }
   ];
+}
+function latencyText(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value <= 0) return "\u2014";
+  return value >= 1e3 ? `${(value / 1e3).toFixed(1)} s` : `${Math.round(value)} ms`;
+}
+function hitRate(row) {
+  const hit = Number(row?.cache_hit_tokens) || 0;
+  const miss = Number(row?.cache_miss_tokens) || 0;
+  const denom = hit + miss;
+  if (denom <= 0) return null;
+  return hit / denom;
 }
 
 // client/endpoints.js
@@ -2242,13 +2393,16 @@ function KpiCards({ items }) {
 }
 function KpiCard({ item }) {
   const animated = useCountUp(Number(item.raw) || 0);
-  const display = item.kind === "tokens" ? formatTokens(animated) : item.kind === "credit" ? formatCredit(animated) : formatNumber(Math.round(animated));
+  const noData = (item.kind === "percent" || item.kind === "ms") && !(Number(item.raw) > 0);
+  const display = noData ? item.value : formatKpi(animated, item.kind);
   return import_react4.default.createElement(
     "div",
     {
       className: "dshc-ust-kpi",
       "data-kpi": item.key,
-      ...item.title ? { title: item.title } : {}
+      // 精确值挂 title：紧凑格式化后卡片上只剩量级，明细不能丢。
+      title: item.title ? `${item.title}
+\u7CBE\u786E\u503C\uFF1A${item.value}` : item.value
     },
     import_react4.default.createElement("div", { className: "dshc-ust-kpi-k" }, item.label),
     import_react4.default.createElement("div", {
@@ -2257,6 +2411,22 @@ function KpiCard({ item }) {
     }, display),
     import_react4.default.createElement("div", { className: "dshc-ust-kpi-d" }, item.detail)
   );
+}
+function formatKpi(value, kind) {
+  switch (kind) {
+    case "tokens":
+      return formatTokens(value);
+    case "credit":
+      return formatCredit(value);
+    case "compact":
+      return formatCompact(value);
+    case "percent":
+      return formatPercent(value, 1);
+    case "ms":
+      return latencyText(value);
+    default:
+      return formatCompact(Math.round(value));
+  }
 }
 function Heatmap({ rows, metric = "requests", onMetricChange, onTip }) {
   const days = import_react4.default.useMemo(() => usageByDay(rows), [rows]);
@@ -2408,12 +2578,26 @@ function HourProfile({ hours }) {
   );
 }
 var SEG_COLORS = [
-  "var(--dsw-alias-brand-primary,#4f6ef7)",
-  "var(--dsw-alias-state-success-primary,#22c55e)",
-  "var(--dsw-alias-state-warn-primary,#f59e0b)",
-  "var(--dsw-alias-state-business-primary,#a855f7)",
-  "var(--dsw-alias-button-info-fill,#0ea5e9)",
-  "var(--dsw-alias-label-tertiary,#94a3b8)"
+  "#4f6ef7",
+  // 蓝
+  "#10b981",
+  // 翠绿
+  "#f59e0b",
+  // 琥珀
+  "#a855f7",
+  // 紫
+  "#06b6d4",
+  // 青
+  "#ef4444",
+  // 红
+  "#84cc16",
+  // 黄绿
+  "#ec4899",
+  // 玫红
+  "#14b8a6",
+  // 蓝绿
+  "#6366f1"
+  // 靛
 ];
 var SERIES_HEAD = 5;
 function DailyBars({ byModel, metric, range, onRangeChange, onMetricChange, onTip }) {
@@ -2586,14 +2770,31 @@ function mergeTail(series) {
   );
   return [...head, { ...merged, color: SEG_COLORS[SEG_COLORS.length - 1], rest: true }];
 }
-function RankCards({ accounts, channels }) {
+function RankCards({ accounts, channels, metric = "tokens", onMetricChange }) {
+  const current = rankMetric(metric);
+  const options = RANK_METRICS.map((item) => [item.id, item.label]);
+  const extra = `\u6309${current.label}`;
   return import_react4.default.createElement(
     "div",
     { className: "dshc-ust-rank" },
     import_react4.default.createElement(
       "div",
       { className: "dshc-ust-card", "data-card": "accounts" },
-      import_react4.default.createElement(CardHead, { title: "\u8D26\u53F7\u7528\u91CF", extra: "\u6309\u8BF7\u6C42\u6570" }),
+      import_react4.default.createElement(
+        "div",
+        { className: "dshc-ust-cardhead" },
+        import_react4.default.createElement(
+          "div",
+          { className: "dshc-ust-cardtitle" },
+          import_react4.default.createElement("h3", null, "\u8D26\u53F7\u7528\u91CF"),
+          import_react4.default.createElement("span", { className: "dshc-ust-cardsub" }, extra)
+        ),
+        import_react4.default.createElement(
+          "div",
+          { className: "dshc-ust-cardactions" },
+          onMetricChange ? import_react4.default.createElement(MetricSwitch, { value: metric, onChange: onMetricChange, seg: "rankMetric", options }) : null
+        )
+      ),
       accounts.length === 0 ? import_react4.default.createElement("div", { style: s.muted }, "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u8D26\u53F7\u8BB0\u5F55") : import_react4.default.createElement(
         import_react4.default.Fragment,
         null,
@@ -2615,7 +2816,8 @@ function RankCards({ accounts, channels }) {
             ),
             import_react4.default.createElement("span", {
               className: "dshc-ust-rank-val",
-              title: `${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206 \xB7 \u6210\u529F\u7387 ${formatPercent(row.successRate, 1)}`
+              title: `${current.label} ${current.format(row.value)}\uFF08${formatPercent(row.share, 1)}\uFF09
+${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206 \xB7 \u6210\u529F\u7387 ${formatPercent(row.successRate, 1)}`
             }, formatPercent(row.share, 0))
           )
         )
@@ -2624,7 +2826,7 @@ function RankCards({ accounts, channels }) {
     import_react4.default.createElement(
       "div",
       { className: "dshc-ust-card", "data-card": "channels" },
-      import_react4.default.createElement(CardHead, { title: "\u6E20\u9053\u7528\u91CF", extra: "\u8D26\u53F7\u6C60\u540C\u6E90\u53E3\u5F84" }),
+      import_react4.default.createElement(CardHead, { title: "\u6E20\u9053\u7528\u91CF", extra: `${extra} \xB7 \u8D26\u53F7\u6C60\u540C\u6E90\u53E3\u5F84` }),
       channels.length === 0 ? import_react4.default.createElement("div", { style: s.muted }, "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u6E20\u9053\u8BB0\u5F55") : import_react4.default.createElement(
         import_react4.default.Fragment,
         null,
@@ -2636,7 +2838,8 @@ function RankCards({ accounts, channels }) {
               "span",
               { className: "dshc-ust-rank-name", style: { flex: 1 } },
               import_react4.default.createElement("span", null, CHANNEL_LABEL[row.key] ?? row.key),
-              import_react4.default.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, `${row.accounts} \u53F7`)
+              // 「3 号」是内部黑话：读者会读成「3 号账号」。写明量词。
+              import_react4.default.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, `${row.accounts} \u4E2A\u8D26\u53F7`)
             ),
             import_react4.default.createElement(
               "span",
@@ -2645,7 +2848,8 @@ function RankCards({ accounts, channels }) {
             ),
             import_react4.default.createElement("span", {
               className: "dshc-ust-rank-val",
-              title: `${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206`
+              title: `${current.label} ${current.format(row.value)}\uFF08${formatPercent(row.share, 1)}\uFF09
+${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206`
             }, formatPercent(row.share, 0))
           )
         )
@@ -3168,6 +3372,7 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   const [range, setRange] = import_react5.default.useState(30);
   const [heatMetric, setHeatMetric] = import_react5.default.useState("requests");
   const [barMetric, setBarMetric] = import_react5.default.useState("tokens");
+  const [rankMetricValue, setRankMetricValue] = import_react5.default.useState(DEFAULT_RANK_METRIC);
   const [tip, setTip] = import_react5.default.useState(null);
   const [exportOpen, setExportOpen] = import_react5.default.useState(false);
   const hasPayloadRef = import_react5.default.useRef(false);
@@ -3225,12 +3430,12 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
     [total, stock, scoped, burn]
   );
   const accountRows = import_react5.default.useMemo(
-    () => accountShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf),
-    [usage, total, accounts, channelOf]
+    () => accountShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [usage, total, accounts, channelOf, rankMetricValue]
   );
   const channelRows = import_react5.default.useMemo(
-    () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf),
-    [usage, total, accounts, channelOf]
+    () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [usage, total, accounts, channelOf, rankMetricValue]
   );
   const subtitle = subtitleText({ freshness, error, lastOkAt });
   const uptime = processUptime(stats);
@@ -3334,8 +3539,13 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         onMetricChange: setBarMetric,
         onTip: setTip
       }),
-      // ── ④ 账号排行 + ⑤ 渠道用量（两列并排） ──
-      import_react5.default.createElement(RankCards, { accounts: accountRows, channels: channelRows }),
+      // ── ④ 账号排行 + ⑤ 渠道用量（两列并排，维度可切，默认按用量） ──
+      import_react5.default.createElement(RankCards, {
+        accounts: accountRows,
+        channels: channelRows,
+        metric: rankMetricValue,
+        onMetricChange: setRankMetricValue
+      }),
       // ── ⑥ 模型占比 ──
       import_react5.default.createElement(ModelDonut, { rows: usage?.by_model ?? [], onTip: setTip })
     ) : null,
@@ -3522,11 +3732,12 @@ var TABS = [
   { id: "logs", label: "\u65E5\u5FD7", icon: "list" },
   { id: "config", label: "\u914D\u7F6E", icon: "gear" }
 ];
-function OverviewCard({ status, channelOf, showDistribution, onToggleDistribution }) {
+function OverviewCard({ status, channelOf, showDistribution, onToggleDistribution, earned }) {
   const counters = summaryCounters(status);
   const realms = realmAvailability(status?.realm_totals);
   const grouped = groupByChannel(status?.accounts ?? [], channelOf);
   const maxRealm = Math.max(1, ...realms.map((realm) => realm.total));
+  const earnTitle = earned ? `\u8D5A\u5F97\u79EF\u5206 = \u5404\u8D26\u53F7\u9010\u5957\u9910\u660E\u7EC6\u7684\u989D\u5EA6\u603B\u91CF\u4E4B\u548C\uFF08\u542B\u5DF2\u6D88\u8017\u6389\u7684\uFF09\uFF0C\u6DB5\u76D6\u7B7E\u5230 / \u6D3B\u52A8 / \u62C9\u65B0\u7B49\u6765\u6E90\u3002\u5DF2\u6D88\u8017 ${formatNumber(Math.round(earned.used))} \xB7 \u5269\u4F59 ${formatNumber(Math.round(earned.remain))}\u3002\u5DF2\u8FC7\u671F\u4E14\u4E0A\u6E38\u4E0D\u518D\u4E0B\u53D1\u7684\u5957\u9910\u4E0D\u8BA1\u5165 \u2014\u2014 \u56E0\u6B64\u662F\u4E0B\u754C\u3002` + (earned.missing > 0 ? `\u53E6\u6709 ${earned.missing} \u4E2A\u8D26\u53F7\u672A\u53D6\u5230\u660E\u7EC6\uFF0C\u672A\u8BA1\u5165\u3002` : "") : "";
   return React.createElement(
     "div",
     { style: s.card },
@@ -3567,12 +3778,41 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
       ...grouped.channels.map(
         (channel) => React.createElement(Tag, {
           key: channel.id,
-          text: `${channel.label} ${channel.count} \u53F7`,
+          text: `${channel.label} ${channel.count} \u4E2A\u8D26\u53F7`,
           tone: channel.count > 0 ? "info" : "idle"
         })
       )
     ) : null,
-    // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）
+    // 赚得积分（累计获得过的额度；口径见 earnedCredits 的说明）
+    React.createElement(
+      "div",
+      { className: "dshc-chancards one", style: { marginTop: 10 } },
+      React.createElement(
+        "div",
+        { className: "dshc-chancard", title: earnTitle },
+        React.createElement(
+          "div",
+          { className: "dshc-row", style: { justifyContent: "space-between" } },
+          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "\u8D5A\u5F97\u79EF\u5206"),
+          React.createElement("span", { style: { ...s.muted, fontSize: 10.5, cursor: "help" } }, "\u7D2F\u8BA1\u83B7\u5F97 \xB7 \u542B\u5DF2\u6D88\u8017")
+        ),
+        React.createElement(
+          "div",
+          {
+            style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: tone.ok.fg, marginTop: 2 },
+            title: earned ? `\u7CBE\u786E\u503C ${formatNumber(Math.round(earned.total))}` : void 0
+          },
+          earned && earned.covered > 0 ? formatCompact(Math.round(earned.total)) : "\u2014"
+        ),
+        React.createElement(
+          "div",
+          { style: { ...s.muted, fontSize: 10.5 } },
+          earned ? earned.covered > 0 ? `\u5DF2\u6D88\u8017 ${formatCompact(Math.round(earned.used))} \xB7 \u8986\u76D6 ${earned.covered}/${earned.count} \u4E2A\u8D26\u53F7` : `${earned.count} \u4E2A\u8D26\u53F7\u5747\u672A\u53D6\u5230\u5957\u9910\u660E\u7EC6` : "\u52A0\u8F7D\u4E2D\u2026"
+        )
+      )
+    ),
+    // 三渠道积分卡（WB / Trae / Qoder；无号的置灰占位）—— 这是**当前可用**，
+    // 与上面的「累计赚得」是两个数，别读成一个。
     React.createElement(
       "div",
       { className: "dshc-chancards", style: { marginTop: 10 } },
@@ -3583,10 +3823,13 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
           React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, channel.label),
           React.createElement(
             "div",
-            { style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg } },
-            channel.count > 0 ? formatNumber(channel.credits) : "\u2014"
+            {
+              style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg },
+              title: `\u7CBE\u786E\u503C ${formatNumber(channel.credits)}`
+            },
+            channel.count > 0 ? formatCompact(channel.credits) : "\u2014"
           ),
-          React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} \u53F7`)
+          React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} \u4E2A\u8D26\u53F7`)
         )
       )
     ),
@@ -4019,12 +4262,16 @@ function rateLimitedNotice(list) {
     )
   );
 }
-function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove }) {
+function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh, error, creditsByUid, scheduleConfig, onRemove, authAccounts }) {
   const [filter, setFilter] = React.useState("all");
   const [view, setView] = React.useState("card");
   const [showDistribution, setShowDistribution] = React.useState(false);
   const [detailAccount, setDetailAccount] = React.useState(null);
   const accounts = status?.accounts ?? [];
+  const earned = React.useMemo(
+    () => earnedCredits(accounts, creditsByUid),
+    [accounts, creditsByUid]
+  );
   const counts = React.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
     for (const account of accounts) {
@@ -4045,7 +4292,8 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
       status,
       channelOf,
       showDistribution,
-      onToggleDistribution: () => setShowDistribution((v) => !v)
+      onToggleDistribution: () => setShowDistribution((v) => !v),
+      earned
     }),
     // 渠道 / 域筛选 + 视图切换 + 账号列表
     React.createElement(
@@ -4079,6 +4327,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
               maxInFlight,
               channel: channelOf(account),
               liveCredits: creditsByUid?.[account.uid],
+              authAccounts,
               onOpen: () => setDetailAccount(account)
             })
           )
@@ -4094,7 +4343,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
               React.createElement(
                 "tr",
                 null,
-                ...["\u8D26\u53F7", "\u6E20\u9053", "\u72B6\u6001", "\u79EF\u5206", "\u5728\u9014", "\u6210\u529F/\u5931\u8D25"].map((h) => React.createElement("th", { key: h }, h))
+                ...["\u8D26\u53F7", "\u6E20\u9053", "\u72B6\u6001", "\u79EF\u5206", "\u5230\u671F", "\u5728\u9014", "\u6210\u529F/\u5931\u8D25"].map((h) => React.createElement("th", { key: h }, h))
               )
             ),
             React.createElement(
@@ -4102,6 +4351,11 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
               null,
               ...filtered.map((account) => {
                 const st = accountState(account, maxInFlight);
+                const exp = accountExpiry({
+                  account,
+                  authAccounts,
+                  creditsDetail: creditsByUid?.[account.uid]
+                });
                 return React.createElement(
                   "tr",
                   { key: account.uid },
@@ -4113,6 +4367,7 @@ function AccountsTab({ status, channelOf, maxInFlight, onAction, busy, onRefresh
                     React.createElement(Tag, { text: st.label, tone: st.tone, title: st.detail || void 0 })
                   ),
                   React.createElement("td", null, formatNumber(account.credits ?? 0)),
+                  React.createElement("td", null, exp ? React.createElement(ExpiryChip, { expiry: exp }) : "\u2014"),
                   React.createElement("td", null, `${account.in_flight ?? 0}/${maxInFlight ?? "\u2014"}`),
                   React.createElement("td", null, `${account.success_count ?? 0}/${account.err_total ?? 0}`)
                 );
@@ -4194,8 +4449,9 @@ function ViewToggle({ view, setView }) {
     }, React.createElement(Icons.listView, null), "\u5217\u8868")
   );
 }
-function AccountCard({ account, maxInFlight, channel, onOpen }) {
+function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authAccounts }) {
   const state = accountState(account, maxInFlight);
+  const expiry = accountExpiry({ account, authAccounts, creditsDetail: liveCredits });
   const credits = account.credits ?? 0;
   const creditsAt = isZeroTime(account.credits_at) ? void 0 : account.credits_at;
   const target = typeof maxInFlight === "number" && maxInFlight > 0 ? maxInFlight : void 0;
@@ -4252,12 +4508,13 @@ function AccountCard({ account, maxInFlight, channel, onOpen }) {
       ),
       React.createElement("span", { className: "dshc-acctcard-bartext" }, `\u5728\u9014 ${inFlight}/${target}`)
     ) : null,
-    // 底行：渠道 · 域 · 成败 —— 从 11px 右下小字改为独立一行，字号可读
+    // 底行：渠道 · 域 · 到期 · 成败 —— 从 11px 右下小字改为独立一行，字号可读
     React.createElement(
       "div",
       { className: "dshc-acctcard-foot" },
       React.createElement("span", { className: "dshc-chip" }, channelLabel(channel) || "\u2014"),
       account.realm ? React.createElement("span", { className: "dshc-chip" }, account.realm === "global" ? "\u56FD\u9645\u7248" : "\u56FD\u5185\u7248") : null,
+      expiry ? React.createElement(ExpiryChip, { expiry }) : null,
       // 成败比：新网关恒透出（零值也写），旧网关缺字段时退回在途数、不编造。
       hasOutcome ? React.createElement(
         "span",
@@ -4270,6 +4527,19 @@ function AccountCard({ account, maxInFlight, channel, onOpen }) {
       lastSuccess ? React.createElement("span", { className: "dshc-chip dshc-chip-dim" }, `\u6700\u8FD1\u6210\u529F ${relativeTime(lastSuccess)}`) : null
     )
   );
+}
+function ExpiryChip({ expiry }) {
+  const date = new Date(expiry.at);
+  const pad = (value) => String(value).padStart(2, "0");
+  const dayText = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const prefix = expiry.kind === "credential" ? "\u5230\u671F" : "\u79EF\u5206\u5230\u671F";
+  const left = expiry.days;
+  const urgent = expiry.expired || left <= 3;
+  const title = expiry.kind === "credential" ? `\u767B\u5F55\u51ED\u8BC1\u5230\u671F\uFF1A${formatAbsolute(new Date(expiry.at).toISOString())}${expiry.expired ? "\uFF08\u5DF2\u8FC7\u671F\uFF09" : `\uFF08\u8FD8\u6709 ${left} \u5929\uFF09`}` : `\u6700\u65E9\u4E00\u6279\u79EF\u5206\u5230\u671F\uFF1A${dayText}${expiry.expired ? "\uFF08\u5DF2\u8FC7\u671F\uFF09" : `\uFF08\u8FD8\u6709 ${left} \u5929\uFF09`} \u2014\u2014 \u51ED\u8BC1\u5230\u671F\u65F6\u95F4\u672A\u80FD\u8BFB\u53D6\uFF08\u5BBF\u4E3B\u4E0E\u7F51\u5173\u4E0D\u540C\u673A\u65F6\u8BFB\u4E0D\u5230 auths \u76EE\u5F55\uFF09`;
+  return React.createElement("span", {
+    className: `dshc-chip${urgent ? " dshc-chip-warn" : " dshc-chip-dim"}`,
+    title
+  }, `${prefix} ${dayText}${expiry.expired ? " \xB7 \u5DF2\u8FC7\u671F" : left <= 0 ? " \xB7 \u4ECA\u5929" : ` \xB7 ${left} \u5929`}`);
 }
 function segmentButton(id, label, active, onChange, count) {
   const isActive = active === id;
@@ -5643,6 +5913,11 @@ function ChanhubPanel({ rpcCall }) {
           const restart = Array.isArray(value.restart_required) ? value.restart_required.length : typeof value.restartRequiredCount === "number" ? value.restartRequiredCount : 0;
           if (hot > 0) parts.push(`${hot} \u9879\u5DF2\u5373\u65F6\u751F\u6548`);
           if (restart > 0) parts.push(`${restart} \u9879\u9700\u91CD\u542F\u7F51\u5173\u751F\u6548`);
+          if (value.viaGateway === false) {
+            const capable = Array.isArray(value.hotCapable) ? value.hotCapable.length : 0;
+            parts.push(`\u26A0 \u7F51\u5173\u70ED\u751F\u6548\u7AEF\u70B9\u4E0D\u53EF\u7528\uFF08${value.gatewayError?.message ?? "\u5DF2\u964D\u7EA7\u4E3A\u6587\u4EF6\u76F4\u5199"}\uFF09`);
+            if (capable > 0) parts.push(`\u4FEE\u590D\u540E\u8FD9 ${capable} \u9879\u53EF\u5373\u65F6\u751F\u6548`);
+          }
           if (value.api_key_hint) parts.push(value.api_key_hint);
           showToast(parts.join(" \xB7 "), 8e3);
           await refresh();
@@ -5995,7 +6270,9 @@ function ChanhubPanel({ rpcCall }) {
       error: "",
       creditsByUid,
       scheduleConfig: configInfo?.config?.schedule,
-      onRemove: onRemoveAccount
+      onRemove: onRemoveAccount,
+      // 凭证盘点（只读、不含 token）：账号卡片的「到期」取它。
+      authAccounts: authInfo?.ok ? authInfo.accounts : []
     }) : null,
     activeTab === "tasks" ? React.createElement(TasksTab, {
       status,
@@ -6055,7 +6332,13 @@ function ChanhubPanel({ rpcCall }) {
       onStart: onLoginStart,
       onPoll: onLoginPoll,
       onCallback: onLoginCallback,
-      onClose: () => setAddOpen(false),
+      // 关弹窗也刷一次：登录成功那条路径由 onDone 触发，但「粘贴回调后直接
+      // 关掉」「登录中途放弃」等路径同样可能已经改变了池状态，让账号池
+      // 停在上一次快照上是不可接受的。刷新是幂等的读操作，多一次无副作用。
+      onClose: () => {
+        setAddOpen(false);
+        void refresh();
+      },
       onDone: refresh
     }) : null,
     // 轻量提示条

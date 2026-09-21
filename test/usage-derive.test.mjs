@@ -10,12 +10,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  accountExpiry,
+  accountShares,
+  channelShares,
   creditBurn,
   creditStock,
   creditsFreshness,
+  earnedCredits,
   formatCredit,
   formatPercent,
+  formatCompact,
   formatTokens,
+  kpiCards,
+  rankMetric,
   heatGrid,
   hourlyProfile,
   heatLevel,
@@ -324,8 +331,15 @@ test('U16 creditsFreshness：无时间戳不谎报「刚刚更新」', () => {
 });
 
 test('U20 格式化：缺失值显示 — 而不是 0 或 NaN', () => {
-  assert.equal(formatTokens(412300), '412.3k');
+  assert.equal(formatTokens(412300), '412.3K');
   assert.equal(formatTokens(11680000), '11.68M');
+  // B 档：真机 30 天窗口实测 19.18 亿 tokens —— 旧实现会写成 1917.97M
+  assert.equal(formatTokens(1917965446), '1.92B');
+  // 紧凑计数走中文量级：万 / 亿
+  assert.equal(formatCompact(3844), '3,844');
+  assert.equal(formatCompact(25940), '2.59W');
+  assert.equal(formatCompact(570027), '57W');
+  assert.equal(formatCompact(123456789), '1.23亿');
   assert.equal(formatTokens(0), '0');
   assert.equal(formatTokens(undefined), '—');
   assert.equal(formatTokens(NaN), '—');
@@ -353,4 +367,114 @@ test('U22 uptimeText：进程累计时长，中文可读', () => {
   assert.equal(uptimeText(200000), '2 天 7 小时');
   assert.equal(uptimeText(undefined), '—');
   assert.equal(uptimeText(-1), '—');
+});
+
+test('U23 earnedCredits：只算取到明细的账号，缺明细的绝不拿余额凑', () => {
+  const accounts = [{ uid: 'a', credits: 100 }, { uid: 'b', credits: 800 }];
+  const byUid = {
+    a: { available: true, credits: { items: [{ total: 500, used: 400, remain: 100 }] } },
+    // b 没取到明细 → 不计入，只进 missing
+    b: { available: false, reason: '端点不可用' },
+  };
+  const got = earnedCredits(accounts, byUid);
+  assert.equal(got.total, 500, '赚得只算有明细的账号');
+  assert.equal(got.used, 400);
+  assert.equal(got.remain, 100);
+  assert.equal(got.covered, 1);
+  assert.equal(got.missing, 1);
+  assert.equal(got.count, 2);
+  // 真机 5 号实测：赚得 = 已用 + 剩余，剩余与池内 credits 合计对齐
+  const all = earnedCredits(
+    [{ uid: 'x' }, { uid: 'y' }],
+    {
+      x: { available: true, credits: { items: [{ total: 5800, used: 4674, remain: 1126 }] } },
+      y: { available: true, credits: { items: [{ total: 800, used: 0, remain: 800 }] } },
+    },
+  );
+  assert.equal(all.total, 6600);
+  assert.equal(all.remain, 1126 + 800, '剩余必须与池内余额同源');
+  assert.deepEqual(earnedCredits([], {}), { total: 0, used: 0, remain: 0, covered: 0, missing: 0, count: 0 });
+});
+
+test('U24 accountExpiry：凭证到期优先，降级取最早积分到期，都没有则 null', () => {
+  const now = Date.parse('2026-09-21T12:00:00Z');
+  const tomorrow = Math.floor(now / 1000) + 86400;
+  // ① 凭证到期（Unix 秒）
+  const viaAuth = accountExpiry({
+    account: { uid: 'a' },
+    authAccounts: [{ uid: 'a', expiresAt: tomorrow }],
+    now,
+  });
+  assert.equal(viaAuth.kind, 'credential');
+  assert.equal(viaAuth.days, 1, '整整 24 小时后到期 → 1 天');
+  assert.equal(viaAuth.expired, false);
+  // ② 无凭证 → 降级到最早一批「还有余额」的积分到期
+  const viaPackage = accountExpiry({
+    account: { uid: 'b' },
+    authAccounts: [],
+    creditsDetail: {
+      available: true,
+      credits: {
+        items: [
+          { remain: 0, expire_at: '2026-09-22' }, // 已耗尽：不算
+          { remain: 10, expire_at: '2026-09-30' },
+          { remain: 5, expire_at: '2026-10-21' },
+        ],
+      },
+    },
+    now,
+  });
+  assert.equal(viaPackage.kind, 'package');
+  assert.equal(new Date(viaPackage.at).getUTCDate(), 30);
+  // ③ 都没有 → null（不编造「永不过期」）
+  assert.equal(accountExpiry({ account: { uid: 'c' }, now }), null);
+  assert.equal(accountExpiry({ account: { uid: 'd' }, creditsDetail: { available: false }, now }), null);
+});
+
+test('U25 排行维度：默认按用量（Tokens），切维度后顺序与占比跟着变', () => {
+  const rows = [
+    { key: 'u1', requests: 100, total_tokens: 1000, credit: 1 },
+    { key: 'u2', requests: 10, total_tokens: 9000, credit: 90 },
+  ];
+  const accounts = [{ uid: 'u1', nickname: '甲' }, { uid: 'u2', nickname: '乙' }];
+  const total = { requests: 110, total_tokens: 10000, credit: 91 };
+  assert.equal(rankMetric(undefined).id, 'tokens', '默认维度必须是按用量');
+
+  const byTokens = accountShares(rows, total, accounts);
+  assert.deepEqual(byTokens.map((r) => r.key), ['u2', 'u1'], '按 Tokens：乙在前');
+  assert.ok(Math.abs(byTokens[0].share - 0.9) < 1e-9);
+
+  const byRequests = accountShares(rows, total, accounts, () => 'workbuddy', 'requests');
+  assert.deepEqual(byRequests.map((r) => r.key), ['u1', 'u2'], '按请求数：甲在前');
+  assert.ok(Math.abs(byRequests[0].share - 100 / 110) < 1e-9);
+
+  const channels = channelShares(rows, total, accounts, () => 'workbuddy', 'credit');
+  assert.equal(channels[0].accounts, 2, '渠道行要带账号数（UI 展示为「2 个账号」）');
+  assert.ok(Math.abs(channels[0].share - 1) < 1e-9);
+});
+
+test('U26 kpiCards：6 张、两行三列，缓存/延迟无观测显示 — 而不是 0', () => {
+  const cards = kpiCards({
+    total: { requests: 7157, failed: 64, total_tokens: 1917965446, credit: 570027.4, cache_hit_tokens: 1472, cache_miss_tokens: 38498, avg_latency_ms: 8446.25 },
+    stock: { usable: 9658, unusable: 0 },
+    days: [{ requests: 10 }],
+    burn: null,
+  });
+  assert.deepEqual(
+    cards.map((c) => c.key),
+    ['tokens', 'credit', 'stock', 'requests', 'cache', 'latency'],
+    '第一行 消耗三件套、第二行 效率三件套',
+  );
+  const byKey = Object.fromEntries(cards.map((c) => [c.key, c]));
+  assert.equal(byKey.tokens.value, '1.92B');
+  assert.equal(byKey.credit.value, '57W');
+  assert.equal(byKey.stock.value, '9,658');
+  assert.equal(byKey.requests.value, '7,157');
+  assert.match(byKey.cache.value, /%$/);
+  assert.equal(byKey.latency.value, '8.4 s');
+  // 无观测：命中率与延迟必须显示 —，不能显示 0.0% / 0 ms
+  const empty = kpiCards({ total: {}, stock: { usable: 0 }, days: [], burn: null });
+  const emptyByKey = Object.fromEntries(empty.map((c) => [c.key, c]));
+  assert.equal(emptyByKey.cache.value, '—');
+  assert.equal(emptyByKey.latency.value, '—');
 });

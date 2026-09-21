@@ -20,6 +20,7 @@ import React from 'react';
 import { s } from '../theme.js';
 import { Icons, Fold } from '../ui.js';
 import {
+  DEFAULT_RANK_METRIC,
   accountShares,
   channelShares,
   creditBurn,
@@ -74,6 +75,9 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   // 读者为一张图改变另一张图的口径 —— 参考实现也是各卡自带切换。
   const [heatMetric, setHeatMetric] = React.useState('requests');
   const [barMetric, setBarMetric] = React.useState('tokens');
+  // 账号/渠道排行的维度：默认**按用量（Tokens）** —— 「谁在用得多」的第一
+  // 答案是量而不是次数（一次长上下文顶几百次短请求）。
+  const [rankMetricValue, setRankMetricValue] = React.useState(DEFAULT_RANK_METRIC);
   const [tip, setTip] = React.useState(null);
   const [exportOpen, setExportOpen] = React.useState(false);
   // 「有没有可显示的旧载荷」用 ref 跟踪：写进 useCallback 的闭包会拿到
@@ -143,12 +147,12 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
     [total, stock, scoped, burn],
   );
   const accountRows = React.useMemo(
-    () => accountShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf),
-    [usage, total, accounts, channelOf],
+    () => accountShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [usage, total, accounts, channelOf, rankMetricValue],
   );
   const channelRows = React.useMemo(
-    () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf),
-    [usage, total, accounts, channelOf],
+    () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [usage, total, accounts, channelOf, rankMetricValue],
   );
 
   const subtitle = subtitleText({ freshness, error, lastOkAt });
@@ -231,8 +235,13 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
             onTip: setTip,
           }),
 
-          // ── ④ 账号排行 + ⑤ 渠道用量（两列并排） ──
-          React.createElement(RankCards, { accounts: accountRows, channels: channelRows }),
+          // ── ④ 账号排行 + ⑤ 渠道用量（两列并排，维度可切，默认按用量） ──
+          React.createElement(RankCards, {
+            accounts: accountRows,
+            channels: channelRows,
+            metric: rankMetricValue,
+            onMetricChange: setRankMetricValue,
+          }),
 
           // ── ⑥ 模型占比 ──
           React.createElement(ModelDonut, { rows: usage?.by_model ?? [], onTip: setTip }),

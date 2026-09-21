@@ -314,6 +314,9 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
 /* 渠道三卡 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+/* 独占一行的卡（赚得积分）：它是累计口径，与下面三个「当前可用」不是同一类数，
+   不给它并排是为了避免被读成「三项之和」。 */
+.dshc-chancards.one { grid-template-columns: 1fr; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
 .dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
 .dshc-chancard.dim { opacity: 0.55; }
@@ -348,6 +351,8 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-acctcard-foot { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; margin-top: auto; padding-top: 7px; border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
 .dshc-chip { font-size: 11px; line-height: 1.5; padding: 1px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); color: var(--dsw-alias-label-secondary,#6b7280); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .dshc-chip-dim { color: var(--dsw-alias-label-tertiary,#9ca3af); }
+/* 到期临近 / 已过期：唯一需要抢注意力的元信息，故用警示底而非灰底 */
+.dshc-chip-warn { background: var(--dsw-alias-state-warn-tertiary,#fffbeb); color: var(--dsw-alias-state-warn-primary,#b45309); }
 /* 逐账号明细行：**网格固定列**，保证同一列在每行位置一致。
    背景：开学季有 5 行但「每日」标签只 4 行有、成长任务 22 行里出现 3/4/5 个子元素
    三种形态 —— 用 flex 自然排版时缺一列就会让后续列左移，视觉上「错位」。 */
@@ -466,10 +471,13 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 .dshc-ust-scope { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .dshc-ust-scope-tag { font-size: 10px; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2,#f3f4f6); color: var(--dsw-alias-label-secondary,#6b7280); flex-shrink: 0; }
 
-/* ── ① KPI 4 卡：主数字 + 一行次级文字 ──
+/* ── ① KPI 6 卡：主数字 + 一行次级文字 ──
    参考实现的 kpi 卡：数值 19px/700/负字距/等宽数位，次级文字 11px。
-   栅格 auto-fit 让窄屏自动换行，而不是硬压 4 列。 */
-.dshc-ust-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+   固定 3 列（auto-fit 会在宽屏排成 4 列，把「三消耗 + 三效率」的两行语义
+   切成 4+2，读的时候就不成组了）；窄屏降 2 列、再窄 1 列。 */
+.dshc-ust-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .dshc-ust-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .dshc-ust-kpis { grid-template-columns: 1fr; } }
 .dshc-ust-kpi { background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; padding: 13px 15px; min-width: 0; }
 .dshc-ust-kpi-k { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dshc-ust-kpi-v { margin-top: 7px; font-size: 19px; font-weight: 700; line-height: 1.2; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

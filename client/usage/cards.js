@@ -15,13 +15,17 @@ import { CardHead, Tag, useCountUp } from '../ui.js';
 import {
   CHANNEL_LABEL,
   DAY_RANGES,
+  RANK_METRICS,
+  formatCompact,
   formatCredit,
   formatNumber,
   formatPercent,
   formatTokens,
   heatGrid,
   hourlyProfile,
+  latencyText,
   niceMax,
+  rankMetric,
   uptimeText,
   usageByDay,
 } from '../derive.js';
@@ -94,16 +98,18 @@ function KpiCard({ item }) {
   // 动效跑在**原始数**上（raw），再按同一格式化器回写 —— 对已格式化字符串
   // 反解（"18.9k" → 18.9）会把单位后缀当成数量级，动效会显示成 0k（真实踩过）。
   const animated = useCountUp(Number(item.raw) || 0);
-  const display = item.kind === 'tokens'
-    ? formatTokens(animated)
-    : item.kind === 'credit'
-      ? formatCredit(animated)
-      : formatNumber(Math.round(animated));
+  // 「无观测」的卡（raw = 0 且 kind 是 percent/ms）直接显示 item.value（—），
+  // 不能把 0 动画成 0.0% —— 那等于宣称「命中率为零」。
+  const noData = (item.kind === 'percent' || item.kind === 'ms') && !(Number(item.raw) > 0);
+  const display = noData
+    ? item.value
+    : formatKpi(animated, item.kind);
 
   return React.createElement('div', {
     className: 'dshc-ust-kpi',
     'data-kpi': item.key,
-    ...(item.title ? { title: item.title } : {}),
+    // 精确值挂 title：紧凑格式化后卡片上只剩量级，明细不能丢。
+    title: item.title ? `${item.title}\n精确值：${item.value}` : item.value,
   },
     React.createElement('div', { className: 'dshc-ust-kpi-k' }, item.label),
     React.createElement('div', {
@@ -112,6 +118,24 @@ function KpiCard({ item }) {
     }, display),
     React.createElement('div', { className: 'dshc-ust-kpi-d' }, item.detail),
   );
+}
+
+/**
+ * 按 KPI 卡的口径回写动效中的数值。
+ *
+ * @param value - 动效当前值（原始数）。
+ * @param kind - `'tokens' | 'compact' | 'credit' | 'percent' | 'ms' | 'count'`。
+ * @returns 展示文本。
+ */
+function formatKpi(value, kind) {
+  switch (kind) {
+    case 'tokens': return formatTokens(value);
+    case 'credit': return formatCredit(value);
+    case 'compact': return formatCompact(value);
+    case 'percent': return formatPercent(value, 1);
+    case 'ms': return latencyText(value);
+    default: return formatCompact(Math.round(value));
+  }
 }
 
 /* ──────────────────────────── ② 活跃热力图 ──────────────────────────── */
@@ -264,14 +288,29 @@ function HourProfile({ hours }) {
 
 /* ─────────────────────────── ③ 每日用量柱状图 ─────────────────────────── */
 
-/** 堆叠色序（走 CSS 变量，深浅主题各自解析）。 */
+/**
+ * 堆叠 / 图例 / 环形图的分类色序（10 色）。
+ *
+ * 为什么要**硬编码**而不是走 `--dsw-alias-*`（这是本文件唯一破例的地方）：
+ *   1. 主题别名里只有 5 个语义色，第 6 个是 `label-tertiary` —— 一个灰。
+ *      真机上「其他」那一档正好落到它，图例块白/灰一片、看不出是哪一段
+ *      （用户明确提了「不要用白色的图例」）；
+ *   2. 分类色的要求是**彼此可区分**，不是「跟随语义」。语义色随主题漂移，
+ *      深浅主题下还可能撞色（success 与 brand 在暗色下都偏冷）。
+ * 因此这里给一组固定色相、明度都在 500–600 档的色板：亮色底上够深、
+ * 暗色底上够亮，两套主题都不糊。
+ */
 export const SEG_COLORS = [
-  'var(--dsw-alias-brand-primary,#4f6ef7)',
-  'var(--dsw-alias-state-success-primary,#22c55e)',
-  'var(--dsw-alias-state-warn-primary,#f59e0b)',
-  'var(--dsw-alias-state-business-primary,#a855f7)',
-  'var(--dsw-alias-button-info-fill,#0ea5e9)',
-  'var(--dsw-alias-label-tertiary,#94a3b8)',
+  '#4f6ef7', // 蓝
+  '#10b981', // 翠绿
+  '#f59e0b', // 琥珀
+  '#a855f7', // 紫
+  '#06b6d4', // 青
+  '#ef4444', // 红
+  '#84cc16', // 黄绿
+  '#ec4899', // 玫红
+  '#14b8a6', // 蓝绿
+  '#6366f1', // 靛
 ];
 
 /** 长尾合并阈值：前 5 名单独着色，其余归「其他」。 */
@@ -453,13 +492,30 @@ export function mergeTail(series) {
  * 两列并排的理由：账号与渠道是同一份数据的两条正交切法，读者常要对照看
  * （「哪个号在烧」与「哪个渠道在烧」）。
  *
- * @param props - `{accounts, channels}`。
+ * 维度切换（默认 Tokens = 按用量）：请求数多不等于用得多 —— 一次长上下文
+ * 请求顶几百次短请求。三个维度取的是同一份 `by_uid` 的不同字段，不是跨口径。
+ *
+ * @param props - `{accounts, channels, metric, onMetricChange}`。
  * @returns React 元素。
  */
-export function RankCards({ accounts, channels }) {
+export function RankCards({ accounts, channels, metric = 'tokens', onMetricChange }) {
+  const current = rankMetric(metric);
+  const options = RANK_METRICS.map((item) => [item.id, item.label]);
+  const extra = `按${current.label}`;
+
   return React.createElement('div', { className: 'dshc-ust-rank' },
     React.createElement('div', { className: 'dshc-ust-card', 'data-card': 'accounts' },
-      React.createElement(CardHead, { title: '账号用量', extra: '按请求数' }),
+      React.createElement('div', { className: 'dshc-ust-cardhead' },
+        React.createElement('div', { className: 'dshc-ust-cardtitle' },
+          React.createElement('h3', null, '账号用量'),
+          React.createElement('span', { className: 'dshc-ust-cardsub' }, extra),
+        ),
+        React.createElement('div', { className: 'dshc-ust-cardactions' },
+          onMetricChange
+            ? React.createElement(MetricSwitch, { value: metric, onChange: onMetricChange, seg: 'rankMetric', options })
+            : null,
+        ),
+      ),
       accounts.length === 0
         ? React.createElement('div', { style: s.muted }, '该窗口内没有账号记录')
         : React.createElement(React.Fragment, null,
@@ -477,14 +533,15 @@ export function RankCards({ accounts, channels }) {
                 ),
                 React.createElement('span', {
                   className: 'dshc-ust-rank-val',
-                  title: `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分 · 成功率 ${formatPercent(row.successRate, 1)}`,
+                  title: `${current.label} ${current.format(row.value)}（${formatPercent(row.share, 1)}）\n`
+                    + `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分 · 成功率 ${formatPercent(row.successRate, 1)}`,
                 }, formatPercent(row.share, 0)),
               ),
             ),
           ),
     ),
     React.createElement('div', { className: 'dshc-ust-card', 'data-card': 'channels' },
-      React.createElement(CardHead, { title: '渠道用量', extra: '账号池同源口径' }),
+      React.createElement(CardHead, { title: '渠道用量', extra: `${extra} · 账号池同源口径` }),
       channels.length === 0
         ? React.createElement('div', { style: s.muted }, '该窗口内没有渠道记录')
         : React.createElement(React.Fragment, null,
@@ -492,14 +549,16 @@ export function RankCards({ accounts, channels }) {
               React.createElement('div', { key: row.key, className: 'dshc-ust-rank-row' },
                 React.createElement('span', { className: 'dshc-ust-rank-name', style: { flex: 1 } },
                   React.createElement('span', null, CHANNEL_LABEL[row.key] ?? row.key),
-                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, `${row.accounts} 号`),
+                  // 「3 号」是内部黑话：读者会读成「3 号账号」。写明量词。
+                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, `${row.accounts} 个账号`),
                 ),
                 React.createElement('span', { className: 'dshc-ust-rank-bar' },
                   React.createElement('i', { style: { width: `${Math.max(2, Math.round(row.barMax * 100))}%` } }),
                 ),
                 React.createElement('span', {
                   className: 'dshc-ust-rank-val',
-                  title: `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分`,
+                  title: `${current.label} ${current.format(row.value)}（${formatPercent(row.share, 1)}）\n`
+                    + `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分`,
                 }, formatPercent(row.share, 0)),
               ),
             ),

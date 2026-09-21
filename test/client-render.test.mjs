@@ -592,6 +592,60 @@ test('渲染：概览 KPI 行 + 三渠道积分卡', { skip }, async () => {
   }
 });
 
+test('渲染账号池：赚得积分卡（累计口径，覆盖度如实标注）+ 渠道卡写「N 个账号」', { skip }, async () => {
+  const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    // 赚得积分：fixture 每个账号给 2 个套餐（100 + 500），3 个账号 → 1800
+    assert.ok(html.includes('赚得积分'), '缺「赚得积分」卡');
+    assert.ok(html.includes('1,800'), `赚得积分应为 1800，实际未渲染`);
+    // 覆盖度必须写出来：拿不到明细的账号不计入，不能只报一个总数
+    assert.match(html, /覆盖 3\/3 个账号/, '缺覆盖度标注（会让用户以为这个数覆盖全部账号）');
+    // 「3 号」是内部黑话，改为带量词的「N 个账号」
+    assert.match(html, /1 个账号/, '渠道卡仍在使用「N 号」写法');
+    assert.ok(!/>\s*\d+\s*号\s*</.test(html), '仍有「N 号」黑话残留');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染账号池：账号卡片带到期时间（凭证读不到时降级为「积分到期」）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const cards = [...document.querySelectorAll('.dshc-acctcard')];
+    assert.ok(cards.length >= 1, '缺账号卡片');
+    // fixture 的 auths 没有 expiresAt → 降级取套餐明细里最早的未耗尽到期日（10-01）
+    const withExpiry = cards.filter((card) => card.textContent.includes('积分到期 10-01'));
+    assert.equal(withExpiry.length, cards.length, '每个账号卡片都应渲染到期时间');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：账号用量卡带维度切换，默认按用量（Tokens）', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    const app = await openUsage(document);
+    const card = app.querySelector('[data-card="accounts"]');
+    assert.ok(card, '缺账号用量卡');
+    assert.match(card.textContent, /按Tokens/, '默认维度应为按用量（Tokens）');
+    const seg = card.querySelector('[data-seg="rankMetric"]');
+    assert.ok(seg, '缺维度切换器');
+    const labels = [...seg.querySelectorAll('button')].map((b) => b.textContent.trim());
+    assert.deepEqual(labels, ['Tokens', '请求', '积分'], `维度项不符：${labels.join(',')}`);
+    // 切到「请求」后副标题跟着变（维度不是装饰）
+    const reqBtn = [...seg.querySelectorAll('button')].find((b) => b.textContent.trim() === '请求');
+    await React.act(async () => {
+      reqBtn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    assert.match(app.querySelector('[data-card="accounts"]').textContent, /按请求/, '切维度后副标题未更新');
+    // 渠道卡与账号卡同维度（否则两列不可比）
+    assert.match(app.querySelector('[data-card="channels"]').textContent, /按请求/, '渠道卡未跟随维度');
+    assert.match(app.querySelector('[data-card="channels"]').textContent, /个账号/, '渠道卡仍写「N 号」');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('渲染：三种账号状态标签都正确出现', { skip }, async () => {
   const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
   try {
@@ -876,24 +930,28 @@ async function openFold(document, id) {
   return app;
 }
 
-test('渲染用量：KPI 恰好 4 卡，每卡主数字 + 一行次级文字', { skip }, async () => {
+test('渲染用量：KPI 恰好 6 卡（两行 × 三列），每卡主数字 + 一行次级文字', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
     const cards = [...app.querySelectorAll('.dshc-ust-kpi')];
-    assert.equal(cards.length, 4, `KPI 应为 4 卡，实际 ${cards.length}`);
+    assert.equal(cards.length, 6, `KPI 应为 6 卡，实际 ${cards.length}`);
     // 每卡三段：标签 / 主数字 / 次级文字 —— 参考实现的「主数字 + 一行参照」纪律
     for (const card of cards) {
       assert.ok(card.querySelector('.dshc-ust-kpi-k'), '缺标签');
       assert.ok(card.querySelector('.dshc-ust-kpi-v'), '缺主数字');
       assert.ok(card.querySelector('.dshc-ust-kpi-d'), '缺次级文字');
     }
-    // 四个键齐全（Tokens / 积分消耗 / 请求数 / 可用积分）
+    // 键序即排布：第一行 消耗三件套、第二行 效率三件套
     const keys = cards.map((c) => c.getAttribute('data-kpi'));
-    assert.deepEqual(keys, ['tokens', 'credit', 'requests', 'stock'], `KPI 键序不符：${keys.join(',')}`);
+    assert.deepEqual(
+      keys,
+      ['tokens', 'credit', 'stock', 'requests', 'cache', 'latency'],
+      `KPI 键序不符：${keys.join(',')}`,
+    );
     // 数值来自窗口分桶 fixture（126 请求 / 18,900 tokens / 31.5 积分）
     const text = app.textContent;
-    assert.ok(text.includes('18.9k'), '缺窗口 Tokens 主数字');
+    assert.ok(text.includes('18.9K'), '缺窗口 Tokens 主数字');
     assert.ok(text.includes('126'), '缺请求数');
     // 请求数卡的次级文字必须拆成功/失败（fixture：117 成功 / 9 失败）
     const reqCard = cards.find((c) => c.getAttribute('data-kpi') === 'requests');
@@ -1107,7 +1165,7 @@ test('渲染用量：刷新失败保留旧数据，副标题如实标注「不�
   try {
     const app = await openUsage(document);
     // 首轮成功，页面上有真实数据
-    assert.ok(app.textContent.includes('18.9k'), '首轮应有数据');
+    assert.ok(app.textContent.includes('18.9K'), '首轮应有数据');
     // 手动刷新（失败）→ 数据仍在，状态降级为 fallback
     const btn = app.querySelector('.dshc-ust-refresh');
     await React.act(async () => { btn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true })); });
@@ -1117,7 +1175,7 @@ test('渲染用量：刷新失败保留旧数据，副标题如实标注「不�
     assert.match(sub.textContent, /不是最新/, '失败态必须写明「不是最新」');
     assert.match(sub.textContent, /网关连不上/, '失败态应带失败原因');
     // 数据没有被清掉
-    assert.ok(app.textContent.includes('18.9k'), '失败后旧数据必须保留');
+    assert.ok(app.textContent.includes('18.9K'), '失败后旧数据必须保留');
     // **不得**把失败渲染成「网关未提供分桶端点」—— 那是端点缺失的降级文案
     assert.ok(!app.textContent.includes('网关未提供分桶端点'), '失败不得伪装成端点缺失');
   } finally {
@@ -1373,8 +1431,9 @@ test('渲染用量：不含横向滚动溢出容器（移动端不撑破）', { 
     assert.match(css, /\.dshc-ust-rank-name\s*\{[^}]*min-width:\s*0/, '排行名称列缺 min-width:0');
     assert.match(css, /\.dshc-mrow2-name\s*\{[^}]*min-width:\s*0/, '进程口径模型名缺 min-width:0');
     assert.match(css, /\.dshc-ust-kpi-v\s*\{[^}]*overflow:\s*hidden/, 'KPI 主数字缺溢出裁剪');
-    // KPI 栅格在窄屏由 auto-fit 自然换行
-    assert.match(css, /\.dshc-ust-kpis\s*\{[^}]*auto-fit/, 'KPI 栅格应 auto-fit（窄屏自动换行）');
+    // KPI 栅格固定 3 列（两行 × 三列），窄屏降级而不是让卡片被压扁
+    assert.match(css, /\.dshc-ust-kpis\s*\{[^}]*repeat\(3/, 'KPI 栅格应为 3 列');
+    assert.match(css, /@media \(max-width: 640px\) \{ \.dshc-ust-kpis \{[^}]*repeat\(2/, '窄屏应降为 2 列');
   } finally {
     await cleanup();
   }

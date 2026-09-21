@@ -10,9 +10,9 @@ Five tabs, driven by real gateway endpoints (`GET /status`, `GET /v1/models`, `G
 
 | Tab | Content |
 |---|---|
-| Accounts | Overview counters, per-realm availability, total/channel credits, channel filter, **batch task triggers** (real gateway endpoints), per-account fold panels (health / quality / credits / schedule blocks) |
+| Accounts | Overview counters, per-realm availability, **lifetime credits earned** (with coverage stated), current usable credits per channel, channel filter, **batch task triggers** (real gateway endpoints), account cards with expiry, per-account fold panels (health / quality / credits / schedule blocks) |
 | Tasks | Task trigger + run status (per-account check-in results), growth-task progress, school-season subtask status |
-| Usage | Four-dimension usage buckets (window switch 24h–30d) with the `/v1/stats` limitation stated |
+| Usage | Single-page card flow: 6 KPIs (tokens / credit burn / usable credits · requests / cache hit / avg latency), activity heatmap, daily stacked bars, account & channel rankings (**switchable metric, defaults to tokens by usage**), model donut; one 720h fetch sliced client-side, `/v1/stats` limitation stated |
 | Logs | Live log ring buffer with channel chips (chat / task / sys) |
 | Config | All 53 gateway config fields, grouped and validated, plus service control |
 
