@@ -112,6 +112,19 @@ export const s = {
     color: 'var(--dsw-alias-state-error-primary,#dc2626)',
     lineHeight: 1.6,
   },
+  // KPI 统计格：与 .dshc-kpi / .dshc-kpis 配套。此前 s 里没有这一项，
+  // 用量页只挂 className（于是 padding 全丢），账号池页内联兜底、两边不一致。
+  kpi: {
+    border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
+    borderRadius: 10,
+    background: 'var(--dsw-alias-bg-layer-2,#f9fafb)',
+    padding: '10px 12px',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
   tag: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -230,10 +243,24 @@ export const FOLD_CSS = `
    —— 它是常驻入口，不该随 Tab 横向滚动而消失。 */
 .dshc-tabadd { position: sticky; right: 0; flex-shrink: 0; align-self: center; margin: 0 0 4px 8px; font: inherit; cursor: pointer; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dsw-alias-button-info-fill,#4176e6); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-button-info-fill,#4176e6); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
 .dshc-tabadd:hover { background: var(--dsw-alias-bg-layer-2,#eef2ff); }
+/* 紧凑段控（窗口 / 指标 / 视图 / 维度切换共用）。
+   与 .dshc-viewtoggle 的分工：那一款是「页级」视图切换（较大），本款是页内的
+   轻量选择器 —— 边框只有 1px 且无外发光，让内容而非控件成为视觉主角。 */
+.dshc-seg { display: inline-flex; align-items: center; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 7px; overflow: hidden; background: var(--dsw-alias-bg-layer-2,#f9fafb); flex-shrink: 0; max-width: 100%; }
+.dshc-seg > button { font: inherit; font-size: 12px; line-height: 1; border: none; background: none; color: var(--dsw-alias-label-secondary,#61666b); padding: 5px 9px; cursor: pointer; white-space: nowrap; }
+.dshc-seg > button + button { border-left: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-seg > button:hover { color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-seg > button.on { background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-brand-primary,#4f6ef7); font-weight: 600; box-shadow: inset 0 -2px 0 var(--dsw-alias-brand-primary,#4f6ef7); }
+/* 分析视图选择器（收起态）：标题 + 当前值 + 折叠箭头，整体可点。
+   为什么做成「收起」：四个视图是探索型入口，默认铺开会让页面先呈现控件而非数据。 */
+.dshc-viewpick { display: inline-flex; align-items: center; gap: 8px; font: inherit; cursor: pointer; border: 1px solid transparent; background: none; border-radius: 7px; padding: 3px 8px; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-viewpick:hover { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-color: var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-viewpick-cur { font-size: 12px; color: var(--dsw-alias-brand-primary,#4f6ef7); font-weight: 600; }
+.dshc-viewpick-caret { font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 /* KPI 行（可点击的统计格） */
 .dshc-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: '10px 12px'; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
 /* 渠道三卡 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
@@ -376,7 +403,7 @@ export const FOLD_CSS = `
 /* 环形百分比 */
 .dshc-uring { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-uring { grid-template-columns: 1fr; } }
-.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px; text-align: center; min-width: 0; }
+.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; text-align: center; min-width: 0; }
 .dshc-uring svg { display: block; margin: 0 auto; }
 .dshc-uring .rv { font-size: 17px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-uring .rl { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-top: 2px; }

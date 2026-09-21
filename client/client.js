@@ -149,6 +149,19 @@ var s = {
     color: "var(--dsw-alias-state-error-primary,#dc2626)",
     lineHeight: 1.6
   },
+  // KPI 统计格：与 .dshc-kpi / .dshc-kpis 配套。此前 s 里没有这一项，
+  // 用量页只挂 className（于是 padding 全丢），账号池页内联兜底、两边不一致。
+  kpi: {
+    border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+    borderRadius: 10,
+    background: "var(--dsw-alias-bg-layer-2,#f9fafb)",
+    padding: "10px 12px",
+    minWidth: 0,
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    gap: 2
+  },
   tag: {
     display: "inline-flex",
     alignItems: "center",
@@ -254,10 +267,24 @@ var FOLD_CSS = `
    \u2014\u2014 \u5B83\u662F\u5E38\u9A7B\u5165\u53E3\uFF0C\u4E0D\u8BE5\u968F Tab \u6A2A\u5411\u6EDA\u52A8\u800C\u6D88\u5931\u3002 */
 .dshc-tabadd { position: sticky; right: 0; flex-shrink: 0; align-self: center; margin: 0 0 4px 8px; font: inherit; cursor: pointer; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dsw-alias-button-info-fill,#4176e6); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-button-info-fill,#4176e6); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
 .dshc-tabadd:hover { background: var(--dsw-alias-bg-layer-2,#eef2ff); }
+/* \u7D27\u51D1\u6BB5\u63A7\uFF08\u7A97\u53E3 / \u6307\u6807 / \u89C6\u56FE / \u7EF4\u5EA6\u5207\u6362\u5171\u7528\uFF09\u3002
+   \u4E0E .dshc-viewtoggle \u7684\u5206\u5DE5\uFF1A\u90A3\u4E00\u6B3E\u662F\u300C\u9875\u7EA7\u300D\u89C6\u56FE\u5207\u6362\uFF08\u8F83\u5927\uFF09\uFF0C\u672C\u6B3E\u662F\u9875\u5185\u7684
+   \u8F7B\u91CF\u9009\u62E9\u5668 \u2014\u2014 \u8FB9\u6846\u53EA\u6709 1px \u4E14\u65E0\u5916\u53D1\u5149\uFF0C\u8BA9\u5185\u5BB9\u800C\u975E\u63A7\u4EF6\u6210\u4E3A\u89C6\u89C9\u4E3B\u89D2\u3002 */
+.dshc-seg { display: inline-flex; align-items: center; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 7px; overflow: hidden; background: var(--dsw-alias-bg-layer-2,#f9fafb); flex-shrink: 0; max-width: 100%; }
+.dshc-seg > button { font: inherit; font-size: 12px; line-height: 1; border: none; background: none; color: var(--dsw-alias-label-secondary,#61666b); padding: 5px 9px; cursor: pointer; white-space: nowrap; }
+.dshc-seg > button + button { border-left: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-seg > button:hover { color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-seg > button.on { background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-brand-primary,#4f6ef7); font-weight: 600; box-shadow: inset 0 -2px 0 var(--dsw-alias-brand-primary,#4f6ef7); }
+/* \u5206\u6790\u89C6\u56FE\u9009\u62E9\u5668\uFF08\u6536\u8D77\u6001\uFF09\uFF1A\u6807\u9898 + \u5F53\u524D\u503C + \u6298\u53E0\u7BAD\u5934\uFF0C\u6574\u4F53\u53EF\u70B9\u3002
+   \u4E3A\u4EC0\u4E48\u505A\u6210\u300C\u6536\u8D77\u300D\uFF1A\u56DB\u4E2A\u89C6\u56FE\u662F\u63A2\u7D22\u578B\u5165\u53E3\uFF0C\u9ED8\u8BA4\u94FA\u5F00\u4F1A\u8BA9\u9875\u9762\u5148\u5448\u73B0\u63A7\u4EF6\u800C\u975E\u6570\u636E\u3002 */
+.dshc-viewpick { display: inline-flex; align-items: center; gap: 8px; font: inherit; cursor: pointer; border: 1px solid transparent; background: none; border-radius: 7px; padding: 3px 8px; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-viewpick:hover { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-color: var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-viewpick-cur { font-size: 12px; color: var(--dsw-alias-brand-primary,#4f6ef7); font-weight: 600; }
+.dshc-viewpick-caret { font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 /* KPI \u884C\uFF08\u53EF\u70B9\u51FB\u7684\u7EDF\u8BA1\u683C\uFF09 */
 .dshc-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: '10px 12px'; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.dshc-kpi { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
 /* \u6E20\u9053\u4E09\u5361 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
@@ -400,7 +427,7 @@ var FOLD_CSS = `
 /* \u73AF\u5F62\u767E\u5206\u6BD4 */
 .dshc-uring { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-uring { grid-template-columns: 1fr; } }
-.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 10px; text-align: center; min-width: 0; }
+.dshc-uring > div { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; background: var(--dsw-alias-bg-layer-2,#f9fafb); padding: 12px 14px; text-align: center; min-width: 0; }
 .dshc-uring svg { display: block; margin: 0 auto; }
 .dshc-uring .rv { font-size: 17px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-uring .rl { font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); margin-top: 2px; }
@@ -3391,7 +3418,7 @@ function UsageAreaChart({ rows, metric }) {
             ),
             React.createElement(
               "div",
-              { style: { ...s.muted, fontSize: 11 } },
+              { style: { ...s.muted, fontSize: 10.5 } },
               `\u5EF6\u8FDF ${Math.round(hover.row.latencyMS)} ms \xB7 \u5360\u6BD4 ${formatPercent(hover.row.requests / Math.max(1, hover.total))}`
             )
           )
@@ -3712,130 +3739,141 @@ function UsageHeatmap({ rows }) {
     ),
     React.createElement(
       "div",
-      { style: { ...s.muted, fontSize: 11, marginTop: 6, lineHeight: 1.7 } },
+      { style: { ...s.muted, fontSize: 10.5, marginTop: 6, lineHeight: 1.7 } },
       `\u5CF0\u503C ${days[Math.floor(bestIndex / 24)]} ${bestIndex % 24}:00 \xB7 ${formatNumber(bestValue)} \u8BF7\u6C42\u3002`,
       "\u4EC5\u8986\u76D6\u5C0F\u65F6\u69FD\uFF08\u8FD1 48h\uFF09\u3002",
       dayRows.length > 0 ? `\u53E6\u6709 ${days.length > 0 ? "" : ""}${dayRows.length} \u4E2A\u65E5\u69FD\u53EA\u6709\u5F53\u5929\u603B\u91CF\u3001\u65E0\u5C0F\u65F6\u7EF4\u5EA6\uFF0C\u672A\u4E0A\u6B64\u56FE\uFF08\u4E0D\u662F\u4E22\u5931\u6570\u636E\uFF09\u3002` : ""
     )
   );
 }
-function UsageRings({ rings }) {
-  const list = rings.filter(Boolean);
+function UsageRatioStrip({ items }) {
+  const list = (items ?? []).filter(Boolean);
   if (list.length === 0) return null;
   return React.createElement(
     "div",
-    { className: "dshc-uring" },
-    ...list.map((ring) => {
-      const radius = 22;
-      const circumference = 2 * Math.PI * radius;
-      const ratio = Math.max(0, Math.min(1, Number(ring.value) || 0));
-      return React.createElement(
+    { className: "dshc-row", style: { marginTop: 10, gap: 14 } },
+    ...list.map(
+      (item) => React.createElement(
         "div",
-        { key: ring.label },
-        React.createElement(
-          "svg",
-          { viewBox: "0 0 60 60", width: 66, height: 66 },
-          React.createElement("circle", { className: "track", cx: 30, cy: 30, r: radius }),
-          React.createElement("circle", {
-            className: `arc ${ring.cls}`,
-            cx: 30,
-            cy: 30,
-            r: radius,
-            strokeDasharray: `${(circumference * ratio).toFixed(1)} ${circumference.toFixed(1)}`
-          })
-        ),
-        React.createElement("div", { className: "rv" }, formatPercent(ratio, 0)),
-        React.createElement("div", { className: "rl" }, ring.label),
-        ring.note ? React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, ring.note) : null
-      );
-    })
+        { key: item.label, className: "dshc-row", style: { gap: 6 } },
+        React.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, item.label),
+        React.createElement("span", {
+          style: { fontSize: 13, fontWeight: 600, color: item.tone ?? "var(--dsw-alias-label-primary,currentColor)" }
+        }, item.value),
+        React.createElement("span", {
+          style: { ...s.muted, fontSize: 10.5, cursor: "help" },
+          title: item.title ?? item.scope
+        }, item.scope)
+      )
+    )
   );
 }
-function UsageHero({ total, rows, stock, windowValue }) {
+function UsageRatioBar({ segments, title }) {
+  const total = segments.reduce((sum, seg) => sum + (Number(seg.value) || 0), 0);
+  return React.createElement(
+    "span",
+    {
+      className: "dshc-palette",
+      style: { height: 5, marginTop: 5, maxWidth: "none", width: "100%" },
+      title
+    },
+    ...total > 0 ? segments.map((seg, index) => React.createElement("span", {
+      key: `s${index}`,
+      style: {
+        width: `${((Number(seg.value) || 0) / total * 100).toFixed(1)}%`,
+        background: seg.color
+      }
+    })) : [React.createElement("span", {
+      key: "empty",
+      style: { width: "100%", background: "var(--dsw-alias-border-l2,#e5e7eb)" }
+    })]
+  );
+}
+function UsageHero({ total, stock, windowValue }) {
   const requests = Number(total?.requests) || 0;
   const failed = Number(total?.failed) || 0;
   const credit = Number(total?.credit) || 0;
-  const latency = Number(total?.avg_latency_ms) || 0;
   const structure = tokenStructure(total);
   const burn = creditBurn(stock.usable, credit, windowValue);
   const successRate = requests > 0 ? (requests - failed) / requests : 0;
-  const cards = [
+  const perRequest = requests > 0 ? credit / requests : null;
+  const tiles = [
     {
-      label: "\u8BF7\u6C42\u603B\u91CF",
+      key: "requests",
+      label: "\u8BF7\u6C42",
       value: formatNumber(requests),
-      sub: `\u6210\u529F ${formatNumber(requests - failed)} \xB7 \u5931\u8D25 ${formatNumber(failed)} \xB7 \u6210\u529F\u7387 ${formatPercent(successRate, 2)}`
+      bar: React.createElement(UsageRatioBar, {
+        segments: [
+          { value: requests - failed, color: tone.ok.fg },
+          { value: failed, color: tone.err.fg }
+        ],
+        title: `\u6210\u529F ${formatNumber(requests - failed)} \xB7 \u5931\u8D25 ${formatNumber(failed)}`
+      }),
+      note: requests > 0 ? `\u6210\u529F ${formatNumber(requests - failed)} \xB7 \u5931\u8D25 ${formatNumber(failed)}` : "\u7A97\u53E3\u5185\u65E0\u8BF7\u6C42"
     },
     {
-      label: "Tokens",
-      value: formatTokens(structure.total),
-      sub: `\u2191${formatTokens(structure.prompt)} / \u2193${formatTokens(structure.completion)}`
-    },
-    {
+      key: "credit",
       label: "\u79EF\u5206\u6D88\u8017",
       value: formatCredit(credit),
-      sub: `\u6BCF\u8BF7\u6C42 ${requests > 0 ? formatCredit(credit / requests) : "\u2014"} \u79EF\u5206`,
-      tone: tone.ok.fg
+      tone: tone.ok.fg,
+      note: perRequest === null ? "\u2014" : `${formatCredit(perRequest)} / \u8BF7\u6C42`
     },
     {
-      label: "\u5E73\u5747\u5EF6\u8FDF",
-      value: latency > 0 ? `${Math.round(latency)} ms` : "\u2014",
-      sub: "\u7A97\u53E3\u5185\u6309\u8BF7\u6C42\u52A0\u6743"
+      key: "stock",
+      label: "\u53EF\u7528\u79EF\u5206",
+      value: formatNumber(Math.round(stock.usable)),
+      tone: tone.ok.fg,
+      note: [
+        burn === null ? null : `\u8FD8\u53EF \u2248 ${burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`}`,
+        stock.unusable > 0 ? `\u4E0D\u53EF\u6D88\u8017 ${formatNumber(Math.round(stock.unusable))}` : null
+      ].filter(Boolean).join(" \xB7 ") || "\u2014",
+      title: [
+        "\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF0C\u4E0D\u53EF\u6D88\u8017\uFF08\u6E20\u9053\u4E13\u7528\u6C60\uFF09\u5355\u5217\u4E0D\u5E76\u5165",
+        burn === null ? "\u7A97\u53E3\u5185\u65E0\u6D88\u8017\u6216\u65E0\u5B58\u91CF\uFF0C\u4E0D\u505A\u5916\u63A8" : `\u6309\u7A97\u53E3\u901F\u7387\u5916\u63A8 ${formatCredit(burn.perDay)} \u79EF\u5206/\u5929\uFF08\u7EBF\u6027\u5916\u63A8\uFF0C\u975E\u627F\u8BFA\uFF1B\u8D26\u672C\u53EA\u8986\u76D6\u7ECF\u672C\u7F51\u5173\u7684\u8BF7\u6C42\uFF0C\u5B9E\u9645\u504F\u4E50\u89C2\uFF09`,
+        ...stock.byChannel.filter((channel) => channel.count > 0).map((channel) => `${CHANNEL_LABEL[channel.id] ?? channel.id} ${formatNumber(Math.round(channel.usable))}\uFF08${channel.count} \u53F7\uFF09`)
+      ].join(" \xB7 ")
+    },
+    {
+      key: "tokens",
+      label: "Tokens",
+      value: formatTokens(structure.total),
+      bar: React.createElement(UsageRatioBar, {
+        segments: [
+          { value: structure.prompt, color: "var(--dsw-alias-brand-primary,#4f6ef7)" },
+          {
+            value: structure.completion,
+            color: "var(--dsw-alias-button-info-fill,#4176e6)"
+          }
+        ],
+        title: `\u8F93\u5165 prompt ${formatNumber(structure.prompt)} \xB7 \u8F93\u51FA completion ${formatNumber(structure.completion)}`
+      }),
+      note: `\u2191${formatTokens(structure.prompt)} \xB7 \u2193${formatTokens(structure.completion)}`
     }
   ];
   return React.createElement(
     "div",
-    { className: "dshc-uhero" },
-    React.createElement(
-      "div",
-      { className: "dshc-kpis" },
-      ...cards.map(
-        (card) => React.createElement(
-          "div",
-          { key: card.label, className: "dshc-kpi", style: { cursor: "default" } },
-          React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, card.label),
-          React.createElement("div", {
-            style: {
-              fontSize: 21,
-              fontWeight: 600,
-              lineHeight: 1.25,
-              color: card.tone ?? "var(--dsw-alias-label-primary,currentColor)"
-            }
-          }, card.value),
-          React.createElement("div", { style: { ...s.muted, fontSize: 11, marginTop: 2 } }, card.sub)
-        )
-      )
-    ),
-    React.createElement(
-      "div",
-      { className: "dshc-ustock" },
-      React.createElement(
+    { className: "dshc-kpis" },
+    ...tiles.map(
+      (tile) => React.createElement(
         "div",
-        { style: { ...s.muted, fontSize: 11 }, title: "\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF1B\u4E0D\u53EF\u6D88\u8017\uFF08\u6E20\u9053\u4E13\u7528\u6C60\uFF09\u5355\u72EC\u5217\u51FA\uFF0C\u4E0D\u5E76\u5165" },
-        "\u53EF\u7528\u79EF\u5206"
-      ),
-      React.createElement(
-        "div",
-        { className: "dshc-row", style: { alignItems: "baseline", gap: 8 } },
-        React.createElement("span", { className: "big" }, formatNumber(Math.round(stock.usable))),
-        stock.unusable > 0 ? React.createElement(Tag, { text: `\u53E6 ${formatNumber(Math.round(stock.unusable))} \u4E0D\u53EF\u6D88\u8017`, tone: "warn" }) : null
-      ),
-      React.createElement(
-        "div",
-        { style: { ...s.muted, fontSize: 11, marginTop: 2 } },
-        burn === null ? "\u5B58\u91CF\u8D8B\u52BF\uFF1A\u7A97\u53E3\u5185\u65E0\u6D88\u8017\u6216\u65E0\u5B58\u91CF\uFF0C\u4E0D\u505A\u5916\u63A8" : `\u2248 \u8FD8\u53EF ${burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`} \xB7 ${formatCredit(burn.perDay)} \u79EF\u5206/\u5929`
-      ),
-      React.createElement(
-        "div",
-        { className: "dshc-uchans" },
-        ...stock.byChannel.map(
-          (channel) => React.createElement(
-            "div",
-            { key: channel.id },
-            React.createElement("div", { className: "n" }, CHANNEL_LABEL[channel.id] ?? channel.id),
-            React.createElement("div", { className: "c" }, channel.count > 0 ? formatNumber(Math.round(channel.usable)) : "\u2014"),
-            React.createElement("div", { className: "n" }, `${channel.count} \u53F7`)
-          )
-        )
+        {
+          key: tile.key,
+          className: "dshc-kpi",
+          style: { ...s.kpi, cursor: "default" },
+          title: tile.title
+        },
+        React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, tile.label),
+        React.createElement("div", {
+          style: {
+            fontSize: 26,
+            fontWeight: 600,
+            lineHeight: 1.15,
+            letterSpacing: "-.02em",
+            color: tile.tone ?? "var(--dsw-alias-label-primary,currentColor)"
+          }
+        }, tile.value),
+        tile.bar ?? null,
+        React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, tile.note)
       )
     )
   );
@@ -3907,7 +3945,7 @@ function UsageTables({ rows, dim, total, accounts, channelOf }) {
             className: "dshc-ushare",
             style: { width: Math.max(3, Math.round(row.share * 90)) }
           }),
-          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, formatPercent(row.share, 1))
+          React.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, formatPercent(row.share, 1))
         )
       ),
       React.createElement("td", null, formatNumber(row.requests ?? 0)),
@@ -4018,6 +4056,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
   const [metric, setMetric] = React.useState("requests");
   const [dim, setDim] = React.useState("uid");
   const [view, setView] = React.useState("combo");
+  const [viewOpen, setViewOpen] = React.useState(false);
   const total = usageData?.total ?? {};
   const windowText = USAGE_WINDOWS.find((item) => item.value === usageWindow)?.label ?? usageWindow;
   const processesUptime = stats?.enabled === true ? uptimeText(stats.uptime_sec) : null;
@@ -4045,20 +4084,18 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         React.createElement(
           "div",
           { className: "dshc-row" },
-          ...USAGE_WINDOWS.map(
-            (option) => React.createElement("button", {
-              key: option.value,
-              type: "button",
-              onClick: () => onWindowChange(option.value),
-              style: {
-                ...s.btnGhost,
-                height: 26,
-                padding: "0 10px",
-                fontSize: 12,
-                borderColor: usageWindow === option.value ? "var(--dsw-alias-brand-primary,#4f6ef7)" : void 0,
-                color: usageWindow === option.value ? "var(--dsw-alias-brand-primary,#4f6ef7)" : void 0
-              }
-            }, option.label)
+          // 页级选择（窗口）：紧凑段控，不与图级控件抢权重
+          React.createElement(
+            "div",
+            { className: "dshc-seg", "data-seg": "window" },
+            ...USAGE_WINDOWS.map(
+              (option) => React.createElement("button", {
+                key: option.value,
+                type: "button",
+                className: usageWindow === option.value ? "on" : "",
+                onClick: () => onWindowChange(option.value)
+              }, option.label)
+            )
           ),
           React.createElement("button", {
             type: "button",
@@ -4079,71 +4116,11 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         usage?.reason ?? "\u7F51\u5173\u672A\u63D0\u4F9B\u5206\u6876\u7AEF\u70B9\uFF0C\u9700\u5728\u7F51\u5173\u4FA7\u652F\u6301 GET /v1/stats/buckets\u3002"
       )
     ) : null,
-    // ── ② 英雄总量区 ────────────────────────────────────────────────────
+    // ── ② 英雄总量区：4 张同权瓷砖（每张一个主数字 + 一个参照） ──────────
     bucketsAvailable ? React.createElement(
       "div",
       { style: s.card },
-      React.createElement(UsageHero, { total, rows, stock, windowValue: usageWindow }),
-      React.createElement(
-        "div",
-        { style: { marginTop: 12 } },
-        React.createElement(UsageRings, {
-          rings: [
-            {
-              value: (Number(total.requests) || 0) > 0 ? (Number(total.requests) - (Number(total.failed) || 0)) / Number(total.requests) : 0,
-              label: "\u6210\u529F\u7387",
-              cls: "ok",
-              note: "\u7A97\u53E3\u53E3\u5F84"
-            },
-            stats?.enabled === true ? { value: Number(stats.total?.cache_hit_rate) || 0, label: "\u7F13\u5B58\u547D\u4E2D\u7387", cls: "brand", note: "\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84" } : null,
-            stats?.enabled === true && (Number(stats.total?.requests) || 0) > 0 ? {
-              value: (Number(stats.total?.streaming) || 0) / Number(stats.total.requests),
-              label: "\u6D41\u5F0F\u8BF7\u6C42\u5360\u6BD4",
-              cls: "warn",
-              note: "\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84"
-            } : null
-          ]
-        })
-      ),
-      // Token 结构条（窗口口径：只有 prompt / completion 两段）
-      React.createElement(
-        "div",
-        { style: { marginTop: 12 } },
-        React.createElement(
-          "div",
-          { className: "dshc-row", style: { justifyContent: "space-between" } },
-          React.createElement("span", { style: { ...s.muted, fontSize: 11 } }, "Token \u7ED3\u6784"),
-          React.createElement(
-            "span",
-            { style: { ...s.muted, fontSize: 11 } },
-            `prompt ${formatTokens(tokenStructure(total).prompt)} \xB7 completion ${formatTokens(tokenStructure(total).completion)} \xB7 \u5408\u8BA1 ${formatTokens(tokenStructure(total).total)}`
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "dshc-ustack", style: { marginTop: 6 } },
-          React.createElement("i", {
-            style: { width: `${(tokenStructure(total).promptShare * 100).toFixed(1)}%`, background: "var(--dsw-alias-brand-primary,#4f6ef7)" },
-            title: `\u8F93\u5165 prompt ${formatNumber(tokenStructure(total).prompt)}`
-          }),
-          React.createElement("i", {
-            style: {
-              width: `${(tokenStructure(total).completionShare * 100).toFixed(1)}%`,
-              background: "var(--dsw-alias-button-info-fill,#4176e6)",
-              opacity: 0.55
-            },
-            title: `\u8F93\u51FA completion ${formatNumber(tokenStructure(total).completion)}`
-          })
-        ),
-        React.createElement(
-          "div",
-          { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
-          React.createElement("span", {
-            style: { cursor: "help" },
-            title: "\u7A97\u53E3\u53E3\u5F84\u53EA\u6709 prompt / completion \u4E24\u6BB5\uFF1B\u7F13\u5B58\u547D\u4E2D\u7387\u5C5E\u4E8E\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\uFF08\u89C1\u4E0A\u65B9\u73AF\u4E0E\u300C\u6A21\u578B\u5168\u666F\u300D\uFF09\u3002"
-          }, "\u8F93\u5165 / \u8F93\u51FA\u4E24\u6BB5")
-        )
-      )
+      React.createElement(UsageHero, { total, stock, windowValue: usageWindow })
     ) : null,
     // ── ③ 主图（走势） ──────────────────────────────────────────────────
     bucketsAvailable ? React.createElement(
@@ -4152,20 +4129,18 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       React.createElement(
         "div",
         { className: "dshc-row", style: { justifyContent: "space-between" } },
+        React.createElement("div", { style: s.label }, "\u8D70\u52BF"),
         React.createElement(
           "div",
-          { className: "dshc-row" },
-          React.createElement("div", { style: s.label }, "\u8D70\u52BF"),
-          React.createElement(
-            "span",
-            { style: { ...s.muted, fontSize: 10.5 } },
-            `${rows.length} \u4E2A\u65F6\u95F4\u69FD`
+          { className: "dshc-seg", "data-seg": "metric" },
+          ...USAGE_METRICS.map(
+            (item) => React.createElement("button", {
+              key: item.id,
+              type: "button",
+              className: metric === item.id ? "on" : "",
+              onClick: () => setMetric(item.id)
+            }, item.label)
           )
-        ),
-        React.createElement(
-          "div",
-          { className: "dshc-row" },
-          ...USAGE_METRICS.map((item) => segmentButton(item.id, item.label, metric, setMetric))
         )
       ),
       rows.length === 0 ? React.createElement(
@@ -4175,7 +4150,12 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       ) : React.createElement(
         "div",
         { style: { marginTop: 10 } },
-        React.createElement(UsageAreaChart, { rows, metric })
+        React.createElement(UsageAreaChart, { rows, metric }),
+        React.createElement(
+          "div",
+          { style: { ...s.muted, fontSize: 10.5, marginTop: 4 } },
+          `${rows.length} \u4E2A\u65F6\u95F4\u69FD`
+        )
       )
     ) : null,
     // ── ④ 分析视图（切换式，避免图墙） ──────────────────────────────────
@@ -4185,12 +4165,38 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
       React.createElement(
         "div",
         { className: "dshc-row", style: { justifyContent: "space-between", marginBottom: 10 } },
-        React.createElement("div", { style: s.label }, "\u5206\u6790\u89C6\u56FE"),
         React.createElement(
+          "button",
+          {
+            type: "button",
+            className: "dshc-viewpick",
+            "aria-expanded": viewOpen,
+            title: viewOpen ? "\u6536\u8D77\u89C6\u56FE\u9009\u62E9" : "\u5207\u6362\u5206\u6790\u89C6\u56FE",
+            onClick: () => setViewOpen((prev) => !prev)
+          },
+          React.createElement("span", { style: s.label }, "\u5206\u6790\u89C6\u56FE"),
+          React.createElement(
+            "span",
+            { className: "dshc-viewpick-cur" },
+            USAGE_VIEWS.find((item) => item.id === view)?.label ?? ""
+          ),
+          React.createElement("span", { className: "dshc-viewpick-caret" }, viewOpen ? "\u25B4" : "\u25BE")
+        ),
+        viewOpen ? React.createElement(
           "div",
-          { className: "dshc-row" },
-          ...USAGE_VIEWS.map((item) => segmentButton(item.id, item.label, view, setView))
-        )
+          { className: "dshc-seg", "data-seg": "views" },
+          ...USAGE_VIEWS.map(
+            (item) => React.createElement("button", {
+              key: item.id,
+              type: "button",
+              className: view === item.id ? "on" : "",
+              onClick: () => {
+                setView(item.id);
+                setViewOpen(false);
+              }
+            }, item.label)
+          )
+        ) : null
       ),
       view === "combo" ? React.createElement(
         "div",
@@ -4217,7 +4223,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         null,
         React.createElement(
           "div",
-          { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
+          { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
           "\u6BCF\u4E2A\u69FD\u7684\u8BF7\u6C42\u6309\u6A21\u578B\u62C6\u5206\u5806\u53E0\uFF08\u5168\u7A97\u53E3\u7D2F\u8BA1\u7ED3\u6784\uFF09"
         ),
         React.createElement(UsageStackChart, { buckets })
@@ -4227,7 +4233,7 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         null,
         React.createElement(
           "div",
-          { style: { ...s.muted, fontSize: 11, marginBottom: 8 } },
+          { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
           "\u884C = \u65E5\u671F \xB7 \u5217 = \u5C0F\u65F6 \xB7 \u6DF1\u6D45 = \u8BF7\u6C42\u91CF"
         ),
         React.createElement(
@@ -4247,14 +4253,15 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
         React.createElement("div", { style: s.label }, "\u5F52\u56E0"),
         React.createElement(
           "div",
-          { className: "dshc-row" },
-          ...USAGE_DIMS.map((item) => segmentButton(
-            item.id,
-            item.label,
-            dim,
-            setDim,
-            item.id === "uid" ? (usageData?.by_uid ?? []).length : void 0
-          ))
+          { className: "dshc-seg", "data-seg": "dims" },
+          ...USAGE_DIMS.map(
+            (item) => React.createElement("button", {
+              key: item.id,
+              type: "button",
+              className: dim === item.id ? "on" : "",
+              onClick: () => setDim(item.id)
+            }, item.label)
+          )
         )
       ),
       usageData?.degraded ? React.createElement(
@@ -4285,6 +4292,29 @@ function UsageTab({ stats, usage, usageWindow, onWindowChange, onRefresh, accoun
             title: stats?.enabled === true && stats.since ? `\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6\u3002\u6570\u636E\u8D77\u70B9 ${stats.since}` : "\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6"
           })
         )
+      }),
+      // 进程口径的比率指标：与表格同源（/v1/stats），放在一起口径自洽
+      React.createElement(UsageRatioStrip, {
+        items: stats?.enabled === true ? [
+          {
+            label: "\u7F13\u5B58\u547D\u4E2D\u7387",
+            value: formatPercent(Number(stats.total?.cache_hit_rate) || 0, 0),
+            scope: "\u8FDB\u7A0B\u7D2F\u8BA1",
+            title: "\u547D\u4E2D /\uFF08\u547D\u4E2D + \u672A\u547D\u4E2D\uFF09\uFF0C\u6765\u81EA /v1/stats\uFF08\u91CD\u542F\u6E05\u96F6\uFF09"
+          },
+          (Number(stats.total?.requests) || 0) > 0 ? {
+            label: "\u6D41\u5F0F\u5360\u6BD4",
+            value: formatPercent((Number(stats.total?.streaming) || 0) / Number(stats.total.requests), 0),
+            scope: "\u8FDB\u7A0B\u7D2F\u8BA1",
+            title: "\u6D41\u5F0F\u8BF7\u6C42 / \u603B\u8BF7\u6C42\uFF0C\u6765\u81EA /v1/stats\uFF08\u91CD\u542F\u6E05\u96F6\uFF09"
+          } : null,
+          {
+            label: "\u5E73\u5747\u5EF6\u8FDF",
+            value: (Number(stats.total?.avg_latency_ms) || 0) > 0 ? `${Math.round(Number(stats.total.avg_latency_ms))} ms` : "\u2014",
+            scope: "\u8FDB\u7A0B\u7D2F\u8BA1",
+            title: "\u7AEF\u5230\u7AEF\u8017\u65F6\u5747\u503C\uFF0C\u6765\u81EA /v1/stats\uFF08\u91CD\u542F\u6E05\u96F6\uFF09"
+          }
+        ] : null
       }),
       React.createElement(UsageModelPanel, { stats })
     )
