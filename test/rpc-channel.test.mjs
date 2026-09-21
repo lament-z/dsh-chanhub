@@ -24,7 +24,7 @@ import { ChanhubClient, normalizeBaseUrl } from '../lib/chanhub-client.js';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 网关真实地址（本机 chanhub / WorkBuddy2API）。 */
-const GATEWAY = process.env.DSH_CHANHUB_TEST_URL ?? 'http://127.0.0.1:7863';
+const GATEWAY = process.env.DSH_CHANHUB_TEST_URL ?? 'http://127.0.0.1:7866';
 const API_KEY = process.env.WB2API_API_KEY ?? '';
 
 /**
@@ -339,7 +339,7 @@ test('A10 请求体超限 → 413', async () => {
 test('A11 上游超时 → 结构化错误信封（不是挂死）', async () => {
   const client = new ChanhubClient({
     // 10.255.255.1 是不可路由地址，用来稳定触发超时
-    resolveConfig: () => ({ baseURL: 'http://10.255.255.1:7863' }),
+    resolveConfig: () => ({ baseURL: 'http://10.255.255.1:7866' }),
   });
   const runtime = {
     client,
@@ -493,11 +493,11 @@ test(
 );
 
 test('B7 normalizeBaseUrl 归一化各种输入', () => {
-  assert.equal(normalizeBaseUrl('127.0.0.1:7863'), 'http://127.0.0.1:7863');
-  assert.equal(normalizeBaseUrl('http://127.0.0.1:7863/'), 'http://127.0.0.1:7863');
+  assert.equal(normalizeBaseUrl('127.0.0.1:7866'), 'http://127.0.0.1:7866');
+  assert.equal(normalizeBaseUrl('http://127.0.0.1:7866/'), 'http://127.0.0.1:7866');
   assert.equal(normalizeBaseUrl('https://gw.example.com///'), 'https://gw.example.com');
-  assert.equal(normalizeBaseUrl(''), 'http://127.0.0.1:7863');
-  assert.equal(normalizeBaseUrl(undefined), 'http://127.0.0.1:7863');
+  assert.equal(normalizeBaseUrl(''), 'http://127.0.0.1:7866');
+  assert.equal(normalizeBaseUrl(undefined), 'http://127.0.0.1:7866');
 });
 
 // ---------------------------------------------------------------------------

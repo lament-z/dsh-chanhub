@@ -19,7 +19,7 @@ import { Context, Service } from '@deepseek-ai/cordis';
 import plugin, { CHANNEL, ENDPOINTS } from '../lib/index.js';
 import { ChanhubClient } from '../lib/chanhub-client.js';
 
-const GATEWAY = process.env.DSH_CHANHUB_TEST_URL ?? 'http://127.0.0.1:7863';
+const GATEWAY = process.env.DSH_CHANHUB_TEST_URL ?? 'http://127.0.0.1:7866';
 const API_KEY = process.env.WB2API_API_KEY ?? '';
 
 /**

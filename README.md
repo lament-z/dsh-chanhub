@@ -78,7 +78,7 @@ See `.scratch/chanhub-panel/execution-report.md` for the evidence.
 
 ## Requirements
 
-- The plugin host must be able to reach the gateway (default `http://127.0.0.1:7863`).
+- The plugin host must be able to reach the gateway (default `http://127.0.0.1:7866`).
 - Reading and writing the gateway `config.json` requires the plugin host and the
   gateway to be on the same machine. Container deployments that mount
   `./config.json:/app/config.json:ro` are read-only — remove `:ro` to allow edits.
@@ -91,7 +91,7 @@ The plugin registers the settings namespace `dsh-chanhub`:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `baseURL` | `http://127.0.0.1:7863` | Gateway address |
+| `baseURL` | `http://127.0.0.1:7866` | Gateway address |
 | `apiKeyEnv` | `WB2API_API_KEY` | Credential reference resolved through `ctx.credentials` |
 | `apiKey` | `""` | Fallback literal key (prefer `apiKeyEnv`) |
 | `gatewayConfigPath` | `""` | Absolute path to the gateway `config.json` on the host |
@@ -127,7 +127,7 @@ DSHC_REACT_DIR=/tmp/dshc-render npm test
 Without them, the render tests skip; the host-side and unit tests still run.
 
 Gateway-backed tests (`B1`–`B6` in `test/rpc-channel.test.mjs`) skip automatically when no
-gateway answers on `127.0.0.1:7863`, so CI stays green without one.
+gateway answers on `127.0.0.1:7866`, so CI stays green without one.
 
 ## Layout
 

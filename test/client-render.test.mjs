@@ -152,7 +152,7 @@ function restoreGlobals(saved) {
   }
 }
 
-/** 真实网关快照（脱敏，形状来自本机 :7863 实测）。 */
+/** 真实网关快照（脱敏，形状来自本机 :7866 实测）。 */
 function realStatusFixture() {
   return {
     accounts: [
@@ -339,7 +339,7 @@ function fakeRpc(status) {
           ok: true,
           value: {
             reachable: true,
-            baseURL: 'http://127.0.0.1:7863',
+            baseURL: 'http://127.0.0.1:7866',
             // probe.features.admin/tasks=true → admin 端点在场（成长码写按钮与批量任务可渲染）。
             probe: { reachable: true, features: { admin: true, tasks: true, stats: false, usageBuckets: true, logs: true, credits: true, growthTasks: true, schoolTasks: true } },
             status,
@@ -860,7 +860,7 @@ test('渲染：日志 Tab 渲染真实日志行与频道筛选', { skip }, async
 test('渲染：连接状态显示真实地址', { skip }, async () => {
   const { html, cleanup } = await mount(fakeRpc(realStatusFixture()));
   try {
-    assert.ok(html.includes('已连接 127.0.0.1:7863'), '缺连接状态文案');
+    assert.ok(html.includes('已连接 127.0.0.1:7866'), '缺连接状态文案');
   } finally {
     await cleanup();
   }
@@ -873,8 +873,8 @@ test('渲染：网关不可达与鉴权失败给不同的处置指引', { skip }
           ok: true,
           value: {
             reachable: false,
-            baseURL: 'http://127.0.0.1:7863',
-            error: { code: 'upstream-unreachable', message: '无法连接网关 http://127.0.0.1:7863' },
+            baseURL: 'http://127.0.0.1:7866',
+            error: { code: 'upstream-unreachable', message: '无法连接网关 http://127.0.0.1:7866' },
           },
         }
       : { ok: true, value: { ok: false, message: 'n/a' } };
@@ -894,7 +894,7 @@ test('渲染：鉴权失败时明确说「网关在线，是 key 不匹配」', 
           ok: true,
           value: {
             reachable: true,
-            baseURL: 'http://127.0.0.1:7863',
+            baseURL: 'http://127.0.0.1:7866',
             error: { code: 'auth-failed', message: '网关拒绝请求（HTTP 401）：missing or invalid API key' },
           },
         }
@@ -1491,7 +1491,7 @@ test('渲染：「＋ 添加账号」→ traework 走通发起到粘贴的接线
     calls.push({ endpoint, payload });
     switch (endpoint) {
       case 'refreshStatus':
-        return { ok: true, value: { reachable: true, baseURL: 'http://127.0.0.1:7863', probe: { reachable: true, features: {} }, status: realStatusFixture() } };
+        return { ok: true, value: { reachable: true, baseURL: 'http://127.0.0.1:7866', probe: { reachable: true, features: {} }, status: realStatusFixture() } };
       case 'getChannels':
         return { ok: true, value: { channels: ['traework'], loginChannels: ['traework'], realms: ['cn'] } };
       case 'loginStart':

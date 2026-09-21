@@ -143,7 +143,7 @@ if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
 
 ## 前置条件
 
-- 插件宿主能连到网关（默认 `http://127.0.0.1:7863`）。
+- 插件宿主能连到网关（默认 `http://127.0.0.1:7866`）。
 - 「添加账号」要求网关带 `/panel/api/login/*` 且 `login_channels` 含目标渠道
   （旧的 chanhub 网关只支持 traework/qoder）。不满足时面板隐藏入口，其余功能不受影响。
 - 读写网关 `config.json` 要求**插件宿主与网关同机**（账号渠道已由 `/status`
@@ -154,7 +154,7 @@ if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `baseURL` | `http://127.0.0.1:7863` | 网关地址 |
+| `baseURL` | `http://127.0.0.1:7866` | 网关地址 |
 | `apiKeyEnv` | `WB2API_API_KEY` | 凭证引用，经 `ctx.credentials` 解析 |
 | `apiKey` | `""` | 明文兜底（建议优先用 `apiKeyEnv`） |
 | `gatewayConfigPath` | `""` | 宿主上网关 `config.json` 的绝对路径 |
@@ -191,7 +191,7 @@ DSHC_REACT_DIR=/tmp/dshc-render npm test
 
 未提供时这些渲染测试会自动跳过，宿主侧与单元测试照常运行。
 
-依赖真实网关的测试（`test/rpc-channel.test.mjs` 的 `B1`–`B6`）在 `127.0.0.1:7863`
+依赖真实网关的测试（`test/rpc-channel.test.mjs` 的 `B1`–`B6`）在 `127.0.0.1:7866`
 无人应答时自动跳过，因此无网关的 CI 仍然是绿的。
 
 ## 目录结构

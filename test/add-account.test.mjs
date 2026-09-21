@@ -118,9 +118,9 @@ async function clientFor(gateway) {
  */
 async function hostFor(gateway) {
   const { createHandler, createRuntime, SETTINGS_NAMESPACE } = await import('../lib/index.js');
-  // 注意顺序：register 会先灌 SETTINGS_DEFAULTS（baseURL 默认 127.0.0.1:7863），
+  // 注意顺序：register 会先灌 SETTINGS_DEFAULTS（baseURL 默认 127.0.0.1:7866），
   // 覆盖必须发生在**读取时**，否则请求会打到真实网关上去（真机踩到：
-  // 测试拿到 401，因为请求去了本机 7863 而不是假网关）。
+  // 测试拿到 401，因为请求去了本机 7866 而不是假网关）。
   const defaults = {};
   const fakeCtx = {
     logger: undefined,
