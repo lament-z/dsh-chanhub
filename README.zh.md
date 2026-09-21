@@ -159,8 +159,25 @@ if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
 | `apiKey` | `""` | 明文兜底（建议优先用 `apiKeyEnv`） |
 | `gatewayConfigPath` | `""` | 宿主上网关 `config.json` 的绝对路径 |
 | `authDir` | `""` | 网关凭证目录（用于渠道推断） |
-| `restartCommand` | `""` | 重启命令，必须以白名单前缀开头 |
+| `restartCommand` | `""` | 重启命令，只接受 `docker restart …` / `docker compose … restart …` / `docker-compose restart …` / `./dev.sh restart`（可执行文件允许写绝对路径）；**找不到 docker 时会自动到 Docker Desktop 自带 CLI 目录找**，见下方「重启网关」 |
 | `allowServiceControl` | `false` | 必须显式开启才会执行重启命令 |
+
+### 重启网关（`docker: command not found` 怎么办）
+
+面板里点的「↻ 重启网关」是在**宿主**上跑命令，不是在容器里。常见故障是命令没错、
+二进制找不到：dsh 由 launchd 拉起时 PATH 只有 `/usr/bin:/bin:/usr/sbin:/sbin`，
+而 Docker Desktop 未必在 `/usr/local/bin` 放 CLI 软链 → `/bin/sh: docker: command not found`。
+
+插件已自动处理：先按 PATH 找，找不到再退到已知安装位（含
+`/Applications/Docker.app/Contents/Resources/bin`），并把该目录补进子进程 PATH、
+保证 `HOME` 存在（否则 docker CLI 找不到 `~/.docker/run/docker.sock`）。
+仍失败时结果里会带 `binPath` 与搜过的目录，便于定位。
+
+想一劳永逸也可以自己补软链：
+
+```bash
+sudo ln -s /Applications/Docker.app/Contents/Resources/bin/docker /usr/local/bin/docker
+```
 
 ## 安装
 

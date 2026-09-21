@@ -96,8 +96,26 @@ The plugin registers the settings namespace `dsh-chanhub`:
 | `apiKey` | `""` | Fallback literal key (prefer `apiKeyEnv`) |
 | `gatewayConfigPath` | `""` | Absolute path to the gateway `config.json` on the host |
 | `authDir` | `""` | Gateway credential directory (for channel derivation) |
-| `restartCommand` | `""` | Restart command, must start with a whitelisted prefix |
+| `restartCommand` | `""` | Restart command; only `docker restart …` / `docker compose … restart …` / `docker-compose restart …` / `./dev.sh restart` are accepted (absolute paths to the binary are allowed). If `docker` is not on PATH, the plugin falls back to known install locations (incl. Docker Desktop's bundled CLI) — see below |
 | `allowServiceControl` | `false` | Must be enabled to run the restart command |
+
+### Restart gateway / `docker: command not found`
+
+The "restart gateway" button runs the command **on the host**, not inside the container.
+A common failure is not the command but the missing binary: when dsh is launched by
+launchd its PATH is only `/usr/bin:/bin:/usr/sbin:/sbin`, and Docker Desktop does not
+always install a CLI symlink into `/usr/local/bin` → `/bin/sh: docker: command not found`.
+
+The plugin now handles this: it looks up PATH first, then falls back to known install
+locations (including `/Applications/Docker.app/Contents/Resources/bin`), prepends that
+directory to the child process PATH, and ensures `HOME` is set (without it the CLI cannot
+resolve `~/.docker/run/docker.sock`). Failures report `binPath` and the searched dirs.
+
+You can also fix it once for every tool with a symlink:
+
+```bash
+sudo ln -s /Applications/Docker.app/Contents/Resources/bin/docker /usr/local/bin/docker
+```
 
 ## Install
 

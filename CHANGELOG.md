@@ -1,5 +1,50 @@
 # Changelog
 
+### 修复：点「↻ 重启网关」报 `/bin/sh: docker: command not found`
+
+真机现场：Docker.app 装着、`chanhub2api-chanhub2api` 容器跑得好好的，点重启却报
+`命令执行失败：Command failed: docker restart chanhub2api-chanhub2api /bin/sh: docker:
+command not found`。**命令本身没错，是宿主进程找不到 docker 这个二进制**：
+
+- dsh 由 `com.dsh.web.plist`（launchd）拉起，继承的是 launchd 的最小 PATH
+  （`/usr/bin:/bin:/usr/sbin:/sbin`，见 `~/.dsh/launchd/dsh-web-launcher.sh` 里那行
+  `export PATH`，它只补了 `/usr/local/bin` 与 `/opt/homebrew/bin`）；
+- 而 Docker Desktop **未必**往 `/usr/local/bin` 放 CLI 软链（本机就没有，
+  `which docker` 为空，二进制只在 `/Applications/Docker.app/Contents/Resources/bin`）。
+
+`docker restart` 走 `/bin/sh -c`，PATH 里没有就只会吐一句含糊的 not found，
+看起来像命令写错或守护进程挂了。改动：
+
+**二进制解析（PATH → 已知安装位）**
+- 新增 `resolveServiceBinary()`：先查宿主 PATH，再退到 `SERVICE_BIN_HINT_DIRS`
+  （`/usr/local/bin`、`/opt/homebrew/bin`、`/usr/bin`…，darwin 追加
+  `/Applications/Docker.app/Contents/Resources/bin`，linux 追加 `/snap/bin`）；
+  win32 下还带 `.exe/.cmd/.bat` 变体。解析到的目录补进子进程 PATH（已存在则
+  保持原顺序，不把它顶到最前）。
+- 解析不到时返回 `binary-not-found` + 搜过的目录 + 「软链 / 填绝对路径」的可操作
+  提示，而不是让 shell 甩一句 not found。
+
+**子进程 env 补 HOME**（顺手修掉下一个坑）
+- Docker Desktop 的 daemon socket 在 `~/.docker/run/docker.sock`，CLI 靠
+  `~/.docker/config.json` 的 `currentContext=desktop-linux` 才能找到它。HOME 缺失时
+  CLI 退回默认的 `/var/run/docker.sock`（macOS 上不存在），报
+  「Cannot connect to the Docker daemon」—— 看着像守护进程挂了，其实是 HOME 丢了。
+
+**白名单从「前缀匹配」改成「形状校验」**（`inspectRestartCommand()`）
+- 前缀匹配会误杀真实部署里常见的 `docker compose -f /srv/x/docker-compose.yml
+  restart svc`；现在只要首 token 是 docker/docker-compose/dev.sh（允许绝对路径），
+  且动作是 restart 即可。
+- 同时挡掉 shell 元字符（`; & | \` $ < >` 与换行）—— 这条通道以宿主用户身份跑
+  shell，不能靠「前缀白名单看起来够严」兜底。
+- 返回体新增 `binPath`，失败结果里也能看到用的是哪个 docker。
+
+**测试**：新增 `test/service-control.test.mjs`（11 例）：形状白名单的接受/拒绝
+（含 `docker rm -f`、`; rm -rf`、`$(id)` 等注入写法）、PATH 命中 / 绝对与相对路径 /
+找不到返回 null、env 的 PATH 去重与 HOME 兜底、disabled/no-command/not-allowed 三态，
+以及一条真机回归 —— **把 PATH 掏成 launchd 的最小集后仍要能执行到 docker**
+（用不存在的容器名，只让 docker 报错退出，不碰真实网关）。全量 181 例：160 通过 /
+0 失败 / 21 跳过。
+
 ### 「用量」Tab v4 —— 单页卡片流重构（参考 AlfredChaos/dsh-usage-panel）
 
 读了参考实现源码（`src/client/*` 全部组件、`styles.ts`、`api.ts`、`export.ts`、
