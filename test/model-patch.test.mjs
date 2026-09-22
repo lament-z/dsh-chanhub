@@ -2,7 +2,18 @@
 // 覆盖：网关 /v1/models → 目录快照；DSH 模型补 input 视觉能力的 read-modify-write。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listFromGatewayBody, buildModelsPatch, addImageInput, providerModelsPath, PI_NS } from '../lib/model-patch.js';
+import {
+  addImageInput,
+  buildModelsPatch,
+  catalogFromSnapshot,
+  diffModelSnapshots,
+  listFromGatewayBody,
+  modelsFromCatalog,
+  parseSnapshot,
+  providerModelsPath,
+  snapshotFromCatalog,
+  PI_NS,
+} from '../lib/model-patch.js';
 
 test('listFromGatewayBody 以白名单判定多模态（不信网关 fields）', () => {
   const body = {
@@ -90,4 +101,101 @@ test('addImageInput 幂等与归一化', () => {
 test('常量与路径助手', () => {
   assert.equal(PI_NS, 'llm-pi-ai');
   assert.deepEqual(providerModelsPath('chanhub2api'), ['providers', 'chanhub2api', 'models']);
+});
+// ---------------------------------------------------------------------------
+// 拉取记录（快照）/ 差异 / 覆盖用目录映射 —— 纯函数
+// ---------------------------------------------------------------------------
+
+const CAT = [
+  { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', supportsImages: true },
+  { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, supportsImages: false },
+];
+
+test('snapshotFromCatalog：字段都存（id/name/ctx/maxOut/credits/vision），无 id 的条目丢弃', () => {
+  const snap = snapshotFromCatalog([...CAT, { name: 'no-id' }, null], { at: 123, provider: 'chanhub2api' });
+  assert.equal(snap.at, 123);
+  assert.equal(snap.provider, 'chanhub2api');
+  assert.equal(snap.count, 2);
+  assert.deepEqual(snap.models[0], { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', ctx: 1000000, maxOut: 64000, credits: 'x0.06', vision: true });
+  assert.deepEqual(snap.models[1], { id: 'traework:cn:glm-5.3', name: 'B', ctx: 200000, maxOut: undefined, credits: '', vision: false });
+});
+
+test('parseSnapshot：坏 JSON / 形状不对一律降级为 null（不抛）', () => {
+  assert.equal(parseSnapshot(undefined), null);
+  assert.equal(parseSnapshot(''), null);
+  assert.equal(parseSnapshot('   '), null);
+  assert.equal(parseSnapshot('{不是 JSON'), null);
+  assert.equal(parseSnapshot('{"models":{}}'), null); // models 必须是数组
+  assert.equal(parseSnapshot('"字符串"'), null);
+  const ok = parseSnapshot(JSON.stringify(snapshotFromCatalog(CAT, { at: 9, provider: 'p' })));
+  assert.equal(ok.count, 2);
+  assert.equal(ok.models[0].vision, true);
+});
+
+test('diffModelSnapshots：首次不报「消失」；之后按新增/消失/逐字段变化算', () => {
+  const s1 = snapshotFromCatalog(CAT, { at: 1, provider: 'p' });
+  const first = diffModelSnapshots(null, s1);
+  assert.equal(first.first, true);
+  assert.deepEqual(first.added, CAT.map((m) => m.id));
+  assert.deepEqual(first.removed, [], '首次拉取没有「上游消失」可言');
+  // 无变化
+  const same = diffModelSnapshots(s1, snapshotFromCatalog(CAT, { at: 2, provider: 'p' }));
+  assert.deepEqual({ added: same.added, removed: same.removed, changed: same.changed }, { added: [], removed: [], changed: [] });
+  // 改名 + 上文变 + 消失 + 新增 + 视觉能力变
+  const s2 = snapshotFromCatalog([
+    { id: 'workbuddy:cn:glm-5.3-flash', name: 'A2', contextWindow: 500000, maxTokens: 64000, credits: 'x0.06', supportsImages: false },
+    { id: 'qoder:cn:new', name: 'C' },
+  ], { at: 3, provider: 'p' });
+  const d = diffModelSnapshots(s1, s2);
+  assert.equal(d.first, false);
+  assert.deepEqual(d.added, ['qoder:cn:new']);
+  assert.deepEqual(d.removed, ['traework:cn:glm-5.3']);
+  assert.deepEqual(d.changed, [{ id: 'workbuddy:cn:glm-5.3-flash', fields: ['name', 'ctx', 'vision'] }]);
+});
+
+test('modelsFromCatalog：以网关为准（增删改）+ 白名单补 input + 保留原条目额外键', () => {
+  const previous = [
+    { id: 'workbuddy:cn:glm-5.3-flash', name: 'old', contextWindow: 1, maxTokens: 2, custom: 'keep', input: ['text'] },
+    { id: 'gone:model', name: 'gone' },
+  ];
+  const out = modelsFromCatalog(CAT, { previous });
+  assert.deepEqual(out.map((m) => m.id), CAT.map((m) => m.id), '目录里没有的旧 id 被丢弃');
+  const wb = out[0];
+  assert.equal(wb.name, 'A');
+  assert.equal(wb.contextWindow, 1000000);
+  assert.equal(wb.maxTokens, 64000);
+  assert.deepEqual(wb.input, ['text', 'image'], '白名单视觉模型补图片能力');
+  assert.equal(wb.custom, 'keep', '我们不认识的键保留（不吞 DSH/用户配置）');
+  assert.equal(out[1].input, undefined, '非白名单不补 input');
+  assert.deepEqual(modelsFromCatalog([{ id: 'x' }], { previous: [] }), [{ id: 'x' }]);
+  assert.deepEqual(modelsFromCatalog(null, {}), []);
+});
+
+// ---------------------------------------------------------------------------
+// catalogFromSnapshot —— 快照还原成目录（打开模型 Tab 时回显，不打网关）
+// ---------------------------------------------------------------------------
+
+test('catalogFromSnapshot：短名还原回目录名，视觉能力随 vision 走', () => {
+  const snap = snapshotFromCatalog(CAT, { at: 7, provider: 'p' });
+  const out = catalogFromSnapshot(snap);
+  assert.deepEqual(out, [
+    { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', supportsImages: true },
+    { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, maxTokens: undefined, credits: undefined, supportsImages: false },
+  ]);
+});
+
+test('catalogFromSnapshot：catalog→snapshot→catalog 往返不丢展示字段', () => {
+  const back = catalogFromSnapshot(snapshotFromCatalog(CAT, { at: 1, provider: 'p' }));
+  // credits 缺省与 maxTokens 缺省在往返中会收敛成 undefined（原本就没有），其余逐字相同。
+  assert.deepEqual(back.map((m) => [m.id, m.name, m.contextWindow, m.supportsImages]),
+    CAT.map((m) => [m.id, m.name, m.contextWindow, m.supportsImages]));
+});
+
+test('catalogFromSnapshot：空/坏输入一律给空数组，且名称缺失回落成 id', () => {
+  assert.deepEqual(catalogFromSnapshot(null), []);
+  assert.deepEqual(catalogFromSnapshot({}), []);
+  assert.deepEqual(catalogFromSnapshot({ models: null }), []);
+  assert.deepEqual(catalogFromSnapshot({ models: [{ id: '' }, null, { id: 'x' }] }), [
+    { id: 'x', name: 'x', contextWindow: undefined, maxTokens: undefined, credits: undefined, supportsImages: false },
+  ]);
 });

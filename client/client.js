@@ -2162,7 +2162,10 @@ var ENDPOINTS = {
   serviceControl: "serviceControl",
   revealApiKey: "revealApiKey",
   discoverModelsForPatch: "discoverModelsForPatch",
-  applyModelsPatch: "applyModelsPatch"
+  applyModelsPatch: "applyModelsPatch",
+  getModelRecord: "getModelRecord",
+  rollbackModelsSync: "rollbackModelsSync",
+  clearModelRecord: "clearModelRecord"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -4013,6 +4016,7 @@ function ExportMenu({ open, onToggle, payload, days, byModelDaily, modelRows, ac
 // client/model-ability.js
 var import_react6 = __toESM(require("react"), 1);
 var DEFAULT_PROVIDER = "chanhub2api";
+var FIELD_LABEL = { name: "\u540D\u79F0", ctx: "\u4E0A\u6587", maxOut: "\u8F93\u51FA", credits: "\u500D\u7387", vision: "\u80FD\u529B" };
 function fmtWindow(n) {
   if (!n || n <= 0) return "\u2014";
   if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
@@ -4041,6 +4045,11 @@ function ModelAbilityTab({ rpcCall, showToast }) {
   const [applyBusy, setApplyBusy] = import_react6.default.useState(false);
   const [lastOk, setLastOk] = import_react6.default.useState(null);
   const [lastErr, setLastErr] = import_react6.default.useState(null);
+  const [record, setRecord] = import_react6.default.useState(null);
+  const [diff, setDiff] = import_react6.default.useState(null);
+  const [backup, setBackup] = import_react6.default.useState(null);
+  const [overwrite, setOverwrite] = import_react6.default.useState(false);
+  const [rollbackBusy, setRollbackBusy] = import_react6.default.useState(false);
   const notify = (msg) => {
     if (typeof showToast === "function") {
       showToast(msg);
@@ -4048,24 +4057,63 @@ function ModelAbilityTab({ rpcCall, showToast }) {
     }
     console.log("[dsh-chanhub]", msg);
   };
-  const load = import_react6.default.useCallback(async () => {
+  const load = import_react6.default.useCallback(async (withOverwrite = false) => {
     if (!rpcCall) return;
+    if (withOverwrite) {
+      const okGo = typeof window === "undefined" || typeof window.confirm !== "function" ? true : window.confirm(`\u5C06\u4EE5\u7F51\u5173\u76EE\u5F55\u6574\u4F53\u8986\u76D6 DSH \u91CC provider\u300C${provider}\u300D\u7684\u6A21\u578B\u914D\u7F6E\uFF1A
+\xB7 \u7F51\u5173\u5DF2\u5220\u9664\u7684\u6A21\u578B\u4F1A\u4ECE\u672C\u5730\u79FB\u9664
+\xB7 \u89C6\u89C9\u80FD\u529B\u6309\u672C\u5730\u767D\u540D\u5355\u81EA\u52A8\u5E26\u4E0A
+\xB7 \u8986\u76D6\u524D\u4F1A\u81EA\u52A8\u5907\u4EFD\uFF0C\u53EF\u968F\u65F6\u300C\u56DE\u6EDA\u4E0A\u6B21\u8986\u76D6\u300D
+
+\u7EE7\u7EED\uFF1F`);
+      if (!okGo) return;
+    }
     setState({ kind: "loading" });
     setLastOk(null);
     setLastErr(null);
     try {
-      const result = await rpcCall(ENDPOINTS.discoverModelsForPatch, { provider });
+      const result = await rpcCall(ENDPOINTS.discoverModelsForPatch, {
+        provider,
+        overwriteDshModels: withOverwrite
+      });
       if (result?.ok !== true || !result.value) {
         setState({ kind: "error", message: result?.error?.message ?? "\u62C9\u53D6\u6A21\u578B\u76EE\u5F55\u5931\u8D25" });
         return;
       }
-      setModels(result.value.models ?? []);
+      const v = result.value;
+      setModels(v.models ?? []);
       setSelected(/* @__PURE__ */ new Set());
+      setRecord(v.record ?? null);
+      setDiff(v.diff ?? null);
+      if (v.backup && v.backup.at > 0) setBackup(v.backup);
       setState({ kind: "loaded" });
+      const d = v.diff;
+      if (d) {
+        const parts = [`\u65B0\u589E ${d.added.length}`, `\u6D88\u5931 ${d.removed.length}`, `\u53D8\u5316 ${d.changed.length}`];
+        notify(`\u5DF2\u62C9\u53D6 ${(v.models ?? []).length} \u4E2A\u6A21\u578B\uFF08${parts.join(" / ")}\uFF09` + (v.overwrote ? "\uFF1B\u5DF2\u8986\u76D6 DSH \u6A21\u578B\u914D\u7F6E" : ""));
+      }
     } catch (error) {
       setState({ kind: "error", message: error?.message ?? String(error) });
     }
   }, [rpcCall, provider]);
+  const hydratedRef = import_react6.default.useRef(false);
+  import_react6.default.useEffect(() => {
+    if (hydratedRef.current || !rpcCall) return;
+    hydratedRef.current = true;
+    (async () => {
+      try {
+        const result = await rpcCall(ENDPOINTS.getModelRecord, {});
+        if (result?.ok !== true || !result.value?.record) return;
+        const v = result.value;
+        setModels(v.models ?? []);
+        setRecord(v.record);
+        if (typeof v.provider === "string" && v.provider !== "") setProvider(v.provider);
+        if (v.backup && v.backup.at > 0) setBackup(v.backup);
+        setState({ kind: "cached" });
+      } catch {
+      }
+    })();
+  }, [rpcCall]);
   const toggle = import_react6.default.useCallback((id) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -4104,6 +4152,52 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       setApplyBusy(false);
     }
   }, [rpcCall, models, selected, provider]);
+  const rollback = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    setRollbackBusy(true);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.rollbackModelsSync, { provider });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? "\u56DE\u6EDA\u5931\u8D25";
+        setLastErr(msg);
+        notify(`\u56DE\u6EDA\u5931\u8D25\uFF1A${msg}`);
+        return;
+      }
+      notify(`\u5DF2\u56DE\u6EDA\u5230\u8986\u76D6\u524D\uFF08${result.value?.restored ?? 0} \u4E2A\u6A21\u578B\uFF09`);
+      setState({ kind: "idle" });
+      setModels(null);
+      setSelected(/* @__PURE__ */ new Set());
+      setRecord(null);
+      setDiff(null);
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+    } finally {
+      setRollbackBusy(false);
+    }
+  }, [rpcCall, provider]);
+  const clearRecord = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.clearModelRecord, {});
+      if (result?.ok !== true) {
+        notify(`\u6E05\u7A7A\u5931\u8D25\uFF1A${result?.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        return;
+      }
+      setRecord(null);
+      setDiff(null);
+      if (state.kind === "cached") {
+        setModels(null);
+        setState({ kind: "idle" });
+      }
+      notify("\u5DF2\u6E05\u7A7A\u62C9\u53D6\u8BB0\u5F55\uFF08\u672A\u6539\u52A8 DSH \u6A21\u578B\u914D\u7F6E\uFF09");
+    } catch (error) {
+      notify(`\u6E05\u7A7A\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+    }
+  }, [rpcCall, state.kind]);
+  const removed = diff?.removed ?? [];
+  const changedMap = new Map((diff?.changed ?? []).map((c) => [c.id, c.fields]));
+  const addedSet = new Set(diff?.added ?? []);
   const alreadyImage = models ? models.filter((m) => m.supportsImages === true).length : 0;
   const mono = { fontFamily: type.text.code.fontFamily, fontSize: 12, wordBreak: "break-all", color: s.label.color };
   return import_react6.default.createElement(
@@ -4126,8 +4220,25 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       }),
       import_react6.default.createElement(
         "button",
-        { style: s.btnPri, type: "button", disabled: applyBusy, onClick: load },
-        state.kind === "loading" ? "\u62C9\u53D6\u4E2D\u2026" : "\u62C9\u53D6\u5168\u6E20\u9053\u6A21\u578B"
+        {
+          style: overwrite ? { ...s.btnPri, background: tone.err.fg, borderColor: tone.err.fg } : s.btnPri,
+          type: "button",
+          disabled: applyBusy,
+          onClick: () => load(overwrite),
+          title: overwrite ? "\u62C9\u53D6\u540E\u4EE5\u7F51\u5173\u76EE\u5F55\u6574\u4F53\u8986\u76D6 DSH \u7684\u8BE5 provider \u6A21\u578B\u914D\u7F6E\uFF08\u8986\u76D6\u524D\u81EA\u52A8\u5907\u4EFD\uFF09" : "\u53EA\u62C9\u53D6\u76EE\u5F55\u5E76\u8BB0\u5F55\uFF0C\u4E0D\u6539\u52A8 DSH \u6A21\u578B\u914D\u7F6E"
+        },
+        state.kind === "loading" ? "\u62C9\u53D6\u4E2D\u2026" : overwrite ? "\u62C9\u53D6\u5E76\u8986\u76D6 DSH \u6A21\u578B\u914D\u7F6E" : state.kind === "cached" ? "\u91CD\u65B0\u62C9\u53D6\uFF08\u5237\u65B0\uFF09" : "\u62C9\u53D6\u5168\u6E20\u9053\u6A21\u578B"
+      ),
+      import_react6.default.createElement(
+        "label",
+        { style: { ...type.text.caption, display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" } },
+        import_react6.default.createElement("input", {
+          type: "checkbox",
+          checked: overwrite,
+          onChange: (ev) => setOverwrite(ev.target.checked),
+          style: { cursor: "pointer" }
+        }),
+        "\u62C9\u53D6\u65F6\u8986\u76D6\uFF08\u7F51\u5173\u4E3A\u51C6\uFF09"
       ),
       models && models.length > 0 ? import_react6.default.createElement(
         "button",
@@ -4135,8 +4246,47 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         applyBusy ? "\u5E94\u7528\u4E2D\u2026" : `\u5E94\u7528\u8865\u4E01\uFF08${selected.size}\uFF09`
       ) : null
     ),
+    // 拉取记录：上次拉取时刻 + 与本次的差异（记录每次拉取都是**整体覆盖**）
+    record ? import_react6.default.createElement(
+      "div",
+      { style: { ...type.text.caption, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+      import_react6.default.createElement(
+        "span",
+        null,
+        `\u4E0A\u6B21\u62C9\u53D6\uFF1A${relativeTime(record.at) || "\u2014"} \xB7 ${record.count} \u4E2A\u6A21\u578B` + (record.recorded === true ? "" : "\uFF08\u8BB0\u5F55\u5199\u5165\u5931\u8D25\uFF09")
+      ),
+      diff && !diff.first ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.info.fg } },
+        `\u672C\u6B21\u65B0\u589E ${diff.added.length} / \u6D88\u5931 ${diff.removed.length} / \u53D8\u5316 ${diff.changed.length}`
+      ) : diff && diff.first ? import_react6.default.createElement("span", { style: { color: tone.idle.fg } }, "\uFF08\u9996\u6B21\u8BB0\u5F55\uFF0C\u65E0\u5386\u53F2\u53EF\u6BD4\uFF09") : null,
+      import_react6.default.createElement("button", {
+        type: "button",
+        style: { ...s.btnGhost, height: 24, padding: "0 8px", fontSize: 11.5 },
+        onClick: clearRecord,
+        title: "\u53EA\u6E05\u7A7A\u8FD9\u4EFD\u62C9\u53D6\u8BB0\u5F55\uFF0C\u4E0D\u52A8 DSH \u6A21\u578B\u914D\u7F6E"
+      }, "\u6E05\u7A7A\u8BB0\u5F55"),
+      backup && backup.at > 0 ? import_react6.default.createElement("button", {
+        type: "button",
+        style: { ...s.btnGhost, height: 24, padding: "0 8px", fontSize: 11.5 },
+        disabled: rollbackBusy,
+        onClick: rollback,
+        title: `\u56DE\u6EDA\u5230\u8986\u76D6\u524D\uFF08\u5907\u4EFD\u4E8E ${new Date(backup.at).toLocaleString()}\uFF0C${backup.count} \u4E2A\u6A21\u578B\uFF09`
+      }, rollbackBusy ? "\u56DE\u6EDA\u4E2D\u2026" : `\u56DE\u6EDA\u4E0A\u6B21\u8986\u76D6\uFF08${backup.count}\uFF09`) : null
+    ) : null,
+    // 上游已移除：这些模型本次没再出现，覆盖后会从 DSH 配置里消失（不单列就看不见了）
+    removed.length > 0 ? import_react6.default.createElement(
+      "div",
+      { style: { ...s.tip, borderColor: tone.warn.fg } },
+      `\u4E0A\u6E38\u5DF2\u79FB\u9664 ${removed.length} \u4E2A\u6A21\u578B\uFF1A${removed.slice(0, 8).join("\u3001")}` + (removed.length > 8 ? ` \u7B49 ${removed.length} \u4E2A` : "") + "\uFF08\u8986\u76D6\u6A21\u5F0F\u4E0B\u4F1A\u4ECE DSH \u914D\u7F6E\u91CC\u79FB\u9664\uFF1B\u4EC5\u8865\u89C6\u89C9\u80FD\u529B\u6A21\u5F0F\u4E0D\u52A8\u5B83\u4EEC\uFF09"
+    ) : null,
     // 说明
     import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, '\u300C\u591A\u6A21\u6001\u300D= \u672C\u5730\u8BC4\u5BA1\u767D\u540D\u5355\u5185\u3001\u771F\u5B9E\u652F\u6301\u56FE\u7247\u8F93\u5165\u7684\u6A21\u578B\uFF08\u4E0A\u6E38 supports_images \u5B57\u6BB5\u4E0D\u53EF\u9760\uFF0C\u6545\u672A\u91C7\u4FE1\uFF09\u3002\u5E94\u7528\u8865\u4E01\u4F1A\u628A\u52FE\u9009\u7684\u6A21\u578B\u5199\u5165 DSH \u8BBE\u7F6E llm-pi-ai \u7684 providers.&lt;provider&gt;.models[].input = ["text","image"]\uFF0C\u8BA9 DSH \u5141\u8BB8\u56FE\u7247\u4E0A\u4F20\u3002\u6CE8\u610F\uFF1A\u4E4B\u540E\u522B\u5728\u300C\u8BBE\u7F6E\u2192\u6A21\u578B\u300D\u91CC\u91CD\u65B0\u300C\u4ECE\u63D0\u4F9B\u5546\u641C\u7D22\u300D\uFF0C\u5426\u5219\u89C6\u89C9\u6807\u8BB0\u4F1A\u88AB\u6E05\u56DE\u3002'),
+    state.kind === "cached" ? import_react6.default.createElement(
+      "div",
+      { style: s.tip },
+      `\u4EE5\u4E0B\u662F\u4E0A\u6B21\u62C9\u53D6\u7684\u7ED3\u679C\uFF08${record ? relativeTime(record.at) || "\u2014" : "\u2014"}\uFF09\uFF0C\u6253\u5F00\u9762\u677F\u65F6\u76F4\u63A5\u56DE\u663E\u3001\u672A\u91CD\u65B0\u8BF7\u6C42\u7F51\u5173\u3002\u8981\u770B\u6700\u65B0\u76EE\u5F55\u70B9\u300C\u91CD\u65B0\u62C9\u53D6\uFF08\u5237\u65B0\uFF09\u300D\u3002`
+    ) : null,
     state.kind === "loading" ? import_react6.default.createElement("div", { style: s.tip }, "\u6B63\u5728\u62C9\u53D6\u7F51\u5173\u6A21\u578B\u76EE\u5F55\u2026") : null,
     state.kind === "error" ? import_react6.default.createElement("div", { style: s.err }, state.message) : null,
     lastOk ? import_react6.default.createElement(
@@ -4172,6 +4322,8 @@ function ModelAbilityTab({ rpcCall, showToast }) {
           null,
           models.map((m) => {
             const checked = selected.has(m.id);
+            const changedFields = changedMap.get(m.id);
+            const isNew = addedSet.has(m.id);
             return import_react6.default.createElement(
               "tr",
               {
@@ -4189,7 +4341,17 @@ function ModelAbilityTab({ rpcCall, showToast }) {
                   style: { cursor: m.supportsImages === true ? "pointer" : "not-allowed", accentColor: "var(--dsw-alias-button-info-fill,#4176e6)" }
                 })
               ),
-              import_react6.default.createElement("td", tdStyle, import_react6.default.createElement("span", { style: mono }, m.id)),
+              import_react6.default.createElement(
+                "td",
+                tdStyle,
+                import_react6.default.createElement("span", { style: mono }, m.id),
+                isNew ? import_react6.default.createElement("span", {
+                  style: { ...s.tag, marginLeft: 6, color: tone.ok.fg, background: tone.ok.bg }
+                }, "\u65B0\u589E") : changedFields ? import_react6.default.createElement("span", {
+                  style: { ...s.tag, marginLeft: 6, color: tone.warn.fg, background: tone.warn.bg },
+                  title: `\u4E0E\u4E0A\u6B21\u62C9\u53D6\u76F8\u6BD4\uFF1A${changedFields.map((f) => FIELD_LABEL[f] ?? f).join("\u3001")} \u53D8\u4E86`
+                }, `\u53D8\u5316 ${changedFields.map((f) => FIELD_LABEL[f] ?? f).join("/")}`) : null
+              ),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.name),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.contextWindow)),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.maxTokens)),
@@ -4204,7 +4366,7 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         { style: { ...type.text.caption, padding: "8px 14px" } },
         `${models.length} \u4E2A\u6A21\u578B \xB7 ${alreadyImage} \u4E2A\u591A\u6A21\u6001\uFF08\u53EF\u52FE\u9009\uFF09\u3002`
       )
-    ) : models && state.kind === "loaded" ? import_react6.default.createElement("div", { style: s.tip }, "\u8BE5 provider \u6CA1\u6709\u6A21\u578B\u76EE\u5F55\u3002") : null
+    ) : models && (state.kind === "loaded" || state.kind === "cached") ? import_react6.default.createElement("div", { style: s.tip }, "\u8BE5 provider \u6CA1\u6709\u6A21\u578B\u76EE\u5F55\u3002") : null
   );
 }
 function th(text) {

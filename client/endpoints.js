@@ -40,6 +40,9 @@ export const ENDPOINTS = {
   revealApiKey: 'revealApiKey',
   discoverModelsForPatch: 'discoverModelsForPatch',
   applyModelsPatch: 'applyModelsPatch',
+  getModelRecord: 'getModelRecord',
+  rollbackModelsSync: 'rollbackModelsSync',
+  clearModelRecord: 'clearModelRecord',
 };
 
 /** RPC 频道（与宿主 apply 里的 CHANNEL 一致）。 */
