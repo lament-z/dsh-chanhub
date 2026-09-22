@@ -1604,7 +1604,7 @@ async function clickEntry(document, container) {
   return button;
 }
 
-test('渲染：入口只在展开态渲染，并给出「健康/总数 · 可用积分」摘要', { skip }, async () => {
+test('渲染：入口两态 —— 展开给摘要、收起只留 36px 图标', { skip }, async () => {
   const status = realStatusFixture();
   const wide = await mountQuick({ wide: true, status });
   const rail = await mountQuick({ wide: false, status });
@@ -1613,8 +1613,14 @@ test('渲染：入口只在展开态渲染，并给出「健康/总数 · 可用
     assert.ok(wideHtml.includes('渠道'), 'wide 态应带标签');
     assert.match(wideHtml, /\d+\/\d+ · /, 'wide 态应显示「健康/总数 · 可用积分」摘要');
     assert.ok(wideHtml.includes('<svg'), '应画出入口图标（不依赖 emoji）');
-    // foot 行是共享 list 槽：56px 轨道只够一个图标（上下文洞察），多塞会被裁一半。
-    assert.equal(rail.container.innerHTML, '', '收起态不渲染主入口（避免两个图标各被裁一半）');
+    // 收起态：只留 36px 图标（与宿主 lc-ov-entry-rail 同尺寸），不放摘要数字（56px 放不下）。
+    const railHtml = rail.container.innerHTML;
+    assert.ok(railHtml.includes('<svg'), '收起态要有图标');
+    assert.ok(!/\d+\/\d+ · /.test(railHtml), '收起态不放摘要数字');
+    // jsdom 没有布局（rect 恒 0），尺寸断言看内联样式
+    const railBtn = rail.container.querySelector('button');
+    assert.equal(railBtn.style.minWidth, '36px', '收起态尺寸与宿主 lc-ov-entry-rail 对齐（36px）');
+    assert.equal(railBtn.style.height, '36px');
   } finally {
     await wide.cleanup();
     await rail.cleanup();

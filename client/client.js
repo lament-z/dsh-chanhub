@@ -4225,7 +4225,7 @@ function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = D
     }
   }, [wide]);
   if (!enabled) return null;
-  if (wide === false) return null;
+  const rail = wide === false;
   const summary = quickSummaryVM({
     status: snapshot?.status,
     usage: snapshot?.usage,
@@ -4258,9 +4258,10 @@ function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = D
         // flex:0 0 auto = 取自然宽度、永不被压扁；让整行样式的那一项去收缩。
         flex: "0 0 auto",
         maxWidth: "100%",
-        height: 32,
-        padding: wide ? "0 8px" : 0,
-        minWidth: wide ? 96 : 32,
+        height: rail ? 36 : 32,
+        padding: rail ? 0 : "0 8px",
+        minWidth: rail ? 36 : 96,
+        justifyContent: rail ? "center" : void 0,
         display: "inline-flex",
         alignItems: "center",
         gap: 7,

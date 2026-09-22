@@ -372,11 +372,13 @@ export function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, 
   }, [wide]);
 
   if (!enabled) return null;
-  // 收起态（56px 轨道）**不渲染**：foot 那一行是共享 list 槽，宿主 CSS 里
-  // `.collapsed .footerActions{justify-content:center;width:auto}`，而 56px 列扣掉
-  // 左右内边距只剩 ~36px —— 恰好只够 dsh-context「上下文洞察」那一个 36px 图标。
-  // 再塞一个只会两个都被裁掉一半（实测）。展开态才显示，摘要也才有意义。
-  if (wide === false) return null;
+  // 收起态（56px 轨道）= 只画一个 36px 图标（与 `lc-ov-entry-rail` 同尺寸），不放摘要数字。
+  // 注意：这一行是共享 list 槽，宿主 CSS 是
+  // `.collapsed .footerActions{justify-content:center;width:auto}`，56px 列扣掉左右内边距
+  // 只剩 ~36px —— 也就是说**收起态只容得下一个图标**。若将来同行的其它入口
+  // （dsh-context「上下文洞察」、cordis 面板）也回到收起态，会互相挤；届时或把本入口
+  // 收起态关掉（一行 return null），或让用户在配置 Tab 的「界面」组里关闭本入口。
+  const rail = wide === false;
 
   const summary = quickSummaryVM({
     status: snapshot?.status,
@@ -404,7 +406,8 @@ export function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, 
       // 所以这里**不能用 width:100%** —— 那会和它互相抢宽、被挤成半行而看不清。
       // flex:0 0 auto = 取自然宽度、永不被压扁；让整行样式的那一项去收缩。
       flex: '0 0 auto', maxWidth: '100%',
-      height: 32, padding: wide ? '0 8px' : 0, minWidth: wide ? 96 : 32,
+      height: rail ? 36 : 32, padding: rail ? 0 : '0 8px', minWidth: rail ? 36 : 96,
+      justifyContent: rail ? 'center' : undefined,
       display: 'inline-flex', alignItems: 'center', gap: 7, transition: 'background .15s', overflow: 'hidden',
     },
   },
