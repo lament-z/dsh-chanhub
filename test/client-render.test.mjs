@@ -553,6 +553,38 @@ function fakeRpc(status) {
             },
           },
         };
+      // 模型 Tab 的只读目录比对（本版新增）：回显上次拉取 + 三态判定。
+      case 'getModelRecord':
+        return {
+          ok: true,
+          value: {
+            record: { at: Date.now() - 60000, count: CATALOG_MODELS.length, recorded: true },
+            provider: 'chanhub2api',
+            models: CATALOG_MODELS,
+            backup: { at: 0, count: 0 },
+          },
+        };
+      case 'getModelCatalog':
+      case 'refreshModelCatalog':
+        return {
+          ok: true,
+          value: {
+            provider: 'chanhub2api',
+            at: Date.now() - 3600000,
+            sources: { 'pi-ai': { entries: 1354 }, 'models.dev': { entries: 8033 }, openrouter: { entries: 444 } },
+            warnings: [],
+            catalog: { keys: 3759, entries: 9831 },
+            summary: {
+              total: CATALOG_MODELS.length,
+              counts: { image: 2, text: 1, unknown: 1, confirmed: 2, borrowed: 1, conflict: 0, alias: 1, missing: 0 },
+              disagreements: [],
+              gaps: [{ id: 'workbuddy:global:kimi-k3', kind: 'catalog-image-not-in-whitelist' }],
+            },
+            verdicts: CATALOG_VERDICTS,
+            readonly: true,
+            ...(endpoint === 'refreshModelCatalog' ? { refreshed: true, failures: [] } : {}),
+          },
+        };
       default:
         return { ok: false, error: { code: 'bad-request', message: `unknown ${endpoint}` } };
     }
@@ -560,6 +592,21 @@ function fakeRpc(status) {
   rpc.calls = calls;
   return rpc;
 }
+
+/** 模型 Tab 目录比对夹具：四个模型覆盖「确认/借判/别名」三种状态。 */
+const CATALOG_MODELS = [
+  { id: 'workbuddy:global:kimi-k3', name: 'Kimi K3', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.1', supportsImages: false },
+  { id: 'workbuddy:cn:glm-5.3', name: 'GLM 5.3', contextWindow: 200000, maxTokens: 32000, credits: 'x0.06', supportsImages: false },
+  { id: 'workbuddy:cn:kimi-k3-1', name: 'Kimi K3-1', contextWindow: 1000000, maxTokens: 64000, supportsImages: false },
+  { id: 'workbuddy:cn:auto', name: 'Auto', contextWindow: 200000, maxTokens: 32000, supportsImages: false },
+];
+
+const CATALOG_VERDICTS = [
+  { id: 'workbuddy:global:kimi-k3', tail: 'kimi-k3', status: 'confirmed', verdict: 'image', tier: 'L1', whitelist: false, how: '精确', matchedKey: 'kimik3', reason: '目录精确命中', tally: { image: 5, text: 0, entries: 5, dissent: 0 }, sources: [{ source: 'models.dev', provider: 'moonshotai', image: true, tier: 'L1' }] },
+  { id: 'workbuddy:cn:glm-5.3', tail: 'glm-5.3', status: 'confirmed', verdict: 'text', tier: 'L1', whitelist: false, how: '精确', matchedKey: 'glm5.3', reason: '目录精确命中', tally: { image: 0, text: 7, entries: 7, dissent: 0 }, sources: [{ source: 'models.dev', provider: 'zai', image: false, tier: 'L1' }] },
+  { id: 'workbuddy:cn:kimi-k3-1', tail: 'kimi-k3-1', status: 'borrowed', verdict: 'image', tier: 'L1', whitelist: false, how: '剥后缀→kimik3', matchedKey: 'kimik3', reason: '剥掉部署后缀后命中，结论借自同名部署（待确认）', tally: { image: 5, text: 0, entries: 5, dissent: 0 }, sources: [{ source: 'models.dev', provider: 'moonshotai', image: true, tier: 'L1' }] },
+  { id: 'workbuddy:cn:auto', tail: 'auto', status: 'alias', verdict: 'unknown', tier: null, whitelist: false, how: '', matchedKey: null, reason: '渠道档位别名（通用名会假匹配，不参与目录比对）', sources: [] },
+];
 
 /** 在挂载后的 DOM 里点某个 Tab。 */
 async function clickTab(document, label) {
@@ -1933,6 +1980,45 @@ test('渲染：配置 Tab 出现「界面」开关，且网关配置不可读时
     assert.ok(html.includes('界面'), '配置 Tab 要有「界面」分组');
     assert.ok(html.includes('在侧边栏左下角显示渠道入口'), '开关文案');
     assert.ok(html.includes('未找到网关 config.json'), '错误分支仍然渲染（否则用户无法关掉入口）');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染模型 Tab：只读目录判定列 + 刷新能力目录（不改配置）', { skip }, async () => {
+  const rpc = fakeRpc(realStatusFixture());
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await clickTab(document, '模型');
+    // 让回显（getModelRecord）与比对（getModelCatalog）两个 effect 落地
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const html = document.getElementById('app').innerHTML;
+
+    assert.ok(html.includes('目录判定'), '表头要有「目录判定」列');
+    assert.ok(html.includes('刷新能力目录'), '工具栏要有「刷新能力目录」按钮');
+    assert.ok(html.includes('能力目录：'), '要有目录快照摘要行');
+    assert.ok(html.includes('3759 个模型名'), '摘要要带真实目录规模');
+
+    // 三态标注都要渲染出来
+    assert.ok(html.includes('目录确认'), '确认态');
+    assert.ok(html.includes('借判·待确认'), '借判态');
+    assert.ok(html.includes('档位别名'), '别名态');
+    assert.ok(html.includes('原厂'), '来源等级要显示');
+
+    // 打开面板只读缓存：打了 getModelRecord + getModelCatalog，绝不打刷新端点
+    const endpoints = rpc.calls.map((call) => call.endpoint);
+    assert.ok(endpoints.includes('getModelRecord'), '回显上次拉取');
+    assert.ok(endpoints.includes('getModelCatalog'), '做一次只读比对');
+    assert.ok(!endpoints.includes('refreshModelCatalog'), '打开面板不得联网刷新目录');
+
+    // 点「刷新能力目录」→ 才走 refreshModelCatalog
+    const refreshBtn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('刷新能力目录'));
+    assert.ok(refreshBtn, '找不到刷新按钮');
+    await React.act(async () => {
+      refreshBtn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    assert.ok(rpc.calls.map((call) => call.endpoint).includes('refreshModelCatalog'), '点击后要走刷新端点');
   } finally {
     await cleanup();
   }

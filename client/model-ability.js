@@ -20,6 +20,64 @@ function fmtWindow(n) {
   return String(n);
 }
 
+/** 目录判定状态的中文名（与宿主 lib/model-catalog.js 的 VERDICT_STATUS 对应）。 */
+const CATALOG_STATUS_LABEL = {
+  confirmed: '目录确认',
+  borrowed: '借判·待确认',
+  conflict: '双源冲突',
+  alias: '档位别名',
+  missing: '目录无收录',
+};
+/** 来源等级：原厂 > 云托管 > 转售。 */
+const CATALOG_TIER_LABEL = { L1: '原厂', L2: '云托管', L3: '转售' };
+
+/** 目录判定的配色：确认=绿/灰，借判=琥珀，冲突=红，别名/无收录=灰。 */
+function catalogColors(v) {
+  if (!v) return tone.idle;
+  if (v.status === 'conflict') return tone.err;
+  if (v.status === 'borrowed') return tone.warn;
+  if (v.verdict === 'image') return tone.ok;
+  return tone.idle;
+}
+
+/** 目录判定徽章（只读标注，不写配置）。hover 里带证据：等级/票数/命中方式/来源。 */
+function CatalogBadge({ verdict, whitelisted }) {
+  if (!verdict) {
+    return React.createElement('span', { style: { ...s.tag, color: tone.idle.fg, background: tone.idle.bg } }, '未比对');
+  }
+  const colors = catalogColors(verdict);
+  const text = verdict.verdict === 'image' ? '多模态' : (verdict.verdict === 'text' ? '纯文本' : '待确认');
+  const status = CATALOG_STATUS_LABEL[verdict.status] ?? verdict.status;
+  const tally = verdict.tally ? `图 ${verdict.tally.image} / 文 ${verdict.tally.text}` : '';
+  const sources = (verdict.sources ?? []).slice(0, 6)
+    .map((x) => `${x.source}/${x.provider || '?'}${x.image ? '图' : '文'}`).join('、');
+  const more = (verdict.sources ?? []).length > 6 ? ` 等 ${verdict.sources.length} 条` : '';
+  const title = [
+    `${status}｜${verdict.tier ? (CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier) : '无来源'}`,
+    tally,
+    verdict.reason ?? '',
+    verdict.how ? `命中方式：${verdict.how}` : '',
+    sources ? `来源：${sources}${more}` : '',
+    '这只是目录标注，不会改动 DSH 配置。',
+  ].filter(Boolean).join('\n');
+  // 与本地白名单打架时额外打一个记号：白名单说图、目录说文（或反过来）
+  const conflictWithWhitelist = (whitelisted === true && verdict.verdict === 'text')
+    || (whitelisted === false && verdict.verdict === 'image');
+  return React.createElement(
+    'span',
+    { style: { display: 'inline-flex', alignItems: 'center', gap: 4 }, title },
+    React.createElement('span', { style: { ...s.tag, color: colors.fg, background: colors.bg } }, text),
+    React.createElement('span', { style: { ...type.text.caption, color: tone.idle.fg } },
+      `${status}${verdict.tier ? ` · ${CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier}` : ''}`),
+    conflictWithWhitelist
+      ? React.createElement('span', {
+          style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg },
+          title: '与本地白名单不一致 —— 白名单可能标错，或目录收录的不是同一个模型',
+        }, '≠白名单')
+      : null,
+  );
+}
+
 function VisionBadge() {
   return React.createElement(
     'span',
@@ -49,6 +107,9 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
   const [backup, setBackup] = React.useState(null); // {at,count}
   const [overwrite, setOverwrite] = React.useState(false); // 默认关：覆盖 DSH 模型配置是破坏性动作
   const [rollbackBusy, setRollbackBusy] = React.useState(false);
+  // 目录比对（只读）：宿主返回的三态判定 + 目录快照元信息
+  const [catalog, setCatalog] = React.useState(null); // {at,sources,catalog,summary,warnings,failures,verdicts:Map}
+  const [catalogBusy, setCatalogBusy] = React.useState(false);
 
   const notify = (msg) => {
     if (typeof showToast === 'function') {
@@ -59,6 +120,54 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     // eslint-disable-next-line no-console
     console.log('[dsh-chanhub]', msg);
   };
+
+  const applyCatalogResult = React.useCallback((v) => {
+    if (!v) return;
+    setCatalog({
+      at: v.at ?? 0,
+      sources: v.sources ?? {},
+      catalog: v.catalog ?? null,
+      summary: v.summary ?? null,
+      warnings: v.warnings ?? [],
+      failures: v.failures ?? [],
+      verdicts: new Map((v.verdicts ?? []).map((x) => [x.id, x])),
+    });
+  }, []);
+
+  // 只读比对：把当前目录喂给宿主做三态判定。**零网络** —— 宿主只读本地 pi-ai
+  // 目录 + 缓存（在线目录只有点「刷新目录」时才会去抓）。
+  const loadCatalog = React.useCallback(async (list) => {
+    if (!rpcCall) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.getModelCatalog, { provider, models: list ?? [] });
+      if (result?.ok !== true) return;
+      applyCatalogResult(result.value);
+    } catch {
+      // 比对失败不影响拉取/打补丁主流程：静默留在「未比对」
+    }
+  }, [rpcCall, provider, applyCatalogResult]);
+
+  // 显式刷新在线目录（models.dev + OpenRouter）→ 宿主落盘缓存 → 同一次往返拿判定。
+  const refreshCatalog = React.useCallback(async () => {
+    if (!rpcCall) return;
+    setCatalogBusy(true);
+    try {
+      const result = await rpcCall(ENDPOINTS.refreshModelCatalog, { provider, models: models ?? [] });
+      if (result?.ok !== true) {
+        notify(`刷新目录失败：${result?.error?.message ?? '未知错误'}`);
+        return;
+      }
+      applyCatalogResult(result.value);
+      const c = result.value.catalog ?? {};
+      const failed = result.value.failures ?? [];
+      notify(`目录已刷新：${c.keys ?? 0} 个模型名 / ${c.entries ?? 0} 条标注`
+        + (failed.length > 0 ? `（${failed.map((f) => f.source).join('、')} 拉取失败）` : ''));
+    } catch (error) {
+      notify(`刷新目录异常：${error?.message ?? error}`);
+    } finally {
+      setCatalogBusy(false);
+    }
+  }, [rpcCall, provider, models, applyCatalogResult]);
 
   const load = React.useCallback(async (withOverwrite = false) => {
     if (!rpcCall) return;
@@ -90,6 +199,8 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
       setDiff(v.diff ?? null);
       if (v.backup && v.backup.at > 0) setBackup(v.backup);
       setState({ kind: 'loaded' });
+      // 新目录到手 → 顺手做一次只读比对（零网络）
+      loadCatalog(v.models ?? []);
       const d = v.diff;
       if (d) {
         const parts = [`新增 ${d.added.length}`, `消失 ${d.removed.length}`, `变化 ${d.changed.length}`];
@@ -120,6 +231,7 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
         if (typeof v.provider === 'string' && v.provider !== '') setProvider(v.provider);
         if (v.backup && v.backup.at > 0) setBackup(v.backup);
         setState({ kind: 'cached' });
+        loadCatalog(v.models ?? []);
       } catch {
         // 回显失败不算错误：静默留在 idle，用户点「拉取」即可。
       }
@@ -271,6 +383,19 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
             applyBusy ? '应用中…' : `应用补丁（${selected.size}）`,
           )
         : null,
+      React.createElement(
+        'button',
+        {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+          type: 'button',
+          disabled: catalogBusy,
+          onClick: refreshCatalog,
+          title: '联网抓取 models.dev 与 OpenRouter 的多模态标注，落盘到 ~/.dsh/dsh-chanhub/model-catalog.json；'
+            + '平时打开面板只读缓存，不联网、不改 DSH 配置',
+        },
+        catalogBusy ? '刷新目录中…' : '刷新能力目录',
+      ),
     ),
     // 拉取记录：上次拉取时刻 + 与本次的差异（记录每次拉取都是**整体覆盖**）
     record
@@ -308,8 +433,40 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
           + (removed.length > 8 ? ` 等 ${removed.length} 个` : '')
           + '（覆盖模式下会从 DSH 配置里移除；仅补视觉能力模式不动它们）')
       : null,
+    // 目录比对摘要（只读标注）：三态计数 + 目录快照新旧 + 源可用性
+    catalog
+      ? React.createElement('div', { style: { ...type.text.caption, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+          React.createElement('span', null,
+            `能力目录：${catalog.catalog?.keys ?? 0} 个模型名 / ${catalog.catalog?.entries ?? 0} 条标注`
+            + (catalog.at > 0 ? ` · 快照 ${relativeTime(catalog.at) || '—'}` : ' · 只有离线源')),
+          catalog.summary
+            ? React.createElement('span', { style: { color: tone.info.fg } },
+                `判定：多模态 ${catalog.summary.counts.image} / 纯文本 ${catalog.summary.counts.text} / 待确认 ${catalog.summary.counts.unknown}`
+                + `（确认 ${catalog.summary.counts.confirmed} · 借判 ${catalog.summary.counts.borrowed}`
+                + ` · 冲突 ${catalog.summary.counts.conflict} · 别名 ${catalog.summary.counts.alias}`
+                + ` · 无收录 ${catalog.summary.counts.missing}）`)
+            : null,
+          catalog.summary && catalog.summary.disagreements.length > 0
+            ? React.createElement('span', { style: { color: tone.warn.fg } },
+                `与白名单不一致 ${catalog.summary.disagreements.length} 个`)
+            : null,
+          catalog.summary && catalog.summary.gaps.length > 0
+            ? React.createElement('span', { style: { color: tone.warn.fg } },
+                `白名单可补 ${catalog.summary.gaps.length} 个`)
+            : null,
+          catalog.warnings.length > 0
+            ? React.createElement('span', { title: catalog.warnings.join('\n'), style: { color: tone.idle.fg } },
+                `⚠ ${catalog.warnings[0]}`)
+            : null,
+          catalog.failures.length > 0
+            ? React.createElement('span', { style: { color: tone.err.fg } },
+                `源失败：${catalog.failures.map((f) => f.source).join('、')}`)
+            : null,
+        )
+      : null,
     // 说明
     React.createElement('p', { style: { ...type.text.caption, lineHeight: 1.7 } }, '「多模态」= 本地评审白名单内、真实支持图片输入的模型（上游 supports_images 字段不可靠，故未采信）。应用补丁会把勾选的模型写入 DSH 设置 llm-pi-ai 的 providers.&lt;provider&gt;.models[].input = ["text","image"]，让 DSH 允许图片上传。注意：之后别在「设置→模型」里重新「从提供商搜索」，否则视觉标记会被清回。'),
+    React.createElement('p', { style: { ...type.text.caption, lineHeight: 1.7 } }, '「目录判定」= 拿公开结构化目录（DSH 自带 pi-ai 目录 + models.dev + OpenRouter）比对出来的结论，只作标注、**不会改动任何配置**。裁决按来源分级：原厂(L1) > 云托管(L2) > 转售(L3)，同级平票才算冲突；剥后缀/模糊命中的结论是「借判」，目录查不到的标「无收录」，渠道档位别名（auto / fast-model 等）不参与比对。'),
     state.kind === 'cached'
       ? React.createElement('div', { style: s.tip },
           `以下是上次拉取的结果（${record ? (relativeTime(record.at) || '—') : '—'}），`
@@ -350,6 +507,7 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                 th('输出'),
                 th('倍率'),
                 th('能力'),
+                th('目录判定'),
               ),
             ),
             React.createElement('tbody', null,
@@ -387,6 +545,11 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, fmtWindow(m.maxTokens)),
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, typeof m.credits === 'string' && m.credits !== '' ? m.credits : '—'),
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, m.supportsImages === true ? React.createElement(VisionBadge) : React.createElement(TextBadge)),
+                  React.createElement('td', tdStyle,
+                    React.createElement(CatalogBadge, {
+                      verdict: catalog?.verdicts?.get(m.id) ?? null,
+                      whitelisted: catalog?.verdicts?.get(m.id)?.whitelist,
+                    })),
                 );
               }),
             ),

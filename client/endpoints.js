@@ -43,6 +43,8 @@ export const ENDPOINTS = {
   getModelRecord: 'getModelRecord',
   rollbackModelsSync: 'rollbackModelsSync',
   clearModelRecord: 'clearModelRecord',
+  getModelCatalog: 'getModelCatalog',
+  refreshModelCatalog: 'refreshModelCatalog',
 };
 
 /** RPC 频道（与宿主 apply 里的 CHANNEL 一致）。 */

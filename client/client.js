@@ -2165,7 +2165,9 @@ var ENDPOINTS = {
   applyModelsPatch: "applyModelsPatch",
   getModelRecord: "getModelRecord",
   rollbackModelsSync: "rollbackModelsSync",
-  clearModelRecord: "clearModelRecord"
+  clearModelRecord: "clearModelRecord",
+  getModelCatalog: "getModelCatalog",
+  refreshModelCatalog: "refreshModelCatalog"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -4023,6 +4025,55 @@ function fmtWindow(n) {
   if (n >= 1e3) return `${Math.round(n / 1e3)}k`;
   return String(n);
 }
+var CATALOG_STATUS_LABEL = {
+  confirmed: "\u76EE\u5F55\u786E\u8BA4",
+  borrowed: "\u501F\u5224\xB7\u5F85\u786E\u8BA4",
+  conflict: "\u53CC\u6E90\u51B2\u7A81",
+  alias: "\u6863\u4F4D\u522B\u540D",
+  missing: "\u76EE\u5F55\u65E0\u6536\u5F55"
+};
+var CATALOG_TIER_LABEL = { L1: "\u539F\u5382", L2: "\u4E91\u6258\u7BA1", L3: "\u8F6C\u552E" };
+function catalogColors(v) {
+  if (!v) return tone.idle;
+  if (v.status === "conflict") return tone.err;
+  if (v.status === "borrowed") return tone.warn;
+  if (v.verdict === "image") return tone.ok;
+  return tone.idle;
+}
+function CatalogBadge({ verdict, whitelisted }) {
+  if (!verdict) {
+    return import_react6.default.createElement("span", { style: { ...s.tag, color: tone.idle.fg, background: tone.idle.bg } }, "\u672A\u6BD4\u5BF9");
+  }
+  const colors = catalogColors(verdict);
+  const text = verdict.verdict === "image" ? "\u591A\u6A21\u6001" : verdict.verdict === "text" ? "\u7EAF\u6587\u672C" : "\u5F85\u786E\u8BA4";
+  const status = CATALOG_STATUS_LABEL[verdict.status] ?? verdict.status;
+  const tally = verdict.tally ? `\u56FE ${verdict.tally.image} / \u6587 ${verdict.tally.text}` : "";
+  const sources = (verdict.sources ?? []).slice(0, 6).map((x) => `${x.source}/${x.provider || "?"}${x.image ? "\u56FE" : "\u6587"}`).join("\u3001");
+  const more = (verdict.sources ?? []).length > 6 ? ` \u7B49 ${verdict.sources.length} \u6761` : "";
+  const title = [
+    `${status}\uFF5C${verdict.tier ? CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier : "\u65E0\u6765\u6E90"}`,
+    tally,
+    verdict.reason ?? "",
+    verdict.how ? `\u547D\u4E2D\u65B9\u5F0F\uFF1A${verdict.how}` : "",
+    sources ? `\u6765\u6E90\uFF1A${sources}${more}` : "",
+    "\u8FD9\u53EA\u662F\u76EE\u5F55\u6807\u6CE8\uFF0C\u4E0D\u4F1A\u6539\u52A8 DSH \u914D\u7F6E\u3002"
+  ].filter(Boolean).join("\n");
+  const conflictWithWhitelist = whitelisted === true && verdict.verdict === "text" || whitelisted === false && verdict.verdict === "image";
+  return import_react6.default.createElement(
+    "span",
+    { style: { display: "inline-flex", alignItems: "center", gap: 4 }, title },
+    import_react6.default.createElement("span", { style: { ...s.tag, color: colors.fg, background: colors.bg } }, text),
+    import_react6.default.createElement(
+      "span",
+      { style: { ...type.text.caption, color: tone.idle.fg } },
+      `${status}${verdict.tier ? ` \xB7 ${CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier}` : ""}`
+    ),
+    conflictWithWhitelist ? import_react6.default.createElement("span", {
+      style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg },
+      title: "\u4E0E\u672C\u5730\u767D\u540D\u5355\u4E0D\u4E00\u81F4 \u2014\u2014 \u767D\u540D\u5355\u53EF\u80FD\u6807\u9519\uFF0C\u6216\u76EE\u5F55\u6536\u5F55\u7684\u4E0D\u662F\u540C\u4E00\u4E2A\u6A21\u578B"
+    }, "\u2260\u767D\u540D\u5355") : null
+  );
+}
 function VisionBadge() {
   return import_react6.default.createElement(
     "span",
@@ -4050,6 +4101,8 @@ function ModelAbilityTab({ rpcCall, showToast }) {
   const [backup, setBackup] = import_react6.default.useState(null);
   const [overwrite, setOverwrite] = import_react6.default.useState(false);
   const [rollbackBusy, setRollbackBusy] = import_react6.default.useState(false);
+  const [catalog, setCatalog] = import_react6.default.useState(null);
+  const [catalogBusy, setCatalogBusy] = import_react6.default.useState(false);
   const notify = (msg) => {
     if (typeof showToast === "function") {
       showToast(msg);
@@ -4057,6 +4110,46 @@ function ModelAbilityTab({ rpcCall, showToast }) {
     }
     console.log("[dsh-chanhub]", msg);
   };
+  const applyCatalogResult = import_react6.default.useCallback((v) => {
+    if (!v) return;
+    setCatalog({
+      at: v.at ?? 0,
+      sources: v.sources ?? {},
+      catalog: v.catalog ?? null,
+      summary: v.summary ?? null,
+      warnings: v.warnings ?? [],
+      failures: v.failures ?? [],
+      verdicts: new Map((v.verdicts ?? []).map((x) => [x.id, x]))
+    });
+  }, []);
+  const loadCatalog = import_react6.default.useCallback(async (list) => {
+    if (!rpcCall) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.getModelCatalog, { provider, models: list ?? [] });
+      if (result?.ok !== true) return;
+      applyCatalogResult(result.value);
+    } catch {
+    }
+  }, [rpcCall, provider, applyCatalogResult]);
+  const refreshCatalog = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    setCatalogBusy(true);
+    try {
+      const result = await rpcCall(ENDPOINTS.refreshModelCatalog, { provider, models: models ?? [] });
+      if (result?.ok !== true) {
+        notify(`\u5237\u65B0\u76EE\u5F55\u5931\u8D25\uFF1A${result?.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        return;
+      }
+      applyCatalogResult(result.value);
+      const c = result.value.catalog ?? {};
+      const failed = result.value.failures ?? [];
+      notify(`\u76EE\u5F55\u5DF2\u5237\u65B0\uFF1A${c.keys ?? 0} \u4E2A\u6A21\u578B\u540D / ${c.entries ?? 0} \u6761\u6807\u6CE8` + (failed.length > 0 ? `\uFF08${failed.map((f) => f.source).join("\u3001")} \u62C9\u53D6\u5931\u8D25\uFF09` : ""));
+    } catch (error) {
+      notify(`\u5237\u65B0\u76EE\u5F55\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+    } finally {
+      setCatalogBusy(false);
+    }
+  }, [rpcCall, provider, models, applyCatalogResult]);
   const load = import_react6.default.useCallback(async (withOverwrite = false) => {
     if (!rpcCall) return;
     if (withOverwrite) {
@@ -4087,6 +4180,7 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       setDiff(v.diff ?? null);
       if (v.backup && v.backup.at > 0) setBackup(v.backup);
       setState({ kind: "loaded" });
+      loadCatalog(v.models ?? []);
       const d = v.diff;
       if (d) {
         const parts = [`\u65B0\u589E ${d.added.length}`, `\u6D88\u5931 ${d.removed.length}`, `\u53D8\u5316 ${d.changed.length}`];
@@ -4110,6 +4204,7 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         if (typeof v.provider === "string" && v.provider !== "") setProvider(v.provider);
         if (v.backup && v.backup.at > 0) setBackup(v.backup);
         setState({ kind: "cached" });
+        loadCatalog(v.models ?? []);
       } catch {
       }
     })();
@@ -4244,7 +4339,19 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         "button",
         { ...s.btnGhost, style: { ...s.btnGhost, opacity: applyBusy || selected.size === 0 ? 0.6 : 1 }, type: "button", disabled: applyBusy || selected.size === 0, onClick: apply2 },
         applyBusy ? "\u5E94\u7528\u4E2D\u2026" : `\u5E94\u7528\u8865\u4E01\uFF08${selected.size}\uFF09`
-      ) : null
+      ) : null,
+      import_react6.default.createElement(
+        "button",
+        {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: catalogBusy,
+          onClick: refreshCatalog,
+          title: "\u8054\u7F51\u6293\u53D6 models.dev \u4E0E OpenRouter \u7684\u591A\u6A21\u6001\u6807\u6CE8\uFF0C\u843D\u76D8\u5230 ~/.dsh/dsh-chanhub/model-catalog.json\uFF1B\u5E73\u65F6\u6253\u5F00\u9762\u677F\u53EA\u8BFB\u7F13\u5B58\uFF0C\u4E0D\u8054\u7F51\u3001\u4E0D\u6539 DSH \u914D\u7F6E"
+        },
+        catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"
+      )
     ),
     // 拉取记录：上次拉取时刻 + 与本次的差异（记录每次拉取都是**整体覆盖**）
     record ? import_react6.default.createElement(
@@ -4280,8 +4387,44 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       { style: { ...s.tip, borderColor: tone.warn.fg } },
       `\u4E0A\u6E38\u5DF2\u79FB\u9664 ${removed.length} \u4E2A\u6A21\u578B\uFF1A${removed.slice(0, 8).join("\u3001")}` + (removed.length > 8 ? ` \u7B49 ${removed.length} \u4E2A` : "") + "\uFF08\u8986\u76D6\u6A21\u5F0F\u4E0B\u4F1A\u4ECE DSH \u914D\u7F6E\u91CC\u79FB\u9664\uFF1B\u4EC5\u8865\u89C6\u89C9\u80FD\u529B\u6A21\u5F0F\u4E0D\u52A8\u5B83\u4EEC\uFF09"
     ) : null,
+    // 目录比对摘要（只读标注）：三态计数 + 目录快照新旧 + 源可用性
+    catalog ? import_react6.default.createElement(
+      "div",
+      { style: { ...type.text.caption, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+      import_react6.default.createElement(
+        "span",
+        null,
+        `\u80FD\u529B\u76EE\u5F55\uFF1A${catalog.catalog?.keys ?? 0} \u4E2A\u6A21\u578B\u540D / ${catalog.catalog?.entries ?? 0} \u6761\u6807\u6CE8` + (catalog.at > 0 ? ` \xB7 \u5FEB\u7167 ${relativeTime(catalog.at) || "\u2014"}` : " \xB7 \u53EA\u6709\u79BB\u7EBF\u6E90")
+      ),
+      catalog.summary ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.info.fg } },
+        `\u5224\u5B9A\uFF1A\u591A\u6A21\u6001 ${catalog.summary.counts.image} / \u7EAF\u6587\u672C ${catalog.summary.counts.text} / \u5F85\u786E\u8BA4 ${catalog.summary.counts.unknown}\uFF08\u786E\u8BA4 ${catalog.summary.counts.confirmed} \xB7 \u501F\u5224 ${catalog.summary.counts.borrowed} \xB7 \u51B2\u7A81 ${catalog.summary.counts.conflict} \xB7 \u522B\u540D ${catalog.summary.counts.alias} \xB7 \u65E0\u6536\u5F55 ${catalog.summary.counts.missing}\uFF09`
+      ) : null,
+      catalog.summary && catalog.summary.disagreements.length > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.warn.fg } },
+        `\u4E0E\u767D\u540D\u5355\u4E0D\u4E00\u81F4 ${catalog.summary.disagreements.length} \u4E2A`
+      ) : null,
+      catalog.summary && catalog.summary.gaps.length > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.warn.fg } },
+        `\u767D\u540D\u5355\u53EF\u8865 ${catalog.summary.gaps.length} \u4E2A`
+      ) : null,
+      catalog.warnings.length > 0 ? import_react6.default.createElement(
+        "span",
+        { title: catalog.warnings.join("\n"), style: { color: tone.idle.fg } },
+        `\u26A0 ${catalog.warnings[0]}`
+      ) : null,
+      catalog.failures.length > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.err.fg } },
+        `\u6E90\u5931\u8D25\uFF1A${catalog.failures.map((f) => f.source).join("\u3001")}`
+      ) : null
+    ) : null,
     // 说明
     import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, '\u300C\u591A\u6A21\u6001\u300D= \u672C\u5730\u8BC4\u5BA1\u767D\u540D\u5355\u5185\u3001\u771F\u5B9E\u652F\u6301\u56FE\u7247\u8F93\u5165\u7684\u6A21\u578B\uFF08\u4E0A\u6E38 supports_images \u5B57\u6BB5\u4E0D\u53EF\u9760\uFF0C\u6545\u672A\u91C7\u4FE1\uFF09\u3002\u5E94\u7528\u8865\u4E01\u4F1A\u628A\u52FE\u9009\u7684\u6A21\u578B\u5199\u5165 DSH \u8BBE\u7F6E llm-pi-ai \u7684 providers.&lt;provider&gt;.models[].input = ["text","image"]\uFF0C\u8BA9 DSH \u5141\u8BB8\u56FE\u7247\u4E0A\u4F20\u3002\u6CE8\u610F\uFF1A\u4E4B\u540E\u522B\u5728\u300C\u8BBE\u7F6E\u2192\u6A21\u578B\u300D\u91CC\u91CD\u65B0\u300C\u4ECE\u63D0\u4F9B\u5546\u641C\u7D22\u300D\uFF0C\u5426\u5219\u89C6\u89C9\u6807\u8BB0\u4F1A\u88AB\u6E05\u56DE\u3002'),
+    import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, "\u300C\u76EE\u5F55\u5224\u5B9A\u300D= \u62FF\u516C\u5F00\u7ED3\u6784\u5316\u76EE\u5F55\uFF08DSH \u81EA\u5E26 pi-ai \u76EE\u5F55 + models.dev + OpenRouter\uFF09\u6BD4\u5BF9\u51FA\u6765\u7684\u7ED3\u8BBA\uFF0C\u53EA\u4F5C\u6807\u6CE8\u3001**\u4E0D\u4F1A\u6539\u52A8\u4EFB\u4F55\u914D\u7F6E**\u3002\u88C1\u51B3\u6309\u6765\u6E90\u5206\u7EA7\uFF1A\u539F\u5382(L1) > \u4E91\u6258\u7BA1(L2) > \u8F6C\u552E(L3)\uFF0C\u540C\u7EA7\u5E73\u7968\u624D\u7B97\u51B2\u7A81\uFF1B\u5265\u540E\u7F00/\u6A21\u7CCA\u547D\u4E2D\u7684\u7ED3\u8BBA\u662F\u300C\u501F\u5224\u300D\uFF0C\u76EE\u5F55\u67E5\u4E0D\u5230\u7684\u6807\u300C\u65E0\u6536\u5F55\u300D\uFF0C\u6E20\u9053\u6863\u4F4D\u522B\u540D\uFF08auto / fast-model \u7B49\uFF09\u4E0D\u53C2\u4E0E\u6BD4\u5BF9\u3002"),
     state.kind === "cached" ? import_react6.default.createElement(
       "div",
       { style: s.tip },
@@ -4314,7 +4457,8 @@ function ModelAbilityTab({ rpcCall, showToast }) {
             th("\u4E0A\u6587"),
             th("\u8F93\u51FA"),
             th("\u500D\u7387"),
-            th("\u80FD\u529B")
+            th("\u80FD\u529B"),
+            th("\u76EE\u5F55\u5224\u5B9A")
           )
         ),
         import_react6.default.createElement(
@@ -4356,7 +4500,15 @@ function ModelAbilityTab({ rpcCall, showToast }) {
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.contextWindow)),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.maxTokens)),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, typeof m.credits === "string" && m.credits !== "" ? m.credits : "\u2014"),
-              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge))
+              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge)),
+              import_react6.default.createElement(
+                "td",
+                tdStyle,
+                import_react6.default.createElement(CatalogBadge, {
+                  verdict: catalog?.verdicts?.get(m.id) ?? null,
+                  whitelisted: catalog?.verdicts?.get(m.id)?.whitelist
+                })
+              )
             );
           })
         )
