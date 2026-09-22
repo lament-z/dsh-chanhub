@@ -2739,6 +2739,8 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   const [addOpen, setAddOpen] = React.useState(false);
   const [loginChannels, setLoginChannels] = React.useState(null);
   const [loginRealms, setLoginRealms] = React.useState([]);
+  // 渠道 → 站点（qoder 的 work/cn/global）。与 loginRealms 同源同一次探测。
+  const [loginSites, setLoginSites] = React.useState({});
 
   // 网关可登录渠道只在挂载时探一次：这是网关**版本能力**，不会在会话中变化，
   // 没必要跟着 8s 轮询反复打 /panel/api/channels。
@@ -2750,6 +2752,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
         if (!alive) return;
         setLoginChannels(result?.value?.loginChannels ?? []);
         setLoginRealms(result?.value?.realms ?? []);
+        setLoginSites(result?.value?.sites ?? {});
       } catch {
         if (alive) setLoginChannels([]);
       }
@@ -2865,7 +2868,8 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
 
   /** 添加账号：轮询登录态（弹窗负责节奏，这里只做转发）。 */
   const onLoginPoll = React.useCallback(
-    async (channel) => rpcCall(ENDPOINTS.loginPoll, { channel }),
+    // 第二维随渠道而定（qoder=site / 其余=realm），网关按 channel 解释。
+    async (channel, realm) => rpcCall(ENDPOINTS.loginPoll, { channel, realm }),
     [rpcCall],
   );
 
@@ -3198,6 +3202,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
       ? React.createElement(AddAccountDialog, {
           channels: loginChannels ?? [],
           realms: loginRealms,
+          sites: loginSites,
           // 发起登录那一刻池里的 uid：弹窗据此区分「新增账号」与「同号重登」。
           // 还没拉到 /status 时传 undefined（= 判断不了，弹窗回中性文案）——
           // 传空数组会被当成「池子是空的」，把已存在的号误报成「已新增账号」。

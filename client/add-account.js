@@ -14,32 +14,19 @@
 
 import React from 'react';
 import { s, tone } from './theme.js';
+import { CHANNEL_FULL_LABEL, CHANNEL_SITES } from './derive.js';
 
-/** 渠道 → 展示名（与账号池的渠道标签同源口径）。 */
-const CHANNEL_LABEL = {
-  workbuddy: 'WorkBuddy',
-  traework: 'TraeWork',
-  qoder: 'QoderWork',
-  qodercn: 'QoderCN',
-  qodercom: 'QoderCOM',
-};
+/** 渠道 → 展示名（与 derive.js 的 CHANNEL_FULL_LABEL 同源口径）。 */
+const CHANNEL_LABEL = CHANNEL_FULL_LABEL;
 
 /**
- * 渠道 → 可选域。
- * workbuddy 有 cn/global 两域（域决定上游 base 与凭证 domain）；其余渠道当前仅 cn。
+ * 渠道 → 可选站点（渠道内的第二维）。
+ *
+ * 直接复用 derive.js 的 CHANNEL_SITES —— 单一来源，避免与侧边栏/抽屉的
+ * 渠道-站点口径漂移。qoder 有三个站点（work/cn/global），workbuddy 有
+ * cn/global（它就是它的 realm），traework 恒 cn。
  */
-const CHANNEL_REALMS = {
-  workbuddy: [
-    { id: 'cn', label: '国内版', note: 'copilot.tencent.com' },
-    { id: 'global', label: '国际版', note: 'www.workbuddy.ai' },
-  ],
-  traework: [{ id: 'cn', label: '默认', note: 'trae.cn' }],
-  qoder: [{ id: 'cn', label: '默认', note: 'qoder.com.cn' }],
-  // QoderCN 与 QoderWork 同域名但为不同产品线（凭据不通用），单独列渠道。
-  qodercn: [{ id: 'cn', label: '默认', note: 'qoder.com.cn' }],
-  // 国际版：业务 openapi.qoder.sh / 推理 api1.qoder.sh / 模型表 api2.qoder.sh。
-  qodercom: [{ id: 'cn', label: '国际版', note: 'openapi.qoder.sh' }],
-};
+const CHANNEL_SITES_LOCAL = CHANNEL_SITES;
 
 /** 轮询间隔（毫秒）。设备授权是人在浏览器里操作，2.5s 足够快也不打网关。 */
 const POLL_INTERVAL_MS = 2500;
@@ -81,11 +68,12 @@ function RadioRow({ label, options, value, onChange }) {
 /**
  * 「添加账号」弹窗。
  *
- * @param props - `{channels, realms, onStart, onPoll, onCallback, onClose, onDone, knownUids}`。
+ * @param props - `{channels, realms, sites, onStart, onPoll, onCallback, onClose, onDone, knownUids}`。
  *   - channels：网关支持**交互登录**的渠道（来自 /panel/api/channels，不是协议全集）；
- *   - realms：网关声明的域集合（当前恒含 cn）；
+ *   - realms：网关声明的域集合（workbuddy 用）；
+ *   - sites：网关声明的「渠道 → 站点」映射（qoder 的 work/cn/global 由此来）；
  *   - onStart(channel, realm, callbackBase) → `{url, callback_url?, external?}`；
- *   - onPoll(channel) → `{status,...}`；
+ *   - onPoll(channel, site) → `{status,...}`；
  *   - onCallback(channel, callback) → `{status:'received'|'error'}`（粘贴完成）；
  *   - onDone()：登录成功后回调（面板据此刷新账号池）；
  *   - knownUids：发起登录那一刻池中已有的 uid 列表。用于在 done 阶段区分「新增账号」
@@ -97,6 +85,7 @@ function RadioRow({ label, options, value, onChange }) {
 export function AddAccountDialog({
   channels,
   realms,
+  sites,
   onStart,
   onPoll,
   onCallback,
@@ -107,7 +96,12 @@ export function AddAccountDialog({
   // 默认选中第一个可用渠道，且必须是**真的能登录**的（旧网关的 workbuddy 会 400）。
   const available = Array.isArray(channels) && channels.length > 0 ? channels : [];
   const [channel, setChannel] = React.useState(available[0] ?? '');
-  const [realm, setRealm] = React.useState('cn');
+  // 第二维的初值取**首个可用渠道的默认站点**，而不是硬编码 'cn'：
+  // 直接以 qoder 进入时（面板只列 qoder）默认应是 work（存量 QoderWork 线），
+  // 硬编码 cn 会静默把用户带到 QoderCN 站点。
+  const [realm, setRealm] = React.useState(
+    () => CHANNEL_SITES_LOCAL[available[0]]?.[0]?.id ?? 'cn',
+  );
   const [phase, setPhase] = React.useState('idle');
   const [url, setUrl] = React.useState('');
   const [message, setMessage] = React.useState('');
@@ -158,7 +152,7 @@ export function AddAccountDialog({
           return;
         }
         try {
-          const res = await onPoll(channel);
+          const res = await onPoll(channel, realm);
           if (generation.current !== gen) return;
           if (res?.ok === false) {
             setPhase('error');
@@ -188,7 +182,7 @@ export function AddAccountDialog({
         }
       }, POLL_INTERVAL_MS);
     },
-    [channel, onPoll, onDone],
+    [channel, realm, onPoll, onDone],
   );
 
   /** 发起登录：拿授权 URL → 打开浏览器 → 起轮询。 */
@@ -308,10 +302,18 @@ export function AddAccountDialog({
     );
   }
 
-  const realmOptions = CHANNEL_REALMS[channel] ?? [{ id: 'cn', label: '默认', note: '' }];
-  // 网关声明的 realms 是权威：CHANNEL_REALMS 是展示信息，二者取交集避免列出
-  // 网关明确不支持的域（如 config 关闭 global 时）。
-  const allowedRealms = Array.isArray(realms) && realms.length > 0 ? realms : ['cn'];
+  const realmOptions = CHANNEL_SITES_LOCAL[channel] ?? [{ id: 'cn', label: '默认', note: '' }];
+  // 网关声明的站点是权威：CHANNEL_SITES 只是展示信息，二者取交集避免列出网关
+  // 明确不支持的站点（如 config 关闭 global 时）。
+  //
+  // ★ qoder 必须用 sites[channel]（work/cn/global）而不是全局 realms（只有
+  // cn/global）—— 否则 "work" 被过滤掉，用户选不到存量 QoderWork 站点。
+  const allowedRealms =
+    Array.isArray(sites?.[channel]) && sites[channel].length > 0
+      ? sites[channel]
+      : Array.isArray(realms) && realms.length > 0
+        ? realms
+        : ['cn'];
   const visibleRealmOptions = realmOptions.filter((o) => allowedRealms.includes(o.id));
 
   // 「新增」还是「同号重登」：网关新版本会在 done 里带 existing（权威口径），
@@ -340,6 +342,10 @@ export function AddAccountDialog({
         value: channel,
         onChange: (id) => {
           setChannel(id);
+          // 第二维也跟着换到该渠道的默认站点：qoder 默认 work（存量 QoderWork 线），
+          // workbuddy 默认 cn。不重置的话从 workbuddy 切到 qoder 会带着 cn，
+          // 用户会莫名其妙落到 QoderCN 站点。
+          setRealm(CHANNEL_SITES_LOCAL[id]?.[0]?.id ?? 'cn');
           // 换渠道必须丢弃上一轮的 URL/轮询：state 是渠道相关的。
           generation.current += 1;
           attempts.current = 0;
@@ -354,7 +360,7 @@ export function AddAccountDialog({
         },
       }),
       React.createElement(RadioRow, {
-        label: '域',
+        label: channel === 'qoder' ? '站点' : '域',
         options: visibleRealmOptions,
         value: realm,
         onChange: (id) => {

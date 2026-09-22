@@ -12,12 +12,44 @@ export const CHANNEL_LABEL = {
   workbuddy: 'WB',
   traework: 'Trae',
   qoder: 'Qoder',
-  qodercn: 'QoderCN',
-  qodercom: 'QoderCOM',
+};
+
+/**
+ * 渠道展示名（全称，弹窗/抽屉用）。
+ * 站点不是渠道 —— qoder 的 work/cn/global 走 CHANNEL_SITES，不在此列。
+ */
+export const CHANNEL_FULL_LABEL = {
+  workbuddy: 'WorkBuddy',
+  traework: 'TraeWork',
+  qoder: 'Qoder',
+};
+
+/**
+ * 渠道 → 站点清单（渠道内的第二维；面板据此渲染「选渠道 → 选站点」）。
+ *
+ * 与网关 /panel/api/channels 的 sites 字段同源口径（网关是权威，这里是展示信息）：
+ *   workbuddy → realm：cn / global
+ *   traework  → 无（恒 cn）
+ *   qoder     → site ：work / cn / global
+ *
+ * 为什么 qoder 有三个而别的渠道没有：work 与 cn **同域名**（qoder.com.cn）但协议
+ * 不同，global 走 .sh（三域名分离）—— 它们是同一渠道的三个上游站点。
+ */
+export const CHANNEL_SITES = {
+  workbuddy: [
+    { id: 'cn', label: '国内版', note: 'copilot.tencent.com' },
+    { id: 'global', label: '国际版', note: 'www.workbuddy.ai' },
+  ],
+  traework: [{ id: 'cn', label: '默认', note: 'trae.cn' }],
+  qoder: [
+    { id: 'work', label: 'QoderWork', note: 'qoder.com.cn · 桌面版协议' },
+    { id: 'cn', label: 'QoderCN', note: 'qoder.com.cn · IDE 协议' },
+    { id: 'global', label: '国际版', note: 'openapi.qoder.sh' },
+  ],
 };
 
 /** 渠道展示顺序（与用户要求的 WB / Trae / Qoder 一致）。 */
-export const CHANNEL_ORDER = ['workbuddy', 'traework', 'qoder', 'qodercn', 'qodercom'];
+export const CHANNEL_ORDER = ['workbuddy', 'traework', 'qoder'];
 
 /** 六类排程的展示定义（顺序即 UI 顺序）。 */
 export const SCHEDULE_ITEMS = [
@@ -574,10 +606,6 @@ export const CHANNEL_COLOR = {
   workbuddy: '#4f6ef7',
   traework: '#a855f7',
   qoder: '#06b6d4',
-  // QoderCN 紫 / QoderCOM 橙金：与上游 wild-work 的渠道主题一致，
-  // 便于两个 Qoder 渠道在同屏下区分（同域名、不同产品线）。
-  qodercn: '#6d28d9',
-  qodercom: '#b45309',
 };
 
 /**
@@ -809,15 +837,7 @@ export function resolveChannel(explicit, domain) {
   //     会与网关实际选路不符（D2 测试抓到过这条偏差）。
   const trimmed = typeof explicit === 'string' ? explicit.trim().toLowerCase() : '';
   if (trimmed !== '') {
-    if (
-      trimmed === 'workbuddy' ||
-      trimmed === 'traework' ||
-      trimmed === 'qoder' ||
-      trimmed === 'qodercn' ||
-      trimmed === 'qodercom'
-    ) {
-      return trimmed;
-    }
+    if (trimmed === 'workbuddy' || trimmed === 'traework' || trimmed === 'qoder') return trimmed;
     return 'workbuddy';
   }
   const value = typeof domain === 'string' ? domain.trim().toLowerCase() : '';

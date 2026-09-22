@@ -891,11 +891,26 @@ function formatFieldValue(field, value) {
 var CHANNEL_LABEL = {
   workbuddy: "WB",
   traework: "Trae",
-  qoder: "Qoder",
-  qodercn: "QoderCN",
-  qodercom: "QoderCOM"
+  qoder: "Qoder"
 };
-var CHANNEL_ORDER = ["workbuddy", "traework", "qoder", "qodercn", "qodercom"];
+var CHANNEL_FULL_LABEL = {
+  workbuddy: "WorkBuddy",
+  traework: "TraeWork",
+  qoder: "Qoder"
+};
+var CHANNEL_SITES = {
+  workbuddy: [
+    { id: "cn", label: "\u56FD\u5185\u7248", note: "copilot.tencent.com" },
+    { id: "global", label: "\u56FD\u9645\u7248", note: "www.workbuddy.ai" }
+  ],
+  traework: [{ id: "cn", label: "\u9ED8\u8BA4", note: "trae.cn" }],
+  qoder: [
+    { id: "work", label: "QoderWork", note: "qoder.com.cn \xB7 \u684C\u9762\u7248\u534F\u8BAE" },
+    { id: "cn", label: "QoderCN", note: "qoder.com.cn \xB7 IDE \u534F\u8BAE" },
+    { id: "global", label: "\u56FD\u9645\u7248", note: "openapi.qoder.sh" }
+  ]
+};
+var CHANNEL_ORDER = ["workbuddy", "traework", "qoder"];
 var SCHEDULE_ITEMS = [
   { id: "checkin", icon: "\u{1F4C5}", label: "\u7B7E\u5230", hoursKey: "checkin_hours", enabledKey: "checkin_enabled" },
   { id: "activity", icon: "\u{1F5FA}", label: "\u6D3B\u8DC3\u5730\u56FE", hoursKey: "activity_hours", enabledKey: "activity_enabled" },
@@ -1222,11 +1237,7 @@ function realmLimitOf(gatewayConfig, realm) {
 var CHANNEL_COLOR = {
   workbuddy: "#4f6ef7",
   traework: "#a855f7",
-  qoder: "#06b6d4",
-  // QoderCN 紫 / QoderCOM 橙金：与上游 wild-work 的渠道主题一致，
-  // 便于两个 Qoder 渠道在同屏下区分（同域名、不同产品线）。
-  qodercn: "#6d28d9",
-  qodercom: "#b45309"
+  qoder: "#06b6d4"
 };
 function channelColor(channel) {
   return CHANNEL_COLOR[channel] ?? "#94a3b8";
@@ -1366,9 +1377,7 @@ function channelResolver(authFiles) {
 function resolveChannel(explicit, domain) {
   const trimmed = typeof explicit === "string" ? explicit.trim().toLowerCase() : "";
   if (trimmed !== "") {
-    if (trimmed === "workbuddy" || trimmed === "traework" || trimmed === "qoder" || trimmed === "qodercn" || trimmed === "qodercom") {
-      return trimmed;
-    }
+    if (trimmed === "workbuddy" || trimmed === "traework" || trimmed === "qoder") return trimmed;
     return "workbuddy";
   }
   const value = typeof domain === "string" ? domain.trim().toLowerCase() : "";
@@ -2065,7 +2074,7 @@ function Fold({ summary, children, open = false, id }) {
   );
 }
 function channelLabel(channel) {
-  return { workbuddy: "WB", traework: "Trae", qoder: "Qoder", qodercn: "QCN", qodercom: "QCOM" }[channel] ?? "";
+  return { workbuddy: "WB", traework: "Trae", qoder: "Qoder" }[channel] ?? "";
 }
 function formatAbsolute(iso) {
   const value = Date.parse(iso);
@@ -2159,25 +2168,8 @@ var CHANNEL = "/dsh-chanhub";
 
 // client/add-account.js
 var import_react2 = __toESM(require("react"), 1);
-var CHANNEL_LABEL2 = {
-  workbuddy: "WorkBuddy",
-  traework: "TraeWork",
-  qoder: "QoderWork",
-  qodercn: "QoderCN",
-  qodercom: "QoderCOM"
-};
-var CHANNEL_REALMS = {
-  workbuddy: [
-    { id: "cn", label: "\u56FD\u5185\u7248", note: "copilot.tencent.com" },
-    { id: "global", label: "\u56FD\u9645\u7248", note: "www.workbuddy.ai" }
-  ],
-  traework: [{ id: "cn", label: "\u9ED8\u8BA4", note: "trae.cn" }],
-  qoder: [{ id: "cn", label: "\u9ED8\u8BA4", note: "qoder.com.cn" }],
-  // QoderCN 与 QoderWork 同域名但为不同产品线（凭据不通用），单独列渠道。
-  qodercn: [{ id: "cn", label: "\u9ED8\u8BA4", note: "qoder.com.cn" }],
-  // 国际版：业务 openapi.qoder.sh / 推理 api1.qoder.sh / 模型表 api2.qoder.sh。
-  qodercom: [{ id: "cn", label: "\u56FD\u9645\u7248", note: "openapi.qoder.sh" }]
-};
+var CHANNEL_LABEL2 = CHANNEL_FULL_LABEL;
+var CHANNEL_SITES_LOCAL = CHANNEL_SITES;
 var POLL_INTERVAL_MS = 2500;
 var MAX_POLL_ATTEMPTS = 360;
 function RadioRow({ label, options, value, onChange }) {
@@ -2205,6 +2197,7 @@ function RadioRow({ label, options, value, onChange }) {
 function AddAccountDialog({
   channels,
   realms,
+  sites,
   onStart,
   onPoll,
   onCallback,
@@ -2214,7 +2207,9 @@ function AddAccountDialog({
 }) {
   const available = Array.isArray(channels) && channels.length > 0 ? channels : [];
   const [channel, setChannel] = import_react2.default.useState(available[0] ?? "");
-  const [realm, setRealm] = import_react2.default.useState("cn");
+  const [realm, setRealm] = import_react2.default.useState(
+    () => CHANNEL_SITES_LOCAL[available[0]]?.[0]?.id ?? "cn"
+  );
   const [phase, setPhase] = import_react2.default.useState("idle");
   const [url, setUrl] = import_react2.default.useState("");
   const [message, setMessage] = import_react2.default.useState("");
@@ -2249,7 +2244,7 @@ function AddAccountDialog({
           return;
         }
         try {
-          const res = await onPoll(channel);
+          const res = await onPoll(channel, realm);
           if (generation.current !== gen) return;
           if (res?.ok === false) {
             setPhase("error");
@@ -2278,7 +2273,7 @@ function AddAccountDialog({
         }
       }, POLL_INTERVAL_MS);
     },
-    [channel, onPoll, onDone]
+    [channel, realm, onPoll, onDone]
   );
   const start = import_react2.default.useCallback(async () => {
     stopPolling();
@@ -2379,8 +2374,8 @@ function AddAccountDialog({
       )
     );
   }
-  const realmOptions = CHANNEL_REALMS[channel] ?? [{ id: "cn", label: "\u9ED8\u8BA4", note: "" }];
-  const allowedRealms = Array.isArray(realms) && realms.length > 0 ? realms : ["cn"];
+  const realmOptions = CHANNEL_SITES_LOCAL[channel] ?? [{ id: "cn", label: "\u9ED8\u8BA4", note: "" }];
+  const allowedRealms = Array.isArray(sites?.[channel]) && sites[channel].length > 0 ? sites[channel] : Array.isArray(realms) && realms.length > 0 ? realms : ["cn"];
   const visibleRealmOptions = realmOptions.filter((o) => allowedRealms.includes(o.id));
   const existingAccount = typeof result?.existing === "boolean" ? result.existing : result?.uid && knownAtStart.current ? knownAtStart.current.has(result.uid) : void 0;
   return import_react2.default.createElement(
@@ -2399,6 +2394,7 @@ function AddAccountDialog({
         value: channel,
         onChange: (id) => {
           setChannel(id);
+          setRealm(CHANNEL_SITES_LOCAL[id]?.[0]?.id ?? "cn");
           generation.current += 1;
           attempts.current = 0;
           stopPolling();
@@ -2412,7 +2408,7 @@ function AddAccountDialog({
         }
       }),
       import_react2.default.createElement(RadioRow, {
-        label: "\u57DF",
+        label: channel === "qoder" ? "\u7AD9\u70B9" : "\u57DF",
         options: visibleRealmOptions,
         value: realm,
         onChange: (id) => {
@@ -8040,6 +8036,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   const [addOpen, setAddOpen] = React.useState(false);
   const [loginChannels, setLoginChannels] = React.useState(null);
   const [loginRealms, setLoginRealms] = React.useState([]);
+  const [loginSites, setLoginSites] = React.useState({});
   React.useEffect(() => {
     let alive = true;
     void (async () => {
@@ -8048,6 +8045,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
         if (!alive) return;
         setLoginChannels(result?.value?.loginChannels ?? []);
         setLoginRealms(result?.value?.realms ?? []);
+        setLoginSites(result?.value?.sites ?? {});
       } catch {
         if (alive) setLoginChannels([]);
       }
@@ -8149,7 +8147,8 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
     [rpcCall]
   );
   const onLoginPoll = React.useCallback(
-    async (channel) => rpcCall(ENDPOINTS.loginPoll, { channel }),
+    // 第二维随渠道而定（qoder=site / 其余=realm），网关按 channel 解释。
+    async (channel, realm) => rpcCall(ENDPOINTS.loginPoll, { channel, realm }),
     [rpcCall]
   );
   const onLoginCallback = React.useCallback(
@@ -8438,6 +8437,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
     addOpen ? React.createElement(AddAccountDialog, {
       channels: loginChannels ?? [],
       realms: loginRealms,
+      sites: loginSites,
       // 发起登录那一刻池里的 uid：弹窗据此区分「新增账号」与「同号重登」。
       // 还没拉到 /status 时传 undefined（= 判断不了，弹窗回中性文案）——
       // 传空数组会被当成「池子是空的」，把已存在的号误报成「已新增账号」。

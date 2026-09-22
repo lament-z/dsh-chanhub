@@ -665,8 +665,9 @@ dialogTests('D7 切换渠道后丢弃上一轮的授权链接与轮询结果', a
     await waitFor(act, 20);
     assert.match(container.textContent, /x\.test\/workbuddy/);
 
-    // 切到 QoderWork：必须回到 idle（旧 URL 消失）。
-    await act(async () => { buttonByText(container, 'QoderWork').click(); });
+    // 切到 qoder 渠道（渠道名是 "Qoder"；"QoderWork" 现在是它下面的**站点**）：
+    // 必须回到 idle（旧 URL 消失）。
+    await act(async () => { buttonByText(container, 'Qoder').click(); });
     await waitFor(act, 20);
     assert.equal(container.textContent.includes('x.test/workbuddy'), false, '切渠道后旧链接必须消失');
     assert.ok(buttonByText(container, '获取授权链接'), '切渠道后应回到可重新发起的 idle 态');
@@ -862,6 +863,46 @@ dialogTests('D13 网关自带 existing 时以网关为准（面板快照口径�
     await waitFor(act, 2700);
 
     assert.match(container.textContent, /账号已存在/);
+  } finally {
+    await cleanup();
+  }
+});
+
+// ---- D9：qoder 的站点选择器（单渠道 + site 子维度） ----
+
+dialogTests('D9 qoder：站点选择器来自网关 sites，且以 site= 参数发起登录', async () => {
+  const calls = [];
+  const { container, act, cleanup } = await mountDialog({
+    channels: ['qoder'],
+    // 全局 realms 只有 cn/global —— qoder 的 work 只能从 sites 拿到，
+    // 若面板误用 realms，"QoderWork" 会被过滤掉、用户选不到存量站点。
+    realms: ['cn', 'global'],
+    sites: { qoder: ['work', 'cn', 'global'] },
+    onStart: async (...args) => {
+      calls.push(args);
+      return { ok: true, value: { url: 'https://x.test/qoder' } };
+    },
+    onPoll: async () => ({ ok: true, value: { status: 'pending' } }),
+    onClose: () => {},
+    onDone: () => {},
+  });
+  try {
+    // 三个站点都应可选（work 来自 sites，不能被 realms 过滤掉）。
+    assert.ok(buttonByText(container, 'QoderWork'), '应列出 work 站点');
+    assert.ok(buttonByText(container, 'QoderCN'), '应列出 cn 站点');
+    assert.ok(buttonByText(container, '国际版'), '应列出 global 站点');
+
+    // 默认站点应是 work（存量 QoderWork 线），不是 cn。
+    await act(async () => { buttonByText(container, '获取授权链接').click(); });
+    await waitFor(act, 20);
+    assert.deepEqual(calls[0], ['qoder', 'work'], 'qoder 默认应以 site=work 发起');
+
+    // 选 cn 站点后再发起：必须把 cn 显式带给网关（不能因「cn 即省略」而退化成 work）。
+    await act(async () => { buttonByText(container, 'QoderCN').click(); });
+    await waitFor(act, 20);
+    await act(async () => { buttonByText(container, '获取授权链接').click(); });
+    await waitFor(act, 20);
+    assert.deepEqual(calls[calls.length - 1], ['qoder', 'cn'], '切站点后应以 site=cn 发起');
   } finally {
     await cleanup();
   }
