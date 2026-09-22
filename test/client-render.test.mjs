@@ -578,11 +578,42 @@ function fakeRpc(status) {
               total: CATALOG_MODELS.length,
               counts: { image: 2, text: 1, unknown: 1, confirmed: 2, borrowed: 1, conflict: 0, alias: 1, missing: 0 },
               disagreements: [],
-              gaps: [{ id: 'workbuddy:global:kimi-k3', kind: 'catalog-image-not-in-whitelist' }],
+              gaps: [
+                { id: 'workbuddy:global:kimi-k3', kind: 'catalog-image-not-in-whitelist', status: 'confirmed' },
+                { id: 'workbuddy:cn:kimi-k3-1', kind: 'catalog-image-not-in-whitelist', status: 'borrowed' },
+              ],
             },
             verdicts: CATALOG_VERDICTS,
+            baseline: { at: 0, count: 0, baselined: 0, pending: 2 },
             readonly: true,
             ...(endpoint === 'refreshModelCatalog' ? { refreshed: true, failures: [] } : {}),
+          },
+        };
+      case 'commitModelCapabilities':
+        return {
+          ok: true,
+          value: {
+            added: ['workbuddy:global:kimi-k3'],
+            changed: [],
+            skipped: 1,
+            count: 1,
+            at: Date.now(),
+            report: {
+              provider: 'chanhub2api',
+              at: Date.now() - 3600000,
+              sources: { 'models.dev': { entries: 8033 } },
+              warnings: [],
+              catalog: { keys: 3759, entries: 9831 },
+              summary: {
+                total: CATALOG_MODELS.length,
+                counts: { image: 2, text: 1, unknown: 1, confirmed: 2, borrowed: 1, conflict: 0, alias: 1, missing: 0 },
+                disagreements: [],
+                gaps: [{ id: 'workbuddy:cn:kimi-k3-1', kind: 'catalog-image-not-in-whitelist', status: 'borrowed' }],
+              },
+              verdicts: CATALOG_VERDICTS,
+              baseline: { at: Date.now(), count: 1, baselined: 1, pending: 1 },
+              readonly: true,
+            },
           },
         };
       default:
@@ -2019,6 +2050,35 @@ test('渲染模型 Tab：只读目录判定列 + 刷新能力目录（不改配�
     });
     await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     assert.ok(rpc.calls.map((call) => call.endpoint).includes('refreshModelCatalog'), '点击后要走刷新端点');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染模型 Tab：沉淀确认项 —— 只把确认态写进基线，借判留着', { skip }, async () => {
+  const rpc = fakeRpc(realStatusFixture());
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await clickTab(document, '模型');
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    let html = document.getElementById('app').innerHTML;
+    // 缺口要能区分确认与借判（不能只报一个数）
+    assert.ok(html.includes('白名单可补 2 个'), '缺口计数');
+    assert.ok(html.includes('其中借判 1'), '借判要单列');
+
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('沉淀确认项'));
+    assert.ok(btn, '有确认项待沉淀时要出按钮');
+    assert.ok(btn.textContent.includes('2'), '按钮上带待沉淀数量');
+
+    await React.act(async () => {
+      btn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const calls = rpc.calls.map((call) => call.endpoint);
+    assert.ok(calls.includes('commitModelCapabilities'), '点击要走沉淀端点');
+    assert.ok(calls.includes('getModelRecord'), '沉淀后重读回显（基线变了，勾选框跟着放开）');
+    html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('已沉淀 1 项'), '沉淀后摘要显示已沉淀数');
   } finally {
     await cleanup();
   }

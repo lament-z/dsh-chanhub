@@ -130,6 +130,8 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
       summary: v.summary ?? null,
       warnings: v.warnings ?? [],
       failures: v.failures ?? [],
+      // 基线状态（已沉淀/待沉淀）—— 漏了它「沉淀确认项」按钮就不会出现
+      baseline: v.baseline ?? null,
       verdicts: new Map((v.verdicts ?? []).map((x) => [x.id, x])),
     });
   }, []);
@@ -212,6 +214,48 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     }
   }, [rpcCall, provider]);
 
+  // 回显：纯本地读插件 settings（快照 + 基线），**不请求网关**。
+  const reloadRecord = React.useCallback(async () => {
+    if (!rpcCall) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.getModelRecord, {});
+      if (result?.ok !== true || !result.value?.record) return;
+      const v = result.value;
+      setModels(v.models ?? []);
+      setRecord(v.record);
+      if (typeof v.provider === 'string' && v.provider !== '') setProvider(v.provider);
+      if (v.backup && v.backup.at > 0) setBackup(v.backup);
+      setState({ kind: 'cached' });
+      loadCatalog(v.models ?? []);
+    } catch {
+      // 回显失败不算错误：静默留在 idle，用户点「拉取」即可。
+    }
+  }, [rpcCall, loadCatalog]);
+
+  // 沉淀：把目录比对的**确认态**结论写进能力基线（只写确认项，借判/冲突不写）。
+  const commitCapabilities = React.useCallback(async () => {
+    if (!rpcCall) return;
+    setCatalogBusy(true);
+    try {
+      const result = await rpcCall(ENDPOINTS.commitModelCapabilities, { provider, models: models ?? [] });
+      if (result?.ok !== true) {
+        notify(`沉淀失败：${result?.error?.message ?? '未知错误'}`);
+        return;
+      }
+      const v = result.value;
+      if (v.report) applyCatalogResult(v.report);
+      notify(`已沉淀 ${(v.added ?? []).length} 项`
+        + ((v.changed ?? []).length > 0 ? `、改写 ${v.changed.length} 项` : '')
+        + `（基线共 ${v.count ?? 0} 项；跳过未确认 ${v.skipped ?? 0} 项）`);
+      // 基线变了 → 勾选框可用范围跟着变，重读一次回显（零网关请求）
+      await reloadRecord();
+    } catch (error) {
+      notify(`沉淀异常：${error?.message ?? error}`);
+    } finally {
+      setCatalogBusy(false);
+    }
+  }, [rpcCall, provider, models, applyCatalogResult, reloadRecord]);
+
   // 打开 Tab 先回显**上次拉取的结果**（纯本地读插件 settings，不请求网关）。
   // 为什么要这一步：本 Tab 在宿主里是条件渲染的，切到别的页签就卸载，models/
   // record 这些组件状态随之丢失；若打开时只能空手等用户再点一次「拉取」，就等于
@@ -221,22 +265,8 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
   React.useEffect(() => {
     if (hydratedRef.current || !rpcCall) return;
     hydratedRef.current = true;
-    (async () => {
-      try {
-        const result = await rpcCall(ENDPOINTS.getModelRecord, {});
-        if (result?.ok !== true || !result.value?.record) return;
-        const v = result.value;
-        setModels(v.models ?? []);
-        setRecord(v.record);
-        if (typeof v.provider === 'string' && v.provider !== '') setProvider(v.provider);
-        if (v.backup && v.backup.at > 0) setBackup(v.backup);
-        setState({ kind: 'cached' });
-        loadCatalog(v.models ?? []);
-      } catch {
-        // 回显失败不算错误：静默留在 idle，用户点「拉取」即可。
-      }
-    })();
-  }, [rpcCall]);
+    reloadRecord();
+  }, [rpcCall, reloadRecord]);
 
   const toggle = React.useCallback((id) => {
     setSelected((prev) => {
@@ -396,6 +426,22 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
         },
         catalogBusy ? '刷新目录中…' : '刷新能力目录',
       ),
+      catalog && (catalog.baseline?.pending ?? 0) > 0
+        ? React.createElement(
+            'button',
+            {
+              ...s.btnGhost,
+              style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+              type: 'button',
+              disabled: catalogBusy,
+              onClick: commitCapabilities,
+              title: '把目录比对中**确认态**的结论写进能力基线（settings.modelCapabilities）：'
+                + '确认多模态的模型会获得视觉能力，确认纯文本的会被记下来。'
+                + '借判/模糊/冲突/别名/无收录一律不写。只改插件 settings，不动 DSH 模型配置。',
+            },
+            `沉淀确认项（${catalog.baseline.pending}）`,
+          )
+        : null,
     ),
     // 拉取记录：上次拉取时刻 + 与本次的差异（记录每次拉取都是**整体覆盖**）
     record
@@ -446,13 +492,24 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                 + ` · 冲突 ${catalog.summary.counts.conflict} · 别名 ${catalog.summary.counts.alias}`
                 + ` · 无收录 ${catalog.summary.counts.missing}）`)
             : null,
+          catalog.baseline && catalog.baseline.count > 0
+            ? React.createElement('span', { style: { color: tone.ok.fg } },
+                `已沉淀 ${catalog.baseline.count} 项`
+                + (catalog.baseline.pending > 0 ? `（待沉淀 ${catalog.baseline.pending}）` : ''))
+            : null,
           catalog.summary && catalog.summary.disagreements.length > 0
             ? React.createElement('span', { style: { color: tone.warn.fg } },
                 `与白名单不一致 ${catalog.summary.disagreements.length} 个`)
             : null,
           catalog.summary && catalog.summary.gaps.length > 0
-            ? React.createElement('span', { style: { color: tone.warn.fg } },
-                `白名单可补 ${catalog.summary.gaps.length} 个`)
+            ? React.createElement('span', {
+                style: { color: tone.warn.fg },
+                title: catalog.summary.gaps.map((g) => `${g.id}（${g.status === 'confirmed' ? '确认' : '借判待确认'}）`).join('\n'),
+              },
+                `白名单可补 ${catalog.summary.gaps.length} 个`
+                + (catalog.summary.gaps.some((g) => g.status !== 'confirmed')
+                  ? `（其中借判 ${catalog.summary.gaps.filter((g) => g.status !== 'confirmed').length}）`
+                  : ''))
             : null,
           catalog.warnings.length > 0
             ? React.createElement('span', { title: catalog.warnings.join('\n'), style: { color: tone.idle.fg } },

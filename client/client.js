@@ -2167,7 +2167,8 @@ var ENDPOINTS = {
   rollbackModelsSync: "rollbackModelsSync",
   clearModelRecord: "clearModelRecord",
   getModelCatalog: "getModelCatalog",
-  refreshModelCatalog: "refreshModelCatalog"
+  refreshModelCatalog: "refreshModelCatalog",
+  commitModelCapabilities: "commitModelCapabilities"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -4119,6 +4120,8 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       summary: v.summary ?? null,
       warnings: v.warnings ?? [],
       failures: v.failures ?? [],
+      // 基线状态（已沉淀/待沉淀）—— 漏了它「沉淀确认项」按钮就不会出现
+      baseline: v.baseline ?? null,
       verdicts: new Map((v.verdicts ?? []).map((x) => [x.id, x]))
     });
   }, []);
@@ -4190,25 +4193,46 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       setState({ kind: "error", message: error?.message ?? String(error) });
     }
   }, [rpcCall, provider]);
+  const reloadRecord = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.getModelRecord, {});
+      if (result?.ok !== true || !result.value?.record) return;
+      const v = result.value;
+      setModels(v.models ?? []);
+      setRecord(v.record);
+      if (typeof v.provider === "string" && v.provider !== "") setProvider(v.provider);
+      if (v.backup && v.backup.at > 0) setBackup(v.backup);
+      setState({ kind: "cached" });
+      loadCatalog(v.models ?? []);
+    } catch {
+    }
+  }, [rpcCall, loadCatalog]);
+  const commitCapabilities = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    setCatalogBusy(true);
+    try {
+      const result = await rpcCall(ENDPOINTS.commitModelCapabilities, { provider, models: models ?? [] });
+      if (result?.ok !== true) {
+        notify(`\u6C89\u6DC0\u5931\u8D25\uFF1A${result?.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        return;
+      }
+      const v = result.value;
+      if (v.report) applyCatalogResult(v.report);
+      notify(`\u5DF2\u6C89\u6DC0 ${(v.added ?? []).length} \u9879` + ((v.changed ?? []).length > 0 ? `\u3001\u6539\u5199 ${v.changed.length} \u9879` : "") + `\uFF08\u57FA\u7EBF\u5171 ${v.count ?? 0} \u9879\uFF1B\u8DF3\u8FC7\u672A\u786E\u8BA4 ${v.skipped ?? 0} \u9879\uFF09`);
+      await reloadRecord();
+    } catch (error) {
+      notify(`\u6C89\u6DC0\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+    } finally {
+      setCatalogBusy(false);
+    }
+  }, [rpcCall, provider, models, applyCatalogResult, reloadRecord]);
   const hydratedRef = import_react6.default.useRef(false);
   import_react6.default.useEffect(() => {
     if (hydratedRef.current || !rpcCall) return;
     hydratedRef.current = true;
-    (async () => {
-      try {
-        const result = await rpcCall(ENDPOINTS.getModelRecord, {});
-        if (result?.ok !== true || !result.value?.record) return;
-        const v = result.value;
-        setModels(v.models ?? []);
-        setRecord(v.record);
-        if (typeof v.provider === "string" && v.provider !== "") setProvider(v.provider);
-        if (v.backup && v.backup.at > 0) setBackup(v.backup);
-        setState({ kind: "cached" });
-        loadCatalog(v.models ?? []);
-      } catch {
-      }
-    })();
-  }, [rpcCall]);
+    reloadRecord();
+  }, [rpcCall, reloadRecord]);
   const toggle = import_react6.default.useCallback((id) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -4351,7 +4375,19 @@ function ModelAbilityTab({ rpcCall, showToast }) {
           title: "\u8054\u7F51\u6293\u53D6 models.dev \u4E0E OpenRouter \u7684\u591A\u6A21\u6001\u6807\u6CE8\uFF0C\u843D\u76D8\u5230 ~/.dsh/dsh-chanhub/model-catalog.json\uFF1B\u5E73\u65F6\u6253\u5F00\u9762\u677F\u53EA\u8BFB\u7F13\u5B58\uFF0C\u4E0D\u8054\u7F51\u3001\u4E0D\u6539 DSH \u914D\u7F6E"
         },
         catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"
-      )
+      ),
+      catalog && (catalog.baseline?.pending ?? 0) > 0 ? import_react6.default.createElement(
+        "button",
+        {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: catalogBusy,
+          onClick: commitCapabilities,
+          title: "\u628A\u76EE\u5F55\u6BD4\u5BF9\u4E2D**\u786E\u8BA4\u6001**\u7684\u7ED3\u8BBA\u5199\u8FDB\u80FD\u529B\u57FA\u7EBF\uFF08settings.modelCapabilities\uFF09\uFF1A\u786E\u8BA4\u591A\u6A21\u6001\u7684\u6A21\u578B\u4F1A\u83B7\u5F97\u89C6\u89C9\u80FD\u529B\uFF0C\u786E\u8BA4\u7EAF\u6587\u672C\u7684\u4F1A\u88AB\u8BB0\u4E0B\u6765\u3002\u501F\u5224/\u6A21\u7CCA/\u51B2\u7A81/\u522B\u540D/\u65E0\u6536\u5F55\u4E00\u5F8B\u4E0D\u5199\u3002\u53EA\u6539\u63D2\u4EF6 settings\uFF0C\u4E0D\u52A8 DSH \u6A21\u578B\u914D\u7F6E\u3002"
+        },
+        `\u6C89\u6DC0\u786E\u8BA4\u9879\uFF08${catalog.baseline.pending}\uFF09`
+      ) : null
     ),
     // 拉取记录：上次拉取时刻 + 与本次的差异（记录每次拉取都是**整体覆盖**）
     record ? import_react6.default.createElement(
@@ -4401,6 +4437,11 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         { style: { color: tone.info.fg } },
         `\u5224\u5B9A\uFF1A\u591A\u6A21\u6001 ${catalog.summary.counts.image} / \u7EAF\u6587\u672C ${catalog.summary.counts.text} / \u5F85\u786E\u8BA4 ${catalog.summary.counts.unknown}\uFF08\u786E\u8BA4 ${catalog.summary.counts.confirmed} \xB7 \u501F\u5224 ${catalog.summary.counts.borrowed} \xB7 \u51B2\u7A81 ${catalog.summary.counts.conflict} \xB7 \u522B\u540D ${catalog.summary.counts.alias} \xB7 \u65E0\u6536\u5F55 ${catalog.summary.counts.missing}\uFF09`
       ) : null,
+      catalog.baseline && catalog.baseline.count > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.ok.fg } },
+        `\u5DF2\u6C89\u6DC0 ${catalog.baseline.count} \u9879` + (catalog.baseline.pending > 0 ? `\uFF08\u5F85\u6C89\u6DC0 ${catalog.baseline.pending}\uFF09` : "")
+      ) : null,
       catalog.summary && catalog.summary.disagreements.length > 0 ? import_react6.default.createElement(
         "span",
         { style: { color: tone.warn.fg } },
@@ -4408,8 +4449,11 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       ) : null,
       catalog.summary && catalog.summary.gaps.length > 0 ? import_react6.default.createElement(
         "span",
-        { style: { color: tone.warn.fg } },
-        `\u767D\u540D\u5355\u53EF\u8865 ${catalog.summary.gaps.length} \u4E2A`
+        {
+          style: { color: tone.warn.fg },
+          title: catalog.summary.gaps.map((g) => `${g.id}\uFF08${g.status === "confirmed" ? "\u786E\u8BA4" : "\u501F\u5224\u5F85\u786E\u8BA4"}\uFF09`).join("\n")
+        },
+        `\u767D\u540D\u5355\u53EF\u8865 ${catalog.summary.gaps.length} \u4E2A` + (catalog.summary.gaps.some((g) => g.status !== "confirmed") ? `\uFF08\u5176\u4E2D\u501F\u5224 ${catalog.summary.gaps.filter((g) => g.status !== "confirmed").length}\uFF09` : "")
       ) : null,
       catalog.warnings.length > 0 ? import_react6.default.createElement(
         "span",

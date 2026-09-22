@@ -36,21 +36,41 @@ const OPENROUTER_FIXTURE = {
   ],
 };
 
-/** 造 runtime：client 打点计数（用来证明「零网关调用」），缓存落到临时目录。 */
-async function makeRuntime({ fetchImpl, pluginNs = {}, piAiDirs = ['/nonexistent/pi-ai'] } = {}) {
+/**
+ * 造 runtime：client 打点计数（用来证明「零网关调用」），缓存落到临时目录，
+ * settings 是**会真的落盘**的内存实现（否则「沉淀 → 后续读回」这条链测不出来）。
+ */
+async function makeRuntime({ fetchImpl, pluginNs = {}, piModels = [], gatewayModels = [], piAiDirs = ['/nonexistent/pi-ai'] } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'chanhub-catalog-rpc-'));
   const cacheFile = join(dir, 'model-catalog.json');
   const ns = { ...SETTINGS_DEFAULTS, ...pluginNs };
+  const piNs = { providers: { [PROVIDER]: { models: piModels } } };
   const calls = [];
   const writes = [];
+  const applyOps = (root, ops) => {
+    for (const op of ops) {
+      if (op.op !== 'set') continue;
+      let node = root;
+      for (let i = 0; i < op.path.length - 1; i += 1) {
+        const key = op.path[i];
+        if (typeof node[key] !== 'object' || node[key] === null) node[key] = {};
+        node = node[key];
+      }
+      node[op.path[op.path.length - 1]] = op.value;
+    }
+  };
   const runtime = {
     client: {
-      models: async () => { calls.push('models'); return { object: 'list', data: [] }; },
+      models: async () => { calls.push('models'); return { object: 'list', data: gatewayModels }; },
     },
     settingsService: {
-      get: () => ({ providers: { [PROVIDER]: { models: [] } } }),
+      get: (namespace) => (namespace === 'llm-pi-ai' ? piNs : ns),
       register: () => ({ get: () => ns }),
-      mutate: async (namespace, ops) => { writes.push({ namespace, ops }); return { ok: true }; },
+      mutate: async (namespace, ops) => {
+        writes.push({ namespace, ops });
+        applyOps(namespace === 'llm-pi-ai' ? piNs : ns, ops);
+        return { ok: true };
+      },
     },
     readSettings: () => ns,
     resolveConfig: () => ({ baseURL: 'http://127.0.0.1:7866', apiKey: '' }),
@@ -60,7 +80,7 @@ async function makeRuntime({ fetchImpl, pluginNs = {}, piAiDirs = ['/nonexistent
     catalogPiAiDirs: piAiDirs,
     ...(fetchImpl ? { fetchImpl } : {}),
   };
-  return { handle: createHandler(runtime), calls, writes, dir, cacheFile, ns };
+  return { handle: createHandler(runtime), calls, writes, dir, cacheFile, ns, piNs };
 }
 
 const MODELS = [
@@ -202,6 +222,171 @@ test('缓存版本不符判废：不崩，只是当没有目录', async () => {
     assert.equal(result.ok, true);
     assert.equal(result.value.at, 0);
     assert.ok(result.value.warnings.some((w) => w.includes('刷新目录')));
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+// --- 沉淀（能力基线）与「应用补丁」----------------------------------------
+
+/** 先把缓存灌好（models.dev 夹具），后续调用都走零网络的缓存路径。 */
+async function seedCatalog(rt) {
+  const result = await rt.handle(ENDPOINTS.refreshModelCatalog, { provider: PROVIDER, models: [] });
+  assert.equal(result.ok, true);
+}
+
+const COMMIT_MODELS = [
+  { id: 'workbuddy:global:kimi-k3' }, // 确认 → 图
+  { id: 'workbuddy:cn:deepseek-v4-flash' }, // 确认 → 文
+  { id: 'workbuddy:cn:kimi-k3-1' }, // 借判（剥后缀）→ 不沉淀
+  { id: 'workbuddy:cn:auto' }, // 档位别名 → 不沉淀
+];
+
+test('commitModelCapabilities：只沉淀确认态，写进 settings.modelCapabilities', async () => {
+  const rt = await makeRuntime({
+    fetchImpl: async (url) => ({
+      ok: true, status: 200,
+      json: async () => (url.includes('models.dev') ? MODELS_DEV_FIXTURE : OPENROUTER_FIXTURE),
+    }),
+  });
+  try {
+    await seedCatalog(rt);
+    const result = await rt.handle(ENDPOINTS.commitModelCapabilities, { provider: PROVIDER, models: COMMIT_MODELS });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(result.value.added.sort(), ['workbuddy:cn:deepseek-v4-flash', 'workbuddy:global:kimi-k3']);
+    assert.equal(result.value.skipped, 2, '借判与别名不沉淀');
+
+    const stored = JSON.parse(rt.ns.modelCapabilities);
+    assert.equal(stored.entries['workbuddy:global:kimi-k3'].image, true);
+    assert.equal(stored.entries['workbuddy:cn:deepseek-v4-flash'].image, false);
+    assert.equal(stored.entries['workbuddy:cn:kimi-k3-1'], undefined, '借判不得落盘');
+    assert.equal(stored.entries['workbuddy:cn:auto'], undefined, '别名不得落盘');
+
+    // 沉淀后报告：待沉淀归零，已沉淀计数跟着来
+    assert.equal(result.value.report.baseline.pending, 0);
+    assert.equal(result.value.report.baseline.count, 2);
+
+    // 幂等：再沉淀一次没有任何新增
+    const again = await rt.handle(ENDPOINTS.commitModelCapabilities, { provider: PROVIDER, models: COMMIT_MODELS });
+    assert.deepEqual(again.value.added, []);
+    assert.deepEqual(again.value.changed, []);
+    assert.equal(again.value.count, 2);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('沉淀后「白名单可补」缺口消失（基线进了有效视觉集合）', async () => {
+  const rt = await makeRuntime({
+    fetchImpl: async (url) => ({
+      ok: true, status: 200,
+      json: async () => (url.includes('models.dev') ? MODELS_DEV_FIXTURE : OPENROUTER_FIXTURE),
+    }),
+  });
+  try {
+    await seedCatalog(rt);
+    const before = await rt.handle(ENDPOINTS.getModelCatalog, { provider: PROVIDER, models: COMMIT_MODELS });
+    // 确认态的缺口 + 借判态的疑似缺口都要列出来，但状态可区分
+    assert.deepEqual(before.value.summary.gaps.map((g) => g.id), ['workbuddy:global:kimi-k3', 'workbuddy:cn:kimi-k3-1']);
+    assert.deepEqual(before.value.summary.gaps.map((g) => g.status), ['confirmed', 'borrowed']);
+    assert.equal(before.value.baseline.pending, 2);
+
+    await rt.handle(ENDPOINTS.commitModelCapabilities, { provider: PROVIDER, models: COMMIT_MODELS });
+
+    const after = await rt.handle(ENDPOINTS.getModelCatalog, { provider: PROVIDER, models: COMMIT_MODELS });
+    // 确认项沉淀后从缺口里消失；借判的那条还在（它没被确认，也不该被沉淀）
+    assert.deepEqual(after.value.summary.gaps.map((g) => g.id), ['workbuddy:cn:kimi-k3-1']);
+    assert.deepEqual(after.value.summary.gaps.map((g) => g.status), ['borrowed']);
+    assert.equal(after.value.baseline.pending, 0);
+    assert.equal(after.value.baseline.count, 2);
+    // 基线里的确认项仍然在判定里标为「有效视觉集合内」
+    const kimi = after.value.verdicts.find((v) => v.id === 'workbuddy:global:kimi-k3');
+    assert.equal(kimi.whitelist, true, 'whitelist 字段现在表示「本地认定集合」');
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('applyModelsPatch：白名单外的模型要等沉淀后才允许补 input', async () => {
+  const rt = await makeRuntime({
+    fetchImpl: async (url) => ({
+      ok: true, status: 200,
+      json: async () => (url.includes('models.dev') ? MODELS_DEV_FIXTURE : OPENROUTER_FIXTURE),
+    }),
+    piModels: [{ id: 'workbuddy:global:kimi-k3', name: 'Kimi K3', contextWindow: 1000000, custom: 'keep' }],
+  });
+  try {
+    await seedCatalog(rt);
+    const denied = await rt.handle(ENDPOINTS.applyModelsPatch, {
+      provider: PROVIDER,
+      selectedIds: ['workbuddy:global:kimi-k3'],
+    });
+    assert.equal(denied.ok, true);
+    assert.deepEqual(denied.value.added, []);
+    assert.deepEqual(denied.value.skipped, ['workbuddy:global:kimi-k3'], '未沉淀 → 拒绝落 input');
+
+    await rt.handle(ENDPOINTS.commitModelCapabilities, { provider: PROVIDER, models: [{ id: 'workbuddy:global:kimi-k3' }] });
+
+    const allowed = await rt.handle(ENDPOINTS.applyModelsPatch, {
+      provider: PROVIDER,
+      selectedIds: ['workbuddy:global:kimi-k3'],
+    });
+    assert.equal(allowed.ok, true, JSON.stringify(allowed));
+    assert.deepEqual(allowed.value.added, ['workbuddy:global:kimi-k3']);
+    const written = rt.piNs.providers[PROVIDER].models;
+    assert.deepEqual(written[0].input, ['text', 'image']);
+    assert.equal(written[0].custom, 'keep', '额外键保留');
+    assert.equal(written[0].contextWindow, 1000000);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('getModelRecord：回显时叠加基线（沉淀后无需重拉即可勾选）', async () => {
+  const rt = await makeRuntime({
+    pluginNs: {
+      modelPullSnapshot: JSON.stringify({
+        at: 1,
+        provider: PROVIDER,
+        count: 1,
+        models: [{ id: 'workbuddy:global:kimi-k3', name: 'Kimi K3', ctx: 1000000, maxOut: 64000, credits: 'x0.1', vision: false }],
+      }),
+    },
+  });
+  try {
+    const before = await rt.handle(ENDPOINTS.getModelRecord, {});
+    assert.equal(before.value.models[0].supportsImages, false);
+    assert.equal(before.value.baseline.count, 0);
+
+    rt.ns.modelCapabilities = JSON.stringify({ at: 2, entries: { 'workbuddy:global:kimi-k3': { image: true, status: 'confirmed' } } });
+
+    const after = await rt.handle(ENDPOINTS.getModelRecord, {});
+    assert.equal(after.value.models[0].supportsImages, true, '基线叠加到回显');
+    assert.equal(after.value.baseline.count, 1);
+    assert.equal(rt.calls.length, 0, '回显依然零网关请求');
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('discoverModelsForPatch：extraVision 贯通到目录与覆盖写入', async () => {
+  const rt = await makeRuntime({
+    gatewayModels: [
+      { id: 'workbuddy:global:kimi-k3', name: 'Kimi K3', context_length: 1000000, max_output_tokens: 64000, reasoning_supported_efforts: ['low', 'high'] },
+    ],
+    pluginNs: {
+      modelCapabilities: JSON.stringify({ at: 2, entries: { 'workbuddy:global:kimi-k3': { image: true, status: 'confirmed' } } }),
+    },
+  });
+  try {
+    const result = await rt.handle(ENDPOINTS.discoverModelsForPatch, { provider: PROVIDER, overwriteDshModels: true });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.models[0].supportsImages, true, '基线让目录条目直接带视觉');
+    assert.equal(result.value.baseline.count, 1);
+    const written = rt.piNs.providers[PROVIDER].models;
+    assert.deepEqual(written[0].input, ['text', 'image']);
+    assert.deepEqual(written[0].reasoningEfforts, { low: 'low', high: 'high' }, '推理档位也要写进去');
+    assert.equal(written[0].contextWindow, 1000000);
   } finally {
     await rm(rt.dir, { recursive: true, force: true });
   }
