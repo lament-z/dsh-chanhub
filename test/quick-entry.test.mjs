@@ -49,7 +49,7 @@ function statusFixture(overrides = {}) {
     in_flight_full: 0,
     sticky_sessions: 4,
     uptime_sec: 3600,
-    version: 'workbuddy2api',
+    version: 'chanhub2api',
     realm_totals: { cn: { total: 1, healthy: 1 }, global: { total: 1, healthy: 1 } },
     ...overrides.status,
   };

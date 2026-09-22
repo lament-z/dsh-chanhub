@@ -566,3 +566,43 @@ test('C3 createRuntime 在没有 settings 服务时降级到 env，且给出告�
   assert.ok(runtime.warnings.length > 0, '必须如实告警降级');
   assert.equal(typeof runtime.client.status, 'function');
 });
+
+test('C4 网关身份：只认 service=chanhub2api，旧名与其他服务一律如实拒绝', async () => {
+  const { createServer } = await import('node:http');
+  const start = (service) =>
+    new Promise((done) => {
+      const server = createServer((req, res) => {
+        if (req.url === '/healthz') {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ service, healthy: 1, total: 1, realm_servable: true }));
+          return;
+        }
+        res.writeHead(404, { 'content-type': 'application/json' });
+        res.end('{}');
+      });
+      server.listen(0, '127.0.0.1', () => done({ server, baseURL: `http://127.0.0.1:${server.address().port}` }));
+    });
+
+  // 只认新名（用户明确要求不做双名兼容）：旧名 = 对端是没重建的旧容器，
+  // 必须当场暴露成「不是本网关」，而不是悄悄迁就。
+  const cases = [
+    ['chanhub2api', true],
+    ['workbuddy2api', false],
+    ['something-else', false],
+    [undefined, false],
+  ];
+  for (const [service, expected] of cases) {
+    const { server, baseURL } = await start(service);
+    try {
+      const client = new ChanhubClient({ resolveConfig: () => ({ baseURL, apiKey: 'x' }) });
+      const probe = await client.versionProbe({ force: true });
+      assert.equal(probe.reachable, true, `${service}: 必须可达`);
+      assert.equal(probe.isChanhub, expected, `${service}: isChanhub 应为 ${expected}`);
+      const denied = (probe.errors ?? []).filter((e) => e.code === 'not-chanhub');
+      assert.equal(denied.length, expected ? 0 : 1, `${service}: 非本网关必须给出 not-chanhub`);
+      if (!expected) assert.match(denied[0].message, /chanhub2api/, '错误文案要点名标准 service');
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
+  }
+});

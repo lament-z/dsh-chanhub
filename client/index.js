@@ -14,12 +14,14 @@
 //             用量分桶、日志端点。相关区块一律显式标注「网关未提供」，
 //             并列出所需的后端端点 —— 如实呈现，不是掩盖缺陷。
 
-import { s, tone, FOLD_CSS } from './theme.js';
+import { s, tone, type, FOLD_CSS } from './theme.js';
 // 无状态基元下沉到 ui.js：用量页拆到 client/usage/ 后，两处都要用它们。
 // 留在本文件会让 usage/* 反向 import 入口 —— 成环，打包后在模块初始化期
 // 拿到 undefined（真机表现为整块面板白屏）。
 import {
   CardHead,
+  ChannelChip,
+  ChannelDot,
   Fold,
   Icons,
   Tag,
@@ -36,6 +38,7 @@ import {
   SCHEDULE_ITEMS,
   accountExpiry,
   accountState,
+  channelPalette,
   channelResolver,
   codeCoverage,
   creditBurn,
@@ -76,6 +79,7 @@ import { coerceField, fieldsByGroup, formatFieldValue, getPath } from '../lib/co
 import { CHANNEL, ENDPOINTS } from './endpoints.js';
 import { AddAccountDialog } from './add-account.js';
 import { UsageTab } from './usage/index.js';
+import { ModelAbilityTab } from './model-ability.js';
 import { QuickEntry } from './quick-entry.js';
 import { createQuickStore, createSidebarPrefs } from './quick-store.js';
 
@@ -83,10 +87,9 @@ const name = 'dsh-chanhub';
 /** 插件 settings 命名空间（与宿主 lib/index.js 的 SETTINGS_NAMESPACE 同值）。 */
 const SETTINGS_NAMESPACE = 'dsh-chanhub';
 // inject 只放**必需**服务：客户端运行时会把缺依赖的插件 park 在 waitingFor
-// （`Object.keys(fiber.inject).filter(name => ctx.get(name) === undefined)`）
-// —— 也就是说，为「打开设置面板」这种便利功能声明依赖，一旦该服务不存在，
-// 整个插件（连「渠道中心」面板）都不会激活。所以 remote / remote.settings
-// 不进 inject，改为点击时惰性取（取不到就隐藏按钮，不影响其它功能）。
+// （`Object.keys(fiber.inject).filter(name => ctx.get(name) === undefined)`）。
+// 「渠道中心」弹窗是本插件自渲染的（portal 到 body），不需要宿主的 layout / remote.settings，
+// 所以这里只依赖 slots / connection / settingsScope。
 // settingsScope 有第三方插件先例（dsh-context / dsh-restart / dsh-univer-office）。
 const inject = ['slots', 'connection', 'settingsScope'];
 
@@ -114,6 +117,7 @@ const TABS = [
   { id: 'accounts', label: '账号池', icon: 'chart' },
   { id: 'tasks', label: '任务', icon: 'check' },
   { id: 'usage', label: '用量', icon: 'trend' },
+  { id: 'models', label: '模型', icon: 'cpu' },
   { id: 'logs', label: '日志', icon: 'list' },
   { id: 'config', label: '配置', icon: 'gear' },
 ];
@@ -192,17 +196,17 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
             title: counter.title ?? (clickable ? '点击查看渠道分布' : undefined),
             style: { ...s.kpi, cursor: clickable ? 'pointer' : 'default' },
           },
-          React.createElement('div', { style: { ...s.muted, fontSize: 11 } },
+          React.createElement('div', { style: type.text.caption },
             counter.label, clickable ? ' ▾' : ''),
           React.createElement(
             'div',
             {
-              style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg },
+              style: { ...type.kpi, color: (tone[counter.tone] ?? tone.idle).fg },
               title: valueTitle,
             },
             String(counter.value),
           ),
-          sub ? React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 2 } }, sub) : null,
+          sub ? React.createElement('div', { style: { ...type.text.caption, marginTop: 2 } }, sub) : null,
         );
       }),
     ),
@@ -212,12 +216,19 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
       ? React.createElement(
           'div',
           { className: 'dshc-row', style: { marginTop: 10, paddingLeft: 4 } },
+          // 渠道身份用颜色（与侧边栏浮层同源）：有号走渠道胶囊，无号保持中性灰
           ...grouped.channels.map((channel) =>
-            React.createElement(Tag, {
-              key: channel.id,
-              text: `${channel.label} ${channel.count} 个账号`,
-              tone: channel.count > 0 ? 'info' : 'idle',
-            }),
+            channel.count > 0
+              ? React.createElement(ChannelChip, {
+                  key: channel.id,
+                  channel: channel.id,
+                  label: `${channel.label} ${channel.count} 个账号`,
+                })
+              : React.createElement(Tag, {
+                  key: channel.id,
+                  text: `${channel.label} 0 个账号`,
+                  tone: 'idle',
+                }),
           ),
         )
       : null,
@@ -230,17 +241,24 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
       ...grouped.channels.map((channel) =>
         React.createElement(
           'div',
-          { key: channel.id, className: `dshc-chancard${channel.count === 0 ? ' dim' : ''}` },
-          React.createElement('div', { style: { ...s.muted, fontSize: 11 } }, channel.label),
+          {
+            key: channel.id,
+            className: `dshc-chancard${channel.count === 0 ? ' dim' : ''}`,
+            // 左缘渠道身份色（与账号卡同一语言：只上形状）
+            style: { '--dshc-chan': channelPalette(channel.id).solid },
+          },
+          React.createElement('div', { style: { ...type.text.caption, display: 'flex', alignItems: 'center', gap: 5 } },
+            React.createElement(ChannelDot, { channel: channel.id, size: 7 }),
+            channel.label),
           React.createElement(
             'div',
             {
-              style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg },
+              style: { ...type.kpi, fontSize: 22, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg },
               title: `精确值 ${formatNumber(channel.credits)}`,
             },
             channel.count > 0 ? formatCompact(channel.credits) : '—',
           ),
-          React.createElement('div', { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} 个账号`),
+          React.createElement('div', { style: type.text.caption }, `${channel.count} 个账号`),
         ),
       ),
     ),
@@ -254,8 +272,8 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
             React.createElement(
               'div',
               { key: realm.realm, className: 'dshc-row', style: { marginBottom: 4 } },
-              React.createElement('span', { style: { ...s.muted, width: 74, flexShrink: 0 } }, realm.label),
-              React.createElement('span', { style: { ...s.muted, whiteSpace: 'nowrap' } },
+              React.createElement('span', { style: { ...type.text.caption, width: 74, flexShrink: 0 } }, realm.label),
+              React.createElement('span', { style: { ...type.text.caption, whiteSpace: 'nowrap' } },
                 `${realm.healthy}/${realm.total} 可用`,
               ),
               React.createElement(
@@ -758,7 +776,7 @@ function AccountsTab({ status, channelOf, maxInFlight, limitOf, onAction, busy, 
           React.createElement('span', { style: { ...s.muted, marginRight: 4 } }, '渠道'),
           segmentButton('all', '全部', filter, setFilter, accounts.length),
           ...CHANNEL_ORDER.filter((id) => (counts.get(id) ?? 0) > 0).map((id) =>
-            segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0),
+            segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0, id),
           ),
         ),
         React.createElement(ViewToggle, { view, setView }),
@@ -799,8 +817,12 @@ function AccountsTab({ status, channelOf, maxInFlight, limitOf, onAction, busy, 
                         creditsDetail: creditsByUid?.[account.uid],
                       });
                       return React.createElement('tr', { key: account.uid },
-                        React.createElement('td', null, account.nickname || account.uid.slice(0, 8)),
-                        React.createElement('td', null, channelLabel(channelOf(account)) || '—'),
+                        React.createElement('td', null,
+                          React.createElement('span', { className: 'dshc-row', style: { gap: 6 } },
+                            React.createElement(ChannelDot, { channel: channelOf(account), title: channelLabel(channelOf(account)) }),
+                            account.nickname || account.uid.slice(0, 8))),
+                        React.createElement('td', null,
+                          React.createElement(ChannelChip, { channel: channelOf(account), label: channelLabel(channelOf(account)) })),
                         React.createElement('td', null,
                           React.createElement(Tag, { text: st.label, tone: st.tone, title: st.detail || undefined })),
                         React.createElement('td', null, formatNumber(account.credits ?? 0)),
@@ -855,7 +877,7 @@ function AccountDrawer({ account, maxInFlight, channel, credits, scheduleConfig,
       React.createElement('button', { type: 'button', className: 'dshc-drawer-close', onClick: onClose, title: '关闭' }, '✕'),
       React.createElement('div', { className: 'dshc-row', style: { marginBottom: 12 } },
         React.createElement('span', { style: { ...s.label, fontSize: 15 } }, account.nickname || account.uid.slice(0, 8)),
-        channelLabel(channel) ? React.createElement(Tag, { text: channelLabel(channel), tone: 'info' }) : null,
+        channelLabel(channel) ? React.createElement(ChannelChip, { channel, label: channelLabel(channel) }) : null,
         account.realm ? React.createElement(Tag, { text: account.realm, tone: 'idle' }) : null,
       ),
       // 完整明细：直接复用 AccountFold（四组折叠），保持数据面不丢；动作在抽屉里可用。
@@ -916,7 +938,14 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
 
   return React.createElement(
     'button',
-    { type: 'button', className: 'dshc-acctcard', onClick: onOpen, title: '点击查看详情' },
+    {
+      type: 'button',
+      className: 'dshc-acctcard',
+      // 左缘渠道身份色（与侧边栏浮层行的左色条同语言）：只上形状，文字仍走令牌
+      style: { '--dshc-chan': channelPalette(channel).solid },
+      onClick: onOpen,
+      title: '点击查看详情',
+    },
     // 顶行：昵称 + 状态
     React.createElement('div', { className: 'dshc-acctcard-top' },
       React.createElement('span', { className: 'dshc-acctcard-name' },
@@ -958,7 +987,7 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
 
     // 底行：渠道 · 域 · 到期 · 成败 —— 从 11px 右下小字改为独立一行，字号可读
     React.createElement('div', { className: 'dshc-acctcard-foot' },
-      React.createElement('span', { className: 'dshc-chip' }, channelLabel(channel) || '—'),
+      React.createElement(ChannelChip, { channel, label: channelLabel(channel) || '—' }),
       account.realm ? React.createElement('span', { className: 'dshc-chip' }, account.realm === 'global' ? '国际版' : '国内版') : null,
       expiry ? React.createElement(ExpiryChip, { expiry }) : null,
       // 成败比：新网关恒透出（零值也写），旧网关缺字段时退回在途数、不编造。
@@ -1006,7 +1035,7 @@ function ExpiryChip({ expiry }) {
 }
 
 /** 分段筛选按钮。 */
-function segmentButton(id, label, active, onChange, count) {
+function segmentButton(id, label, active, onChange, count, channel) {
   const isActive = active === id;
   return React.createElement(
     'button',
@@ -1024,7 +1053,11 @@ function segmentButton(id, label, active, onChange, count) {
         fontWeight: isActive ? 600 : 400,
       },
     },
-    `${label}${count === undefined ? '' : ` ${count}`}`,
+    channel
+      ? React.createElement('span', { className: 'dshc-row', style: { gap: 5 } },
+          React.createElement(ChannelDot, { channel, size: 7 }),
+          `${label}${count === undefined ? '' : ` ${count}`}`)
+      : `${label}${count === undefined ? '' : ` ${count}`}`,
   );
 }
 
@@ -1999,13 +2032,13 @@ function InterfaceCard({ prefs }) {
       style: { justifyContent: 'space-between', gap: 12, marginTop: 10, alignItems: 'flex-start' },
     },
       React.createElement('div', { style: { minWidth: 0 } },
-        React.createElement('div', { style: { ...s.label, fontSize: 13 } }, '在侧边栏左下角显示渠道入口'),
-        React.createElement('div', { style: { ...s.muted, marginTop: 3, fontSize: 11.5, lineHeight: 1.6 } },
+        React.createElement('div', { style: type.text.body }, '在侧边栏左下角显示渠道入口'),
+        React.createElement('div', { style: { ...type.text.secondary, marginTop: 3, lineHeight: 1.6 } },
           '显示「渠道」按钮，点开即看账号池摘要与各号可用积分（只读，不会自动打上游）。',
           React.createElement('br', null),
           '关掉后入口隐藏，本面板不受影响；也可在 DSH 原生插件设置里改。'),
         mode === 'local' && available
-          ? React.createElement('div', { style: { ...s.muted, marginTop: 4, fontSize: 11.5, lineHeight: 1.6 } },
+          ? React.createElement('div', { style: { ...type.text.caption, marginTop: 4, lineHeight: 1.6 } },
               '当前页面不是本机（远程访问）：DSH 只在 127.0.0.1 页面提供宿主设置读写，'
               + '所以这里的开关只作用于本浏览器；在电脑上打开 127.0.0.1 的那个页面改，才能全局生效。')
           : null,
@@ -2018,11 +2051,11 @@ function InterfaceCard({ prefs }) {
       }),
     ),
     failed
-      ? React.createElement('div', { style: { ...s.muted, marginTop: 8, fontSize: 11.5, color: tone.err.fg } },
+      ? React.createElement('div', { style: { ...type.text.caption, marginTop: 8, color: tone.err.fg } },
           '保存失败：宿主设置未写入，已回滚为当前值。')
       : null,
     !available
-      ? React.createElement('div', { style: { ...s.muted, marginTop: 8, fontSize: 11.5 } },
+      ? React.createElement('div', { style: { ...type.text.caption, marginTop: 8 } },
           '当前环境既没有宿主设置服务、也没有可用的本浏览器存储，开关不可用；入口按默认（开启）显示。')
       : null,
   );
@@ -3126,6 +3159,12 @@ function ChanhubPanel({ rpcCall, prefs }) {
           onRefreshAll: refresh,
         })
       : null,
+    activeTab === 'models'
+      ? React.createElement(ModelAbilityTab, {
+          rpcCall,
+          showToast,
+        })
+      : null,
     activeTab === 'logs'
       ? React.createElement(LogsTab, {
           logs,
@@ -3214,18 +3253,19 @@ function apply(ctx) {
   effect(() => () => store.dispose(), 'dsh-chanhub: sidebar quick store');
   effect(() => () => prefs.dispose?.(), 'dsh-chanhub: sidebar entry prefs');
 
-  // 「打开设置面板」是便利入口，不是硬依赖（见文件顶 inject 注释）：
-  // 惰性取 remote.settings；取不到就让组件隐藏按钮（hasOpenSettings=false）。
-  const remoteSettings = () => {
-    try {
-      const remote = typeof ctx.get === 'function' ? ctx.get('remote') : undefined;
-      return remote?.settings;
-    } catch {
-      return undefined;
-    }
-  };
+  // 「打开渠道中心」是便利入口，不是硬依赖（见文件顶 inject 注释）：惰性取宿主布局服务
+  // `layout`（由 @deepseek-ai/dsh-client-ui-layout 提供），取不到就隐藏按钮。
+  //
+  // 为什么不用 `remote.settings.openSettingsDocument()`：那个宿主动作的语义是
+  // 「把 settings.yaml 交给原生文本编辑器打开」（dsh-api-settings-controller 的
+  // Materialize … open it in a native text editor），**不是**打开设置面板；而且宿主没有
+  // `openSettings(sectionId)` 这类深链接口（`.scratch/sidebar-quick-entry/spec.md` 已记过）。
+  // 所以「渠道中心」做成**本插件自己的弹窗**：面板组件以 prop 注入给侧边栏入口
+  // （`centerPanel` / `centerPanelProps`），由入口组件 portal 到 body 渲染 —— 与设置里那个
+  // 分区共用同一份组件与数据源，且不占主区、不打断当前会话。
 
   // foot 区入口（list 槽；cordis 面板按默认 order=0 排在前，我们取 100 排其后）。
+  // 入口自己带一枚无文字图标按钮（本行最右端），点它开「渠道中心」弹窗。
   ctx.slots.inject('sidebar.footer.action', () =>
     ctx.slots.register(
       {
@@ -3236,8 +3276,8 @@ function apply(ctx) {
         inject: () => ({
           store,
           prefs,
-          hasOpenSettings: () => typeof remoteSettings()?.openSettingsDocument === 'function',
-          openSettings: () => remoteSettings()?.openSettingsDocument?.(),
+          centerPanel: ChanhubPanel,
+          centerPanelProps: { rpcCall, prefs },
         }),
       },
       QuickEntry,

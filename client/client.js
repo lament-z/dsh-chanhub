@@ -194,13 +194,67 @@ var tone = {
   },
   info: {
     fg: "var(--dsw-alias-button-info-fill,#4176e6)",
-    bg: "var(--dsw-alias-bg-layer-2,#eef2ff)"
+    bg: "var(--dsw-alias-state-business-tertiary,#e4edfd)"
   },
   idle: {
     fg: "var(--dsw-alias-label-secondary,#6b7280)",
     bg: "var(--dsw-alias-bg-layer-2,#f3f4f6)"
   }
 };
+var type = {
+  /** 字号分档：H1 20 / H2 15 / body 13 / caption 12 / micro 11。 */
+  size: {
+    h1: 20,
+    h2: 15,
+    h3: 13,
+    body: 13,
+    caption: 12,
+    micro: 11
+  },
+  text: {
+    heading: { color: "var(--dsw-alias-label-primary,currentColor)", fontSize: 15, fontWeight: 600, lineHeight: 1.4 },
+    body: { color: "var(--dsw-alias-label-primary,currentColor)", fontSize: 13, fontWeight: 400, lineHeight: 1.5 },
+    secondary: { color: "var(--dsw-alias-label-secondary,#6b7280)", fontSize: 12, fontWeight: 400, lineHeight: 1.5 },
+    caption: { color: "var(--dsw-alias-label-tertiary,#8b93a1)", fontSize: 11, fontWeight: 400, lineHeight: 1.5 },
+    code: {
+      fontFamily: "ui-monospace,Menlo,monospace",
+      fontSize: 12,
+      fontWeight: 400,
+      wordBreak: "break-all",
+      color: "var(--dsw-alias-label-primary,currentColor)"
+    },
+    num: {
+      fontVariantNumeric: "tabular-nums",
+      letterSpacing: "-.01em",
+      color: "var(--dsw-alias-label-primary,currentColor)"
+    },
+    link: { color: "var(--dsw-alias-brand-primary,#4f6ef7)", fontSize: 12, fontWeight: 500, textDecoration: "none" }
+  },
+  /** KPI 主数值：统一给语义色（ok 绿 / warn 橙 / danger 红 / info 蓝 / idle 灰）。 */
+  kpi: {
+    fontSize: 20,
+    fontWeight: 700,
+    lineHeight: 1.2,
+    letterSpacing: "-.02em",
+    fontVariantNumeric: "tabular-nums"
+  }
+};
+var SEG_COLORS = [
+  "#10b981",
+  // 翠绿
+  "#f59e0b",
+  // 琥珀
+  "#ef4444",
+  // 红
+  "#84cc16",
+  // 黄绿
+  "#ec4899",
+  // 玫红
+  "#14b8a6",
+  // 蓝绿
+  "#6366f1"
+  // 靛
+];
 var FOLD_CSS = `
 .dshc-fold { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 8px; margin-bottom: 8px; background: var(--dsw-alias-bg-layer-2,#f9fafb); min-width: 0; }
 .dshc-fold > summary { cursor: pointer; padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; list-style: none; min-width: 0; }
@@ -339,7 +393,7 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 /* \u6E20\u9053\u4E09\u5361\uFF08\u5F53\u524D\u53EF\u7528\u79EF\u5206\uFF1AWB / Trae / Qoder\uFF09 */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
-.dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
+.dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-left: 3px solid var(--dshc-chan, var(--dsw-alias-border-l2,#e5e7eb)); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
 .dshc-chancard.dim { opacity: 0.55; }
 /* \u89C6\u56FE\u5207\u6362\uFF08\u5361\u7247/\u5217\u8868\uFF09 */
 .dshc-viewtoggle { display: inline-flex; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
@@ -350,7 +404,7 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 /* \u8D26\u53F7\u5361\uFF1A\u56DB\u6BB5\u5F0F\u7EB5\u5411\u7ED3\u6784\uFF08\u5934 / \u4E3B\u6570\u503C / \u5728\u9014\u6761 / \u5E95\u884C\uFF09\uFF0C\u4FE1\u606F\u5404\u5F52\u5176\u4F4D\u3002
    \u539F\u5148\u53EA\u6709\u4E24\u884C\u4E14\u53F3\u4FA7\u6324\u4E00\u884C 11px \u5C0F\u5B57\uFF0C\u4E3B\u4F53\u5927\u7247\u7559\u767D \u2014\u2014 \u6539\u4E3A\u4E00\u5217\u94FA\u6EE1\uFF0C
    \u4E3B\u6570\u503C\u653E\u5927\u5360\u6574\u884C\uFF0C\u5143\u4FE1\u606F\u62C6\u5230\u72EC\u7ACB\u5E95\u884C\uFF08\u5B57\u53F7 11.5px \u4ECD\u53EF\u8BFB\uFF09\u3002 */
-.dshc-acctcard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); cursor: pointer; min-width: 0; text-align: left; font: inherit; transition: box-shadow .15s, border-color .15s; }
+.dshc-acctcard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-left: 3px solid var(--dshc-chan, var(--dsw-alias-border-l2,#e5e7eb)); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); cursor: pointer; min-width: 0; text-align: left; font: inherit; transition: box-shadow .15s, border-color .15s; }
 .dshc-acctcard:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); border-color: var(--dsw-alias-brand-primary,#4f6ef7); }
 .dshc-acctcard-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .dshc-acctcard-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
@@ -624,212 +678,6 @@ body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
 
 // client/ui.js
 var import_react = __toESM(require("react"), 1);
-var svg = (props, ...children) => import_react.default.createElement(
-  "svg",
-  {
-    viewBox: "0 0 24 24",
-    width: 16,
-    height: 16,
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    ...props
-  },
-  ...children
-);
-var Icons = {
-  // 渠道中心主图标：三条汇入一个节点的线（渠道汇聚），与 bridge 的
-  // tunnel/ops/gear、宿主齿轮 fallback 均不重合。
-  hub: (props) => svg(
-    { width: 18, height: 18, ...props },
-    import_react.default.createElement("circle", { key: "c", cx: 12, cy: 12, r: 2.6 }),
-    import_react.default.createElement("path", { key: "a", d: "M12 9.4V3.5" }),
-    import_react.default.createElement("path", { key: "b", d: "M9.8 13.4l-5.1 3" }),
-    import_react.default.createElement("path", { key: "d", d: "M14.2 13.4l5.1 3" }),
-    import_react.default.createElement("circle", { key: "e", cx: 12, cy: 3, r: 1.6 }),
-    import_react.default.createElement("circle", { key: "f", cx: 4, cy: 17, r: 1.6 }),
-    import_react.default.createElement("circle", { key: "g", cx: 20, cy: 17, r: 1.6 })
-  ),
-  chart: (props) => svg(
-    props,
-    import_react.default.createElement("path", { key: "a", d: "M3 20h18" }),
-    import_react.default.createElement("rect", { key: "b", x: 4, y: 10, width: 4, height: 8, rx: 1 }),
-    import_react.default.createElement("rect", { key: "c", x: 10, y: 5, width: 4, height: 13, rx: 1 }),
-    import_react.default.createElement("rect", { key: "d", x: 16, y: 13, width: 4, height: 5, rx: 1 })
-  ),
-  check: (props) => svg(props, import_react.default.createElement("path", { d: "M20 6L9 17l-5-5" })),
-  trend: (props) => svg(
-    props,
-    import_react.default.createElement("path", { key: "a", d: "M3 17l6-6 4 4 8-8" }),
-    import_react.default.createElement("path", { key: "b", d: "M15 7h6v6" })
-  ),
-  list: (props) => svg(props, import_react.default.createElement("path", { d: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" })),
-  gear: (props) => svg(
-    props,
-    import_react.default.createElement("circle", { key: "c", cx: 12, cy: 12, r: 3 }),
-    import_react.default.createElement("path", {
-      key: "p",
-      d: "M12 2l1.6 1.2 2-.2.8 1.9 1.8.9-.3 2 1.2 1.7-1.2 1.7.3 2-1.8.9-.8 1.9-2-.2L12 22l-1.6-1.2-2 .2-.8-1.9-1.8-.9.3-2L4.9 12l1.2-1.7-.3-2 1.8-.9.8-1.9 2 .2z"
-    })
-  ),
-  refresh: (props) => svg(
-    { width: 13, height: 13, ...props },
-    import_react.default.createElement("path", { key: "a", d: "M21 12a9 9 0 1 1-3-6.7" }),
-    import_react.default.createElement("path", { key: "b", d: "M21 3v6h-6" })
-  ),
-  // v2 新增
-  eye: (props) => svg(
-    { width: 14, height: 14, ...props },
-    import_react.default.createElement("path", { key: "a", d: "M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" }),
-    import_react.default.createElement("circle", { key: "b", cx: 12, cy: 12, r: 3 })
-  ),
-  eyeOff: (props) => svg(
-    { width: 14, height: 14, ...props },
-    import_react.default.createElement("path", { key: "a", d: "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" }),
-    import_react.default.createElement("line", { key: "b", x1: 1, y1: 1, x2: 23, y2: 23 })
-  ),
-  copy: (props) => svg(
-    { width: 13, height: 13, ...props },
-    import_react.default.createElement("rect", { key: "a", x: 9, y: 9, width: 13, height: 13, rx: 2 }),
-    import_react.default.createElement("path", { key: "b", d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
-  ),
-  cardView: (props) => svg(
-    { width: 13, height: 13, ...props },
-    import_react.default.createElement("rect", { key: "a", x: 3, y: 3, width: 7, height: 7, rx: 1.5 }),
-    import_react.default.createElement("rect", { key: "b", x: 14, y: 3, width: 7, height: 7, rx: 1.5 }),
-    import_react.default.createElement("rect", { key: "c", x: 3, y: 14, width: 7, height: 7, rx: 1.5 }),
-    import_react.default.createElement("rect", { key: "d", x: 14, y: 14, width: 7, height: 7, rx: 1.5 })
-  ),
-  listView: (props) => svg(
-    { width: 13, height: 13, ...props },
-    import_react.default.createElement("rect", { key: "a", x: 3, y: 4, width: 18, height: 4, rx: 1 }),
-    import_react.default.createElement("rect", { key: "b", x: 3, y: 10, width: 18, height: 4, rx: 1 }),
-    import_react.default.createElement("rect", { key: "c", x: 3, y: 16, width: 18, height: 4, rx: 1 })
-  ),
-  bolt: (props) => svg(props, import_react.default.createElement("path", { d: "M13 2L3 14h7l-1 8 10-12h-7l1-8z" })),
-  // 用量页新增：导出菜单的下载图标
-  download: (props) => svg(
-    { width: 13, height: 13, ...props },
-    import_react.default.createElement("path", { key: "a", d: "M12 3v12" }),
-    import_react.default.createElement("path", { key: "b", d: "M7 10l5 5 5-5" }),
-    import_react.default.createElement("path", { key: "c", d: "M4 20h16" })
-  )
-};
-function Tag({ text, tone: toneName = "idle", title }) {
-  const palette = tone[toneName] ?? tone.idle;
-  return import_react.default.createElement(
-    "span",
-    {
-      style: { ...s.tag, background: palette.bg, color: palette.fg },
-      ...title === void 0 ? {} : { title }
-    },
-    text
-  );
-}
-function CardHead({ title, extra, actions }) {
-  return import_react.default.createElement(
-    "div",
-    { className: "dshc-cardhead" },
-    import_react.default.createElement("span", { style: s.label }, title),
-    extra ? import_react.default.createElement("span", { style: s.muted }, extra) : null,
-    actions ? import_react.default.createElement("span", { className: "dshc-row", style: { marginLeft: "auto", gap: 6 } }, actions) : null
-  );
-}
-function Unavailable({ title, needs, hint }) {
-  return import_react.default.createElement(
-    "div",
-    { style: { ...s.card, borderStyle: "dashed" } },
-    import_react.default.createElement(
-      "div",
-      { style: { ...s.label, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-      title,
-      import_react.default.createElement(Tag, { text: "\u7F51\u5173\u672A\u63D0\u4F9B", tone: "warn" })
-    ),
-    import_react.default.createElement(
-      "div",
-      { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
-      "\u5F53\u524D\u7F51\u5173\uFF08plugins/chanhub\uFF09\u6CA1\u6709\u66B4\u9732\u6B64\u89C6\u56FE\u6240\u9700\u7684\u6570\u636E\u7AEF\u70B9\uFF0C\u56E0\u6B64\u8FD9\u91CC\u4E0D\u663E\u793A\u4EFB\u4F55\u63A8\u65AD\u503C\u3002"
-    ),
-    needs ? import_react.default.createElement(
-      "div",
-      {
-        style: {
-          ...s.code,
-          marginTop: 8,
-          background: "var(--dsw-alias-bg-layer-1,#fff)",
-          padding: "8px 10px",
-          borderRadius: 6
-        }
-      },
-      `\u6240\u9700\u540E\u7AEF\u7AEF\u70B9\uFF1A${needs}`
-    ) : null,
-    hint ? import_react.default.createElement("div", { style: { ...s.muted, marginTop: 8 } }, hint) : null
-  );
-}
-function Fold({ summary, children, open = false, id }) {
-  return import_react.default.createElement(
-    "details",
-    { className: "dshc-fold", ...open ? { open: true } : {}, ...id ? { "data-fold": id } : {} },
-    import_react.default.createElement("summary", null, summary),
-    import_react.default.createElement("div", { className: "dshc-body" }, children)
-  );
-}
-function channelLabel(channel) {
-  return { workbuddy: "WB", traework: "Trae", qoder: "Qoder" }[channel] ?? "";
-}
-function formatAbsolute(iso) {
-  const value = Date.parse(iso);
-  if (!Number.isFinite(value) || value <= 0) return "\u2014";
-  return new Date(value).toLocaleString("zh-CN", { hour12: false });
-}
-function formatLatency(value) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(1)} tok/s` : "\u2014";
-}
-function useCountUp(target, duration = 900) {
-  const value = Number(target) || 0;
-  const [shown, setShown] = import_react.default.useState(value);
-  const fromRef = import_react.default.useRef(value);
-  import_react.default.useEffect(() => {
-    const canAnimate = typeof requestAnimationFrame === "function" && typeof cancelAnimationFrame === "function" && !(typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    if (!canAnimate) {
-      fromRef.current = value;
-      setShown(value);
-      return void 0;
-    }
-    const from = fromRef.current;
-    const start = Date.now();
-    let frame = 0;
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      fromRef.current = value;
-      setShown(value);
-    };
-    const tick = () => {
-      if (settled) return;
-      const t = Math.min(1, (Date.now() - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setShown(from + (value - from) * eased);
-      if (t < 1) frame = requestAnimationFrame(tick);
-      else settle();
-    };
-    frame = requestAnimationFrame(tick);
-    const guard = setTimeout(settle, duration + 150);
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      clearTimeout(guard);
-    };
-  }, [value, duration]);
-  const shownRef = import_react.default.useRef(shown);
-  shownRef.current = shown;
-  import_react.default.useEffect(() => {
-    fromRef.current = shownRef.current;
-  }, [value]);
-  return shown;
-}
 
 // lib/config-spec.js
 var DURATION_PATTERN = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$/;
@@ -1376,6 +1224,14 @@ var CHANNEL_COLOR = {
 };
 function channelColor(channel) {
   return CHANNEL_COLOR[channel] ?? "#94a3b8";
+}
+function channelPalette(channel) {
+  const solid = channelColor(channel);
+  return {
+    solid,
+    soft: `color-mix(in srgb, ${solid} 12%, transparent)`,
+    edge: `color-mix(in srgb, ${solid} 45%, transparent)`
+  };
 }
 function activityOf(account, now = Date.now()) {
   const inFlight = Number(account?.in_flight) || 0;
@@ -1930,6 +1786,7 @@ function kpiCards({ total, stock, days, burn }) {
       // 对已格式化字符串反解（"18.9k" → 18.9）会把单位当数量级，动效会显示 0k。
       raw: structure.total,
       kind: "tokens",
+      tone: "info",
       detail: `\u8F93\u5165 ${formatTokens(structure.prompt)} \xB7 \u8F93\u51FA ${formatTokens(structure.completion)}`,
       title: `\u7A97\u53E3\u5185 prompt + completion \u5408\u8BA1 ${formatNumber(structure.total)}\uFF08\u4E24\u6BB5\u4E92\u65A5\uFF0C\u76F8\u52A0\u4E0D\u91CD\u590D\u8BA1\uFF09`
     },
@@ -1940,7 +1797,7 @@ function kpiCards({ total, stock, days, burn }) {
       raw: credit,
       kind: "compact",
       detail: requests > 0 ? `\u6BCF\u8BF7\u6C42 ${formatCredit(credit / requests)}` : "\u7A97\u53E3\u5185\u65E0\u8BF7\u6C42",
-      tone: "ok",
+      tone: "warn",
       title: `\u7A97\u53E3\u5185\u771F\u5B9E\u6263\u8D39\u5408\u8BA1 ${formatCredit(credit)}\uFF08\u7F51\u5173\u8D26\u672C\u53E3\u5F84\uFF09`
     },
     {
@@ -1960,6 +1817,7 @@ function kpiCards({ total, stock, days, burn }) {
       raw: requests,
       kind: "compact",
       detail: `\u6210\u529F ${formatNumber(requests - failed)} \xB7 \u5931\u8D25 ${formatNumber(failed)}`,
+      tone: "info",
       title: "\u7F51\u5173\u65E0\u4F1A\u8BDD\u6982\u5FF5\uFF0C\u6545\u8FD9\u91CC\u5982\u5B9E\u7ED9\u8BF7\u6C42\u6570\uFF08\u4E0D\u7F16\u9020\u300C\u4F1A\u8BDD\u6570\u300D\uFF09"
     },
     {
@@ -1970,6 +1828,7 @@ function kpiCards({ total, stock, days, burn }) {
       raw: hit ?? 0,
       kind: "percent",
       detail: hit === null ? "\u7A97\u53E3\u5185\u65E0\u7F13\u5B58\u89C2\u6D4B" : `\u547D\u4E2D ${formatTokens(Number(total?.cache_hit_tokens) || 0)} \xB7 \u672A\u547D\u4E2D ${formatTokens(Number(total?.cache_miss_tokens) || 0)}`,
+      tone: hit !== null && hit >= 0.75 ? "ok" : "idle",
       title: "\u7A97\u53E3\u5206\u6876\u53E3\u5F84\uFF1A\u547D\u4E2D /\uFF08\u547D\u4E2D + \u672A\u547D\u4E2D\uFF09\uFF0C\u5199\u5165\u4E0D\u8BA1\u5165\u5206\u6BCD\u3002\u8FDB\u7A0B\u7D2F\u8BA1\u53E3\u5F84\u7684\u547D\u4E2D\u7387\u89C1\u4E0B\u65B9\u6298\u53E0\u533A\uFF08\u4E24\u8005\u4E0D\u53EF\u6DF7\u7B97\uFF09"
     },
     {
@@ -1979,6 +1838,7 @@ function kpiCards({ total, stock, days, burn }) {
       raw: Number.isFinite(latency) ? latency : 0,
       kind: "ms",
       detail: requests > 0 ? `\u6309\u8BF7\u6C42\u6570\u52A0\u6743 \xB7 ${formatNumber(requests)} \u6B21` : "\u7A97\u53E3\u5185\u65E0\u8BF7\u6C42",
+      tone: Number.isFinite(latency) && latency > 0 && latency >= 5e3 ? "warn" : "idle",
       title: "\u7A97\u53E3\u5206\u6876\u53E3\u5F84\uFF1A\u9010\u69FD\u5747\u503C\u6309\u8BF7\u6C42\u6570\u52A0\u6743\u540E\u7684\u7AEF\u5230\u7AEF\u8017\u65F6\uFF08\u4E0E /v1/stats \u7684\u8FDB\u7A0B\u7D2F\u8BA1\u5747\u503C\u662F\u4E24\u4E2A\u53E3\u5F84\uFF09"
     }
   ];
@@ -1994,6 +1854,261 @@ function hitRate(row) {
   const denom = hit + miss;
   if (denom <= 0) return null;
   return hit / denom;
+}
+
+// client/ui.js
+var svg = (props, ...children) => import_react.default.createElement(
+  "svg",
+  {
+    viewBox: "0 0 24 24",
+    width: 16,
+    height: 16,
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    ...props
+  },
+  ...children
+);
+var Icons = {
+  // 渠道中心主图标：三条汇入一个节点的线（渠道汇聚），与 bridge 的
+  // tunnel/ops/gear、宿主齿轮 fallback 均不重合。
+  hub: (props) => svg(
+    { width: 18, height: 18, ...props },
+    import_react.default.createElement("circle", { key: "c", cx: 12, cy: 12, r: 2.6 }),
+    import_react.default.createElement("path", { key: "a", d: "M12 9.4V3.5" }),
+    import_react.default.createElement("path", { key: "b", d: "M9.8 13.4l-5.1 3" }),
+    import_react.default.createElement("path", { key: "d", d: "M14.2 13.4l5.1 3" }),
+    import_react.default.createElement("circle", { key: "e", cx: 12, cy: 3, r: 1.6 }),
+    import_react.default.createElement("circle", { key: "f", cx: 4, cy: 17, r: 1.6 }),
+    import_react.default.createElement("circle", { key: "g", cx: 20, cy: 17, r: 1.6 })
+  ),
+  chart: (props) => svg(
+    props,
+    import_react.default.createElement("path", { key: "a", d: "M3 20h18" }),
+    import_react.default.createElement("rect", { key: "b", x: 4, y: 10, width: 4, height: 8, rx: 1 }),
+    import_react.default.createElement("rect", { key: "c", x: 10, y: 5, width: 4, height: 13, rx: 1 }),
+    import_react.default.createElement("rect", { key: "d", x: 16, y: 13, width: 4, height: 5, rx: 1 })
+  ),
+  check: (props) => svg(props, import_react.default.createElement("path", { d: "M20 6L9 17l-5-5" })),
+  trend: (props) => svg(
+    props,
+    import_react.default.createElement("path", { key: "a", d: "M3 17l6-6 4 4 8-8" }),
+    import_react.default.createElement("path", { key: "b", d: "M15 7h6v6" })
+  ),
+  list: (props) => svg(props, import_react.default.createElement("path", { d: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" })),
+  gear: (props) => svg(
+    props,
+    import_react.default.createElement("circle", { key: "c", cx: 12, cy: 12, r: 3 }),
+    import_react.default.createElement("path", {
+      key: "p",
+      d: "M12 2l1.6 1.2 2-.2.8 1.9 1.8.9-.3 2 1.2 1.7-1.2 1.7.3 2-1.8.9-.8 1.9-2-.2L12 22l-1.6-1.2-2 .2-.8-1.9-1.8-.9.3-2L4.9 12l1.2-1.7-.3-2 1.8-.9.8-1.9 2 .2z"
+    })
+  ),
+  cpu: (props) => svg(
+    props,
+    import_react.default.createElement("rect", { key: "r", x: 5, y: 5, width: 14, height: 14, rx: 2 }),
+    import_react.default.createElement("rect", { key: "i", x: 9.5, y: 9.5, width: 5, height: 5, rx: 1 }),
+    import_react.default.createElement("path", { key: "a", d: "M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" })
+  ),
+  refresh: (props) => svg(
+    { width: 13, height: 13, ...props },
+    import_react.default.createElement("path", { key: "a", d: "M21 12a9 9 0 1 1-3-6.7" }),
+    import_react.default.createElement("path", { key: "b", d: "M21 3v6h-6" })
+  ),
+  // v2 新增
+  eye: (props) => svg(
+    { width: 14, height: 14, ...props },
+    import_react.default.createElement("path", { key: "a", d: "M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" }),
+    import_react.default.createElement("circle", { key: "b", cx: 12, cy: 12, r: 3 })
+  ),
+  eyeOff: (props) => svg(
+    { width: 14, height: 14, ...props },
+    import_react.default.createElement("path", { key: "a", d: "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" }),
+    import_react.default.createElement("line", { key: "b", x1: 1, y1: 1, x2: 23, y2: 23 })
+  ),
+  copy: (props) => svg(
+    { width: 13, height: 13, ...props },
+    import_react.default.createElement("rect", { key: "a", x: 9, y: 9, width: 13, height: 13, rx: 2 }),
+    import_react.default.createElement("path", { key: "b", d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
+  ),
+  cardView: (props) => svg(
+    { width: 13, height: 13, ...props },
+    import_react.default.createElement("rect", { key: "a", x: 3, y: 3, width: 7, height: 7, rx: 1.5 }),
+    import_react.default.createElement("rect", { key: "b", x: 14, y: 3, width: 7, height: 7, rx: 1.5 }),
+    import_react.default.createElement("rect", { key: "c", x: 3, y: 14, width: 7, height: 7, rx: 1.5 }),
+    import_react.default.createElement("rect", { key: "d", x: 14, y: 14, width: 7, height: 7, rx: 1.5 })
+  ),
+  listView: (props) => svg(
+    { width: 13, height: 13, ...props },
+    import_react.default.createElement("rect", { key: "a", x: 3, y: 4, width: 18, height: 4, rx: 1 }),
+    import_react.default.createElement("rect", { key: "b", x: 3, y: 10, width: 18, height: 4, rx: 1 }),
+    import_react.default.createElement("rect", { key: "c", x: 3, y: 16, width: 18, height: 4, rx: 1 })
+  ),
+  bolt: (props) => svg(props, import_react.default.createElement("path", { d: "M13 2L3 14h7l-1 8 10-12h-7l1-8z" })),
+  // 用量页新增：导出菜单的下载图标
+  download: (props) => svg(
+    { width: 13, height: 13, ...props },
+    import_react.default.createElement("path", { key: "a", d: "M12 3v12" }),
+    import_react.default.createElement("path", { key: "b", d: "M7 10l5 5 5-5" }),
+    import_react.default.createElement("path", { key: "c", d: "M4 20h16" })
+  )
+};
+function ChannelDot({ channel, size = 7, title }) {
+  return import_react.default.createElement("span", {
+    "aria-hidden": "true",
+    "data-channel-dot": channel ?? "",
+    ...title === void 0 ? {} : { title },
+    style: {
+      width: size,
+      height: size,
+      borderRadius: 999,
+      flex: "0 0 auto",
+      background: channelPalette(channel).solid,
+      display: "inline-block"
+    }
+  });
+}
+function ChannelChip({ channel, label, title }) {
+  const palette = channelPalette(channel);
+  return import_react.default.createElement(
+    "span",
+    {
+      "data-channel-chip": channel ?? "",
+      ...title === void 0 ? {} : { title },
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        flex: "0 0 auto",
+        padding: "1px 7px",
+        borderRadius: 999,
+        fontSize: 11.5,
+        lineHeight: "17px",
+        background: palette.soft,
+        border: `1px solid ${palette.edge}`,
+        color: "var(--dsw-alias-label-primary,currentColor)",
+        whiteSpace: "nowrap"
+      }
+    },
+    import_react.default.createElement(ChannelDot, { channel, size: 6 }),
+    import_react.default.createElement("span", null, label ?? CHANNEL_LABEL[channel] ?? channel ?? "\u2014")
+  );
+}
+function Tag({ text, tone: toneName = "idle", title }) {
+  const palette = tone[toneName] ?? tone.idle;
+  return import_react.default.createElement(
+    "span",
+    {
+      style: { ...s.tag, background: palette.bg, color: palette.fg },
+      ...title === void 0 ? {} : { title }
+    },
+    text
+  );
+}
+function CardHead({ title, extra, actions }) {
+  return import_react.default.createElement(
+    "div",
+    { className: "dshc-cardhead" },
+    import_react.default.createElement("span", { style: s.label }, title),
+    extra ? import_react.default.createElement("span", { style: s.muted }, extra) : null,
+    actions ? import_react.default.createElement("span", { className: "dshc-row", style: { marginLeft: "auto", gap: 6 } }, actions) : null
+  );
+}
+function Unavailable({ title, needs, hint }) {
+  return import_react.default.createElement(
+    "div",
+    { style: { ...s.card, borderStyle: "dashed" } },
+    import_react.default.createElement(
+      "div",
+      { style: { ...s.label, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+      title,
+      import_react.default.createElement(Tag, { text: "\u7F51\u5173\u672A\u63D0\u4F9B", tone: "warn" })
+    ),
+    import_react.default.createElement(
+      "div",
+      { style: { ...s.muted, marginTop: 8, lineHeight: 1.7 } },
+      "\u5F53\u524D\u7F51\u5173\uFF08plugins/chanhub\uFF09\u6CA1\u6709\u66B4\u9732\u6B64\u89C6\u56FE\u6240\u9700\u7684\u6570\u636E\u7AEF\u70B9\uFF0C\u56E0\u6B64\u8FD9\u91CC\u4E0D\u663E\u793A\u4EFB\u4F55\u63A8\u65AD\u503C\u3002"
+    ),
+    needs ? import_react.default.createElement(
+      "div",
+      {
+        style: {
+          ...s.code,
+          marginTop: 8,
+          background: "var(--dsw-alias-bg-layer-1,#fff)",
+          padding: "8px 10px",
+          borderRadius: 6
+        }
+      },
+      `\u6240\u9700\u540E\u7AEF\u7AEF\u70B9\uFF1A${needs}`
+    ) : null,
+    hint ? import_react.default.createElement("div", { style: { ...s.muted, marginTop: 8 } }, hint) : null
+  );
+}
+function Fold({ summary, children, open = false, id }) {
+  return import_react.default.createElement(
+    "details",
+    { className: "dshc-fold", ...open ? { open: true } : {}, ...id ? { "data-fold": id } : {} },
+    import_react.default.createElement("summary", null, summary),
+    import_react.default.createElement("div", { className: "dshc-body" }, children)
+  );
+}
+function channelLabel(channel) {
+  return { workbuddy: "WB", traework: "Trae", qoder: "Qoder" }[channel] ?? "";
+}
+function formatAbsolute(iso) {
+  const value = Date.parse(iso);
+  if (!Number.isFinite(value) || value <= 0) return "\u2014";
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
+function formatLatency(value) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(1)} tok/s` : "\u2014";
+}
+function useCountUp(target, duration = 900) {
+  const value = Number(target) || 0;
+  const [shown, setShown] = import_react.default.useState(value);
+  const fromRef = import_react.default.useRef(value);
+  import_react.default.useEffect(() => {
+    const canAnimate = typeof requestAnimationFrame === "function" && typeof cancelAnimationFrame === "function" && !(typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    if (!canAnimate) {
+      fromRef.current = value;
+      setShown(value);
+      return void 0;
+    }
+    const from = fromRef.current;
+    const start = Date.now();
+    let frame = 0;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      fromRef.current = value;
+      setShown(value);
+    };
+    const tick = () => {
+      if (settled) return;
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(from + (value - from) * eased);
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else settle();
+    };
+    frame = requestAnimationFrame(tick);
+    const guard = setTimeout(settle, duration + 150);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      clearTimeout(guard);
+    };
+  }, [value, duration]);
+  const shownRef = import_react.default.useRef(shown);
+  shownRef.current = shown;
+  import_react.default.useEffect(() => {
+    fromRef.current = shownRef.current;
+  }, [value]);
+  return shown;
 }
 
 // client/endpoints.js
@@ -2028,7 +2143,9 @@ var ENDPOINTS = {
   loginCallback: "loginCallback",
   getChannels: "getChannels",
   serviceControl: "serviceControl",
-  revealApiKey: "revealApiKey"
+  revealApiKey: "revealApiKey",
+  discoverModelsForPatch: "discoverModelsForPatch",
+  applyModelsPatch: "applyModelsPatch"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -2547,6 +2664,8 @@ function KpiCard({ item }) {
   const animated = useCountUp(Number(item.raw) || 0);
   const noData = (item.kind === "percent" || item.kind === "ms") && !(Number(item.raw) > 0);
   const display = noData ? item.value : formatKpi(animated, item.kind);
+  const kpiTone = tone[item.tone] ?? tone.idle;
+  const color = noData ? tone.idle.fg : kpiTone.fg;
   return import_react4.default.createElement(
     "div",
     {
@@ -2559,7 +2678,7 @@ function KpiCard({ item }) {
     import_react4.default.createElement("div", { className: "dshc-ust-kpi-k" }, item.label),
     import_react4.default.createElement("div", {
       className: "dshc-ust-kpi-v",
-      style: item.tone === "ok" ? { color: tone.ok.fg } : void 0
+      style: { color }
     }, display),
     import_react4.default.createElement("div", { className: "dshc-ust-kpi-d" }, item.detail)
   );
@@ -2678,7 +2797,7 @@ function Heatmap({ rows, metric = "requests", onMetricChange, onTip }) {
       { className: "dshc-ust-cardfoot" },
       import_react4.default.createElement(
         "span",
-        { style: { ...s.muted, fontSize: 10.5 } },
+        { style: type.text.caption },
         hasDayData ? `\u6D3B\u8DC3 ${grid.activeDays} \u5929 \xB7 \u5CF0\u503C ${formatNumber(grid.max)} ${unit}/\u5929` : `\u8FD1 ${HEAT_WINDOW_DAYS} \u5929\u6682\u65E0\u6309\u5929\u8BB0\u5F55`
       ),
       import_react4.default.createElement("span", {
@@ -2692,7 +2811,7 @@ function Heatmap({ rows, metric = "requests", onMetricChange, onTip }) {
       { className: "dshc-ust-subblock" },
       import_react4.default.createElement(
         "div",
-        { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
+        { style: type.text.caption },
         hasDayData ? `\u6309\u5929\u8BB0\u5F55\u53EA\u6709 ${grid.activeDays} \u5929\uFF08\u7F51\u5173\u5C0F\u65F6\u69FD\u53EA\u4FDD 48 \u5C0F\u65F6\u3001\u65E5\u69FD\u8981\u8DE8\u5929\u624D\u4EA7\u751F\uFF09\u2014\u2014 \u6309\u5C0F\u65F6\u770B\u66F4\u6E05\u695A\uFF1A` : "\u8FD1 30 \u5929\u6CA1\u6709\u6309\u5929\u8BB0\u5F55 \u2014\u2014 \u6309\u5C0F\u65F6\u770B\u5F53\u524D\u8FD9\u6BB5\uFF1A"
       ),
       import_react4.default.createElement(HourProfile, { hours })
@@ -2725,32 +2844,14 @@ function HourProfile({ hours }) {
     import_react4.default.createElement(
       "div",
       { style: { display: "flex", justifyContent: "space-between", marginTop: 4 } },
-      ...["00", "06", "12", "18", "23"].map((label) => import_react4.default.createElement("span", { key: label, style: { ...s.muted, fontSize: 10.5 } }, label))
+      ...["00", "06", "12", "18", "23"].map((label) => import_react4.default.createElement("span", { key: label, style: type.text.caption }, label))
     )
   );
 }
-var SEG_COLORS = [
-  "#4f6ef7",
-  // 蓝
-  "#10b981",
-  // 翠绿
-  "#f59e0b",
-  // 琥珀
-  "#a855f7",
-  // 紫
-  "#06b6d4",
-  // 青
-  "#ef4444",
-  // 红
-  "#84cc16",
-  // 黄绿
-  "#ec4899",
-  // 玫红
-  "#14b8a6",
-  // 蓝绿
-  "#6366f1"
-  // 靛
-];
+function seriesColor(item, index) {
+  const channel = item?.channel ?? (typeof item?.key === "string" && CHANNEL_LABEL[item.key] !== void 0 ? item.key : void 0);
+  return channel ? channelColor(channel) : SEG_COLORS[index % SEG_COLORS.length];
+}
 var SERIES_HEAD = 5;
 function DailyBars({ byModel, metric, range, onRangeChange, onMetricChange, onTip }) {
   const rows = import_react4.default.useMemo(() => mergeTail(byModel.series), [byModel]);
@@ -2907,7 +3008,7 @@ function mergeTail(series) {
   const list = Array.isArray(series) ? series : [];
   const head = list.slice(0, SERIES_HEAD).map((row, i) => ({
     ...row,
-    color: SEG_COLORS[i % SEG_COLORS.length],
+    color: seriesColor(row, i),
     rest: false
   }));
   const tail = list.slice(SERIES_HEAD);
@@ -2959,12 +3060,18 @@ function RankCards({ accounts, channels, metric = "tokens", onMetricChange }) {
               "span",
               { className: "dshc-ust-rank-name" },
               import_react4.default.createElement("span", { title: row.key }, row.name),
-              row.channel ? import_react4.default.createElement(Tag, { text: CHANNEL_LABEL[row.channel] ?? row.channel, tone: "info" }) : null
+              row.channel ? import_react4.default.createElement(ChannelChip, { channel: row.channel, label: CHANNEL_LABEL[row.channel] ?? row.channel }) : null
             ),
             import_react4.default.createElement(
               "span",
               { className: "dshc-ust-rank-bar" },
-              import_react4.default.createElement("i", { style: { width: `${Math.max(2, Math.round(row.barShare * 100))}%` } })
+              // 身份色只上形状：排行条按渠道着色（与侧边栏/账号池同源）
+              import_react4.default.createElement("i", {
+                style: {
+                  width: `${Math.max(2, Math.round(row.barShare * 100))}%`,
+                  background: seriesColor(row, index)
+                }
+              })
             ),
             import_react4.default.createElement("span", {
               className: "dshc-ust-rank-val",
@@ -2989,14 +3096,20 @@ ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7
             import_react4.default.createElement(
               "span",
               { className: "dshc-ust-rank-name", style: { flex: 1 } },
+              import_react4.default.createElement(ChannelDot, { channel: row.key, size: 8, title: CHANNEL_LABEL[row.key] ?? row.key }),
               import_react4.default.createElement("span", null, CHANNEL_LABEL[row.key] ?? row.key),
               // 「3 号」是内部黑话：读者会读成「3 号账号」。写明量词。
-              import_react4.default.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, `${row.accounts} \u4E2A\u8D26\u53F7`)
+              import_react4.default.createElement("span", { style: type.text.caption }, `${row.accounts} \u4E2A\u8D26\u53F7`)
             ),
             import_react4.default.createElement(
               "span",
               { className: "dshc-ust-rank-bar" },
-              import_react4.default.createElement("i", { style: { width: `${Math.max(2, Math.round(row.barMax * 100))}%` } })
+              import_react4.default.createElement("i", {
+                style: {
+                  width: `${Math.max(2, Math.round(row.barMax * 100))}%`,
+                  background: channelColor(row.key)
+                }
+              })
             ),
             import_react4.default.createElement("span", {
               className: "dshc-ust-rank-val",
@@ -3025,7 +3138,7 @@ function ModelDonut({ rows, onTip }) {
   let offset = 0;
   const arcs = shares.map((item, index) => {
     const len = item.share * CIRC;
-    const arc = { ...item, index, len, offset, color: SEG_COLORS[index % SEG_COLORS.length] };
+    const arc = { ...item, index, len, offset, color: seriesColor(item, index) };
     offset += len;
     return arc;
   });
@@ -3252,7 +3365,7 @@ function BurnPanel({ rows, stock, windowValue, burn }) {
     ),
     import_react4.default.createElement(
       "div",
-      { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
+      { style: type.text.caption },
       import_react4.default.createElement("span", {
         style: { cursor: "help" },
         title: "\u5B9E\u7EBF = \u7A97\u53E3\u8D77\u70B9\u5B58\u91CF\u6309\u5DF2\u6D88\u8017\u9010\u69FD\u56DE\u63A8\uFF08\u56DE\u63A8\u503C\uFF0C\u975E\u9010\u65F6\u5B9E\u6D4B\uFF09\uFF1B\u865A\u7EBF = \u6309\u7A97\u53E3\u901F\u7387\u7EBF\u6027\u5916\u63A8\uFF08\u975E\u627F\u8BFA\uFF0C\u5B9E\u9645\u504F\u4E50\u89C2\uFF09\u3002\u7A97\u53E3\u8D77\u70B9\u5B58\u91CF = \u5F53\u524D\u53EF\u7528\u5B58\u91CF + \u7A97\u53E3\u5185\u5DF2\u6D88\u8017\uFF1B\u53EA\u7B97\u53EF\u6D88\u8017\u989D\u5EA6\uFF1B\u8D26\u672C\u53EA\u8986\u76D6\u7ECF\u672C\u7F51\u5173\u7684\u8BF7\u6C42\u3002"
@@ -3336,12 +3449,12 @@ function ProcessPanel({ stats, windowTotal }) {
               import_react4.default.createElement("span", { className: "dshc-mrow2-name", title: model.model }, model.model),
               // 倍率取上游原文；缺失显示 —（绝不显示 x0.00 —— 缺失 ≠ 免费）
               model.credits ? import_react4.default.createElement(Tag, { text: model.credits, tone: "idle" }) : import_react4.default.createElement("span", {
-                style: { ...s.muted, fontSize: 10.5 },
+                style: type.text.caption,
                 title: "\u4E0A\u6E38\u672A\u4E0B\u53D1\u8BE5\u6A21\u578B\u500D\u7387\uFF08\u7F3A\u5931 \u2260 \u514D\u8D39\uFF09"
               }, "\u500D\u7387 \u2014"),
               import_react4.default.createElement(
                 "span",
-                { style: { ...s.muted, fontSize: 10.5, flexShrink: 0 } },
+                { style: type.text.caption },
                 `${formatNumber(Number(model.requests) || 0)} \u8BF7\u6C42`
               )
             ),
@@ -3393,12 +3506,12 @@ function RatioStrip({ items }) {
       (item, index) => import_react4.default.createElement(
         "div",
         { key: `${item.label}-${item.scope}-${index}`, className: "dshc-row", style: { gap: 6 } },
-        import_react4.default.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, item.label),
+        import_react4.default.createElement("span", { style: type.text.caption }, item.label),
         import_react4.default.createElement("span", {
           style: { fontSize: 13, fontWeight: 600, color: item.tone ?? "var(--dsw-alias-label-primary,currentColor)" }
         }, item.value),
         import_react4.default.createElement("span", {
-          style: { ...s.muted, fontSize: 10.5, cursor: "help" },
+          style: type.text.caption,
           title: item.title ?? item.scope
         }, item.scope)
       )
@@ -3669,7 +3782,7 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
           import_react5.default.createElement("span", { className: "dshc-ust-scope-tag" }, "\u7A97\u53E3\u53E3\u5F84"),
           import_react5.default.createElement(
             "span",
-            { style: { ...s.muted, fontSize: 10.5 }, title: WINDOW_TIP },
+            { style: type.text.caption, title: WINDOW_TIP },
             `\u8FD1 ${range} \u5929 \xB7 \u6570\u636E\u843D\u76D8 data/usage.json\uFF0C\u91CD\u542F\u4E0D\u6E05\u96F6`
           )
         )
@@ -3723,13 +3836,13 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         summary: import_react5.default.createElement(
           "span",
           { className: "dshc-row" },
-          import_react5.default.createElement("span", { style: s.label }, "\u79EF\u5206\u71C3\u5C3D"),
+          import_react5.default.createElement("span", { style: type.text.body }, "\u79EF\u5206\u71C3\u5C3D"),
           import_react5.default.createElement(
             "span",
-            { style: { ...s.muted, fontSize: 10.5 } },
+            { style: type.text.caption },
             burn ? `\u2248 \u8FD8\u53EF ${burn.days > 1095 ? ">3 \u5E74" : burn.days >= 1 ? `${burn.days.toFixed(1)} \u5929` : `${(burn.days * 24).toFixed(1)} \u5C0F\u65F6`}` : "\u65E0\u6CD5\u5916\u63A8"
           ),
-          import_react5.default.createElement("span", { style: { ...s.muted, fontSize: 10.5 } }, "\u7A97\u53E3\u53E3\u5F84 \xB7 \u5916\u63A8")
+          import_react5.default.createElement("span", { style: type.text.caption }, "\u7A97\u53E3\u53E3\u5F84 \xB7 \u5916\u63A8")
         )
       },
       import_react5.default.createElement(BurnPanel, { rows, stock, windowValue: "720h", burn })
@@ -3742,14 +3855,14 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         summary: import_react5.default.createElement(
           "span",
           { className: "dshc-row" },
-          import_react5.default.createElement("span", { style: s.label }, "\u8FDB\u7A0B\u53E3\u5F84\u7EC6\u8282"),
+          import_react5.default.createElement("span", { style: type.text.body }, "\u8FDB\u7A0B\u53E3\u5F84\u7EC6\u8282"),
           import_react5.default.createElement("span", {
-            style: { ...s.muted, fontSize: 10.5 },
-            title: stats?.enabled === true && stats.since ? `\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6\u3002\u6570\u636E\u8D77\u70B9 ${stats.since}` : "\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6"
+            style: { ...type.text.caption, whiteSpace: "nowrap" },
+            title: stats?.enabled === true && stats.since ? `\u8FDB\u7A0B\u7D2F\u8BA1\uFF1B\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6\u3002\u6570\u636E\u8D77\u70B9 ${stats.since}` : "\u8FDB\u7A0B\u7D2F\u8BA1\uFF1B\u81EA\u8FDB\u7A0B\u542F\u52A8\u7D2F\u8BA1\uFF0C\u91CD\u542F\u6E05\u96F6"
           }, uptime ? `\u8FDB\u7A0B\u7D2F\u8BA1 \xB7 ${uptime}` : "\u8FDB\u7A0B\u7D2F\u8BA1"),
           import_react5.default.createElement(
             "span",
-            { style: { ...s.muted, fontSize: 10.5 } },
+            { style: type.text.caption },
             "\u7F13\u5B58\u547D\u4E2D\u7387 / TTFB / \u541E\u5410 / \u500D\u7387"
           )
         )
@@ -3861,9 +3974,243 @@ function ExportMenu({ open, onToggle, payload, days, byModelDaily, modelRows, ac
   );
 }
 
-// client/quick-entry.js
+// client/model-ability.js
 var import_react6 = __toESM(require("react"), 1);
+var DEFAULT_PROVIDER = "chanhub2api";
+function fmtWindow(n) {
+  if (!n || n <= 0) return "\u2014";
+  if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${Math.round(n / 1e3)}k`;
+  return String(n);
+}
+function VisionBadge() {
+  return import_react6.default.createElement(
+    "span",
+    { style: { ...s.tag, color: tone.ok.fg, background: tone.ok.bg } },
+    "\u591A\u6A21\u6001"
+  );
+}
+function TextBadge() {
+  return import_react6.default.createElement(
+    "span",
+    { style: { ...s.tag, color: tone.idle.fg, background: tone.idle.bg } },
+    "\u6587\u672C"
+  );
+}
+function ModelAbilityTab({ rpcCall, showToast }) {
+  const [state, setState] = import_react6.default.useState({ kind: "idle" });
+  const [provider, setProvider] = import_react6.default.useState(DEFAULT_PROVIDER);
+  const [models, setModels] = import_react6.default.useState(null);
+  const [selected, setSelected] = import_react6.default.useState(() => /* @__PURE__ */ new Set());
+  const [applyBusy, setApplyBusy] = import_react6.default.useState(false);
+  const [lastOk, setLastOk] = import_react6.default.useState(null);
+  const [lastErr, setLastErr] = import_react6.default.useState(null);
+  const notify = (msg) => {
+    if (typeof showToast === "function") {
+      showToast(msg);
+      return;
+    }
+    console.log("[dsh-chanhub]", msg);
+  };
+  const load = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    setState({ kind: "loading" });
+    setLastOk(null);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.discoverModelsForPatch, { provider });
+      if (result?.ok !== true || !result.value) {
+        setState({ kind: "error", message: result?.error?.message ?? "\u62C9\u53D6\u6A21\u578B\u76EE\u5F55\u5931\u8D25" });
+        return;
+      }
+      setModels(result.value.models ?? []);
+      setSelected(/* @__PURE__ */ new Set());
+      setState({ kind: "loaded" });
+    } catch (error) {
+      setState({ kind: "error", message: error?.message ?? String(error) });
+    }
+  }, [rpcCall, provider]);
+  const toggle = import_react6.default.useCallback((id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const apply2 = import_react6.default.useCallback(async () => {
+    if (!rpcCall || !models) return;
+    if (selected.size === 0) {
+      notify("\u8BF7\u5148\u52FE\u9009\u8981\u8865\u89C6\u89C9\u80FD\u529B\u7684\u6A21\u578B");
+      return;
+    }
+    setApplyBusy(true);
+    setLastOk(null);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.applyModelsPatch, {
+        provider,
+        selectedIds: [...selected]
+      });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? "\u672A\u77E5\u9519\u8BEF";
+        setLastErr(msg);
+        notify(`\u5E94\u7528\u5931\u8D25\uFF1A${msg}`);
+        return;
+      }
+      const v = result.value;
+      setLastOk({ added: v.added ?? [], skipped: v.skipped ?? [], wrote: v.wrote === true });
+      notify(`\u5DF2\u7ED9 ${(v.added ?? []).length} \u4E2A\u6A21\u578B\u8865\u591A\u6A21\u6001\u80FD\u529B`);
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+      notify(`\u5E94\u7528\u5F02\u5E38\uFF1A${error?.message ?? error}`);
+    } finally {
+      setApplyBusy(false);
+    }
+  }, [rpcCall, models, selected, provider]);
+  const alreadyImage = models ? models.filter((m) => m.supportsImages === true).length : 0;
+  const mono = { fontFamily: type.text.code.fontFamily, fontSize: 12, wordBreak: "break-all", color: s.label.color };
+  return import_react6.default.createElement(
+    "div",
+    { style: { display: "flex", flexDirection: "column", gap: 12, minWidth: 0, padding: "4px 2px" } },
+    // 工具栏
+    import_react6.default.createElement(
+      "div",
+      { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+      import_react6.default.createElement(
+        "span",
+        { style: type.text.secondary },
+        "provider"
+      ),
+      import_react6.default.createElement("input", {
+        style: { ...s.input, flex: "1 1 200px", maxWidth: 240 },
+        value: provider,
+        placeholder: "chanhub2api",
+        onChange: (ev) => setProvider(ev.target.value.trim() || DEFAULT_PROVIDER)
+      }),
+      import_react6.default.createElement(
+        "button",
+        { style: s.btnPri, type: "button", disabled: applyBusy, onClick: load },
+        state.kind === "loading" ? "\u62C9\u53D6\u4E2D\u2026" : "\u62C9\u53D6\u5168\u6E20\u9053\u6A21\u578B"
+      ),
+      models && models.length > 0 ? import_react6.default.createElement(
+        "button",
+        { ...s.btnGhost, style: { ...s.btnGhost, opacity: applyBusy || selected.size === 0 ? 0.6 : 1 }, type: "button", disabled: applyBusy || selected.size === 0, onClick: apply2 },
+        applyBusy ? "\u5E94\u7528\u4E2D\u2026" : `\u5E94\u7528\u8865\u4E01\uFF08${selected.size}\uFF09`
+      ) : null
+    ),
+    // 说明
+    import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, '\u300C\u591A\u6A21\u6001\u300D= \u672C\u5730\u8BC4\u5BA1\u767D\u540D\u5355\u5185\u3001\u771F\u5B9E\u652F\u6301\u56FE\u7247\u8F93\u5165\u7684\u6A21\u578B\uFF08\u4E0A\u6E38 supports_images \u5B57\u6BB5\u4E0D\u53EF\u9760\uFF0C\u6545\u672A\u91C7\u4FE1\uFF09\u3002\u5E94\u7528\u8865\u4E01\u4F1A\u628A\u52FE\u9009\u7684\u6A21\u578B\u5199\u5165 DSH \u8BBE\u7F6E llm-pi-ai \u7684 providers.&lt;provider&gt;.models[].input = ["text","image"]\uFF0C\u8BA9 DSH \u5141\u8BB8\u56FE\u7247\u4E0A\u4F20\u3002\u6CE8\u610F\uFF1A\u4E4B\u540E\u522B\u5728\u300C\u8BBE\u7F6E\u2192\u6A21\u578B\u300D\u91CC\u91CD\u65B0\u300C\u4ECE\u63D0\u4F9B\u5546\u641C\u7D22\u300D\uFF0C\u5426\u5219\u89C6\u89C9\u6807\u8BB0\u4F1A\u88AB\u6E05\u56DE\u3002'),
+    state.kind === "loading" ? import_react6.default.createElement("div", { style: s.tip }, "\u6B63\u5728\u62C9\u53D6\u7F51\u5173\u6A21\u578B\u76EE\u5F55\u2026") : null,
+    state.kind === "error" ? import_react6.default.createElement("div", { style: s.err }, state.message) : null,
+    lastOk ? import_react6.default.createElement(
+      "div",
+      { style: { ...s.tip, color: tone.ok.fg } },
+      `\u5DF2\u5E94\u7528\uFF1A\u7ED9 ${lastOk.added.length} \u4E2A\u6A21\u578B\u8865\u591A\u6A21\u6001\u80FD\u529B` + (lastOk.skipped.length ? `\uFF1B\u5FFD\u7565 ${lastOk.skipped.length} \u4E2A\u672A\u627E\u5230\u7684 id` : "") + (lastOk.wrote ? "" : "\uFF08\u65E0\u53EF\u5199\u53D8\u66F4\uFF09")
+    ) : null,
+    lastErr ? import_react6.default.createElement("div", { style: s.err }, lastErr) : null,
+    // 表格
+    models && models.length > 0 ? import_react6.default.createElement(
+      "div",
+      { style: { ...s.card, padding: 0, overflow: "hidden", marginBottom: 0 } },
+      import_react6.default.createElement(
+        "table",
+        { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 } },
+        import_react6.default.createElement(
+          "thead",
+          null,
+          import_react6.default.createElement(
+            "tr",
+            null,
+            th(""),
+            th("\u6A21\u578B ID"),
+            th("\u540D\u79F0"),
+            th("\u4E0A\u6587"),
+            th("\u8F93\u51FA"),
+            th("\u500D\u7387"),
+            th("\u80FD\u529B")
+          )
+        ),
+        import_react6.default.createElement(
+          "tbody",
+          null,
+          models.map((m) => {
+            const checked = selected.has(m.id);
+            return import_react6.default.createElement(
+              "tr",
+              {
+                key: m.id,
+                style: { background: checked ? "rgba(11,110,67,.06)" : "transparent" }
+              },
+              import_react6.default.createElement(
+                "td",
+                tdStyle,
+                import_react6.default.createElement("input", {
+                  type: "checkbox",
+                  checked,
+                  onChange: () => toggle(m.id),
+                  disabled: m.supportsImages !== true,
+                  style: { cursor: m.supportsImages === true ? "pointer" : "not-allowed", accentColor: "var(--dsw-alias-button-info-fill,#4176e6)" }
+                })
+              ),
+              import_react6.default.createElement("td", tdStyle, import_react6.default.createElement("span", { style: mono }, m.id)),
+              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.name),
+              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.contextWindow)),
+              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.maxTokens)),
+              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, typeof m.credits === "string" && m.credits !== "" ? m.credits : "\u2014"),
+              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge))
+            );
+          })
+        )
+      ),
+      import_react6.default.createElement(
+        "p",
+        { style: { ...type.text.caption, padding: "8px 14px" } },
+        `${models.length} \u4E2A\u6A21\u578B \xB7 ${alreadyImage} \u4E2A\u591A\u6A21\u6001\uFF08\u53EF\u52FE\u9009\uFF09\u3002`
+      )
+    ) : models && state.kind === "loaded" ? import_react6.default.createElement("div", { style: s.tip }, "\u8BE5 provider \u6CA1\u6709\u6A21\u578B\u76EE\u5F55\u3002") : null
+  );
+}
+function th(text) {
+  return import_react6.default.createElement("th", {
+    style: {
+      textAlign: "left",
+      fontWeight: 600,
+      color: "var(--dsw-alias-label-secondary,#6b7280)",
+      padding: "8px 10px",
+      whiteSpace: "nowrap",
+      borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+      background: "var(--dsw-alias-bg-layer-2,#f9fafb)"
+    }
+  }, text);
+}
+var tdStyle = {
+  padding: "7px 10px",
+  borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+  color: "var(--dsw-alias-label-primary,currentColor)",
+  verticalAlign: "top",
+  maxWidth: 280
+};
+
+// client/quick-entry.js
+var import_react7 = __toESM(require("react"), 1);
 var import_react_dom = require("react-dom");
+var ENTRY_CSS = `
+@keyframes dshc-entry-in { from{opacity:0} to{opacity:1} }
+.dshc-entry-card { border:1px solid var(--dsw-alias-border-l2,#e5e7eb); animation:dshc-entry-in .22s ease-out both; }
+.dshc-entry-card:hover { border-color:var(--dsw-alias-border-l3,#d1d5db); transform:translateY(-1px); box-shadow:0 4px 12px rgba(15,23,42,.08); }
+.dshc-entry-card[data-open="true"] { border-color:var(--dsw-alias-border-l3,#d1d5db); }
+.dshc-entry-card:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:1px; }
+.dshc-entry-icon { background:transparent; animation:dshc-entry-in .22s ease-out both; }
+.dshc-entry-icon:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.05)); color:var(--dsw-alias-label-primary,#1f2328); }
+.dshc-entry-icon[data-open="true"] { background:var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06)); }
+.dshc-entry-icon:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:1px; }
+@media (prefers-reduced-motion:reduce){
+  .dshc-entry-card{transition:none; animation:none}
+  .dshc-entry-card:hover{transform:none}
+  .dshc-entry-icon{animation:none}
+}
+`;
 var QUICK_CSS = `
 @keyframes dshc-quick-pulse { 0%{transform:scale(1);opacity:.9} 70%{transform:scale(1.9);opacity:0} 100%{opacity:0} }
 .dshc-quick-dot { position:relative; }
@@ -3874,18 +4221,26 @@ var QUICK_CSS = `
 .dshc-quick-scroll::-webkit-scrollbar { width:6px; }
 .dshc-quick-scroll::-webkit-scrollbar-thumb { background:var(--dsw-alias-border-l3,#d1d5db); border-radius:999px; }
 .dshc-quick-row:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.04)); }
-@media (prefers-reduced-motion:reduce){ .dshc-quick-pop{animation:none} .dshc-quick-dot::after{animation:none} }
+/* \u6E20\u9053\u4E2D\u5FC3\u5F39\u7A97\uFF1A\u80CC\u666F\u6DE1\u5165 + \u9762\u677F\u8F7B\u5FAE\u4E0A\u6D6E\uFF08\u52A8\u6548\u4E0E popover \u540C\u4E00\u5957\u624B\u611F\uFF09 */
+.dshc-center-backdrop { animation:dshc-center-in .14s var(--ds-ease-in-out,ease-out); }
+.dshc-center-dialog { animation:dshc-center-rise .18s cubic-bezier(.2,.8,.2,1); }
+@keyframes dshc-center-in { from{opacity:0} to{opacity:1} }
+@keyframes dshc-center-rise { from{opacity:0; transform:translateY(10px) scale(.99)} to{opacity:1; transform:none} }
+.dshc-center-body { scrollbar-width:thin; }
+.dshc-center-body::-webkit-scrollbar { width:8px; }
+.dshc-center-body::-webkit-scrollbar-thumb { background:var(--dsw-alias-border-l3,#d1d5db); border-radius:999px; }
+@media (prefers-reduced-motion:reduce){ .dshc-quick-pop{animation:none} .dshc-quick-dot::after{animation:none} .dshc-center-backdrop,.dshc-center-dialog{animation:none} }
 `;
 var POP_WIDTH = 344;
 var POP_MAX_HEIGHT = 520;
-function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "var(--dsw-alias-border-l3,#e5e7eb)" }) {
+function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "var(--dsw-alias-border-l3,#e5e7eb)", transition = "stroke-dasharray .35s" }) {
   const clamped = Math.max(0, Math.min(1, Number(ratio) || 0));
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "svg",
     { width: size, height: size, viewBox: `0 0 ${size} ${size}`, "aria-hidden": "true" },
-    import_react6.default.createElement("circle", {
+    import_react7.default.createElement("circle", {
       cx: size / 2,
       cy: size / 2,
       r: radius,
@@ -3893,7 +4248,7 @@ function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "v
       stroke: track,
       strokeWidth: stroke
     }),
-    import_react6.default.createElement("circle", {
+    import_react7.default.createElement("circle", {
       cx: size / 2,
       cy: size / 2,
       r: radius,
@@ -3903,31 +4258,60 @@ function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "v
       strokeLinecap: "round",
       strokeDasharray: `${circumference * clamped} ${circumference}`,
       transform: `rotate(-90 ${size / 2} ${size / 2})`,
-      style: { transition: "stroke-dasharray .35s" }
+      style: { transition }
     })
   );
+}
+function useMountProgress(duration = 520) {
+  const canAnimate = typeof requestAnimationFrame === "function" && !(typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const [progress, setProgress] = import_react7.default.useState(canAnimate ? 0 : 1);
+  import_react7.default.useEffect(() => {
+    if (!canAnimate) return void 0;
+    const start = Date.now();
+    let frame = 0;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      setProgress(1);
+    };
+    const tick = () => {
+      if (settled) return;
+      const t = Math.min(1, (Date.now() - start) / duration);
+      setProgress(t);
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else settle();
+    };
+    frame = requestAnimationFrame(tick);
+    const guard = setTimeout(settle, duration + 150);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      clearTimeout(guard);
+    };
+  }, [duration, canAnimate]);
+  return progress;
 }
 function Sparkline({ values, color = tone.info.fg, width = 96, height = 22 }) {
   const { points, area, flat } = sparkPath(values, { width, height });
   if (points === "") {
-    return import_react6.default.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, "\u65E0\u89C2\u6D4B");
+    return import_react7.default.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, "\u65E0\u89C2\u6D4B");
   }
   const id = `dshc-spark-${Math.abs(hashString(points)).toString(36)}`;
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "svg",
     { width, height, viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true" },
-    import_react6.default.createElement(
+    import_react7.default.createElement(
       "defs",
       null,
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "linearGradient",
         { id, x1: 0, y1: 0, x2: 0, y2: 1 },
-        import_react6.default.createElement("stop", { offset: "0%", stopColor: color, stopOpacity: flat ? 0.08 : 0.28 }),
-        import_react6.default.createElement("stop", { offset: "100%", stopColor: color, stopOpacity: 0 })
+        import_react7.default.createElement("stop", { offset: "0%", stopColor: color, stopOpacity: flat ? 0.08 : 0.28 }),
+        import_react7.default.createElement("stop", { offset: "100%", stopColor: color, stopOpacity: 0 })
       )
     ),
-    flat ? null : import_react6.default.createElement("polygon", { points: area, fill: `url(#${id})`, stroke: "none" }),
-    import_react6.default.createElement("polyline", {
+    flat ? null : import_react7.default.createElement("polygon", { points: area, fill: `url(#${id})`, stroke: "none" }),
+    import_react7.default.createElement("polyline", {
       points,
       fill: "none",
       stroke: color,
@@ -3941,30 +4325,30 @@ function Sparkline({ values, color = tone.info.fg, width = 96, height = 22 }) {
 function ChannelBar({ channels, total }) {
   const rows = (channels ?? []).filter((row) => row.count > 0);
   const sum = rows.reduce((acc, row) => acc + row.count, 0) || total || 1;
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "div",
     { style: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 } },
-    import_react6.default.createElement(
+    import_react7.default.createElement(
       "div",
       {
         style: { display: "flex", height: 6, borderRadius: 999, overflow: "hidden", background: "var(--dsw-alias-bg-layer-2,#f3f4f6)" }
       },
       ...rows.map(
-        (row) => import_react6.default.createElement("span", {
+        (row) => import_react7.default.createElement("span", {
           key: row.id,
           title: `${row.label} \xB7 ${row.count} \u4E2A\u8D26\u53F7`,
           style: { width: `${row.count / sum * 100}%`, background: row.color ?? "var(--dsw-alias-button-info-fill,#4176f7)" }
         })
       )
     ),
-    import_react6.default.createElement(
+    import_react7.default.createElement(
       "div",
       { style: { display: "flex", flexWrap: "wrap", gap: 8, minWidth: 0 } },
       ...rows.map(
-        (row) => import_react6.default.createElement(
+        (row) => import_react7.default.createElement(
           "span",
           { key: row.id, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } },
-          import_react6.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: row.color } }),
+          import_react7.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: row.color } }),
           `${row.label} ${row.count}`
         )
       )
@@ -3972,7 +4356,7 @@ function ChannelBar({ channels, total }) {
   );
 }
 function Chip({ text, fg, bg, title }) {
-  return import_react6.default.createElement("span", {
+  return import_react7.default.createElement("span", {
     title,
     style: {
       fontSize: 10.5,
@@ -3989,7 +4373,7 @@ function Chip({ text, fg, bg, title }) {
   }, text);
 }
 function Tile({ label, value, hint, accent, children }) {
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "div",
     {
       style: {
@@ -4004,12 +4388,12 @@ function Tile({ label, value, hint, accent, children }) {
         border: "1px solid var(--dsw-alias-border-l2,#eef1f5)"
       }
     },
-    import_react6.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, label),
-    import_react6.default.createElement(
+    import_react7.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, label),
+    import_react7.default.createElement(
       "span",
       { style: { display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 } },
-      import_react6.default.createElement("span", { style: { fontSize: 17, fontWeight: 650, letterSpacing: "-0.01em", color: accent ?? "var(--dsw-alias-label-primary,currentColor)" } }, value),
-      hint ? import_react6.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, hint) : null
+      import_react7.default.createElement("span", { style: { fontSize: 17, fontWeight: 650, letterSpacing: "-0.01em", color: accent ?? "var(--dsw-alias-label-primary,currentColor)" } }, value),
+      hint ? import_react7.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, hint) : null
     ),
     children
   );
@@ -4017,42 +4401,42 @@ function Tile({ label, value, hint, accent, children }) {
 function AccountQuickRow({ vm, series, usageTotal }) {
   const statusTone = tone[vm.state?.tone] ?? tone.idle;
   const dayCount = Number(usageTotal?.requests) || (Array.isArray(series) ? series.reduce((a, b) => a + b, 0) : 0);
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "div",
     {
       className: "dshc-quick-row",
       style: { display: "flex", gap: 9, padding: "8px 10px", borderRadius: 10, minWidth: 0, alignItems: "stretch" }
     },
     // 渠道色条：一眼分辨是哪个渠道的号
-    import_react6.default.createElement("span", { style: { width: 3, borderRadius: 999, background: vm.color, flex: "0 0 3px" } }),
-    import_react6.default.createElement(
+    import_react7.default.createElement("span", { style: { width: 3, borderRadius: 999, background: vm.color, flex: "0 0 3px" } }),
+    import_react7.default.createElement(
       "div",
       { style: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0, flex: 1 } },
       // 行 1：名称 + 活跃/short 状态
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } },
-        import_react6.default.createElement("span", {
+        import_react7.default.createElement("span", {
           style: { fontSize: 12.5, fontWeight: 550, color: "var(--dsw-alias-label-primary,currentColor)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 },
           title: `${vm.name} \xB7 ${vm.uid}`
         }, vm.name),
-        vm.activity ? import_react6.default.createElement(
+        vm.activity ? import_react7.default.createElement(
           "span",
           { style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, color: (tone[vm.activity.tone] ?? tone.info).fg, whiteSpace: "nowrap" } },
-          import_react6.default.createElement("span", { className: vm.activity.key === "busy" ? "dshc-quick-dot" : void 0, style: { width: 5, height: 5, borderRadius: 999, background: "currentColor", display: "inline-block" } }),
+          import_react7.default.createElement("span", { className: vm.activity.key === "busy" ? "dshc-quick-dot" : void 0, style: { width: 5, height: 5, borderRadius: 999, background: "currentColor", display: "inline-block" } }),
           vm.activity.label
         ) : null
       ),
       // 行 2：余额条（相对池内最高）+ 数值
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
-        import_react6.default.createElement(
+        import_react7.default.createElement(
           "span",
           {
             style: { flex: "1 1 auto", minWidth: 30, height: 4, borderRadius: 999, background: "var(--dsw-alias-bg-layer-2,#f1f5f9)", overflow: "hidden" }
           },
-          import_react6.default.createElement("span", {
+          import_react7.default.createElement("span", {
             style: {
               display: "block",
               height: "100%",
@@ -4063,40 +4447,41 @@ function AccountQuickRow({ vm, series, usageTotal }) {
             }
           })
         ),
-        import_react6.default.createElement("span", {
+        import_react7.default.createElement("span", {
           title: `${vm.creditsExact} \u79EF\u5206`,
           style: { fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: "var(--dsw-alias-label-primary,currentColor)", whiteSpace: "nowrap" }
         }, vm.creditsText)
       ),
       // 行 3：状态 + 渠道 + 24h 用量 + 到期 + 在途
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", minWidth: 0 } },
-        import_react6.default.createElement(Chip, { text: vm.state?.label ?? "\u2014", fg: statusTone.fg, bg: statusTone.bg, title: vm.state?.detail || void 0 }),
-        import_react6.default.createElement(Chip, { text: vm.channelLabel }),
-        vm.inFlight > 0 ? import_react6.default.createElement(Chip, {
+        import_react7.default.createElement(Chip, { text: vm.state?.label ?? "\u2014", fg: statusTone.fg, bg: statusTone.bg, title: vm.state?.detail || void 0 }),
+        // 渠道胶囊与渠道中心共用一个组件（同一渠道两处必然同色）
+        import_react7.default.createElement(ChannelChip, { channel: vm.channel, label: vm.channelLabel }),
+        vm.inFlight > 0 ? import_react7.default.createElement(Chip, {
           text: `\u5728\u9014 ${vm.inFlight}${vm.target ? `/${vm.target}` : ""}`,
           fg: vm.inFlightFull ? tone.warn.fg : tone.info.fg,
           bg: vm.inFlightFull ? tone.warn.bg : tone.info.bg,
           title: vm.target ? `\u5355\u53F7\u5728\u9014\u4E0A\u9650 ${vm.target}` : "\u672A\u8BBE\u4E0A\u9650\uFF080 = \u4E0D\u9650\uFF09"
         }) : null,
-        vm.expiry ? import_react6.default.createElement(Chip, {
+        vm.expiry ? import_react7.default.createElement(Chip, {
           text: vm.expiry.expired ? "\u51ED\u8BC1\u5DF2\u8FC7\u671F" : `\u5230\u671F ${daysText(vm.expiry.days)}`,
           fg: vm.expiry.days <= 7 ? tone.warn.fg : void 0,
           bg: vm.expiry.days <= 7 ? tone.warn.bg : void 0,
           title: `\u6765\u6E90\uFF1A${vm.expiry.kind === "credential" ? "\u767B\u5F55\u51ED\u8BC1" : "\u79EF\u5206\u5957\u9910"}`
         }) : null,
-        vm.expiring > 0 ? import_react6.default.createElement(Chip, { text: `${formatCompact(vm.expiring)} \u5C06\u8FC7\u671F`, fg: tone.warn.fg, bg: tone.warn.bg, title: "\u8BE5\u7A97\u53E3\u5185\u5373\u5C06\u8FC7\u671F\u7684\u79EF\u5206\uFF08\u4F18\u5148\u6D88\u8017\uFF09" }) : null,
-        series && series.some((value) => value > 0) ? import_react6.default.createElement(
+        vm.expiring > 0 ? import_react7.default.createElement(Chip, { text: `${formatCompact(vm.expiring)} \u5C06\u8FC7\u671F`, fg: tone.warn.fg, bg: tone.warn.bg, title: "\u8BE5\u7A97\u53E3\u5185\u5373\u5C06\u8FC7\u671F\u7684\u79EF\u5206\uFF08\u4F18\u5148\u6D88\u8017\uFF09" }) : null,
+        series && series.some((value) => value > 0) ? import_react7.default.createElement(
           "span",
           { style: { marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5 } },
-          import_react6.default.createElement(Sparkline, { values: series, color: vm.color, width: 74, height: 18 }),
-          import_react6.default.createElement(
+          import_react7.default.createElement(Sparkline, { values: series, color: vm.color, width: 74, height: 18 }),
+          import_react7.default.createElement(
             "span",
             { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", whiteSpace: "nowrap" } },
             `${formatNumber(dayCount)} \u6B21/24h`
           )
-        ) : dayCount > 0 ? import_react6.default.createElement(
+        ) : dayCount > 0 ? import_react7.default.createElement(
           "span",
           { style: { marginLeft: "auto", fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", whiteSpace: "nowrap" } },
           `${formatNumber(dayCount)} \u6B21/24h`
@@ -4116,17 +4501,17 @@ function hashString(text) {
   return hash;
 }
 function EntryIcon({ size = 16, color = "currentColor" }) {
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "svg",
     { width: size, height: size, viewBox: "0 0 20 20", fill: "none", "aria-hidden": "true" },
-    import_react6.default.createElement("path", {
+    import_react7.default.createElement("path", {
       d: "M4 12.5a6.5 6.5 0 1 1 12 0",
       stroke: color,
       strokeWidth: 1.6,
       strokeLinecap: "round"
     }),
-    import_react6.default.createElement("circle", { cx: 10, cy: 13.4, r: 2.1, fill: color }),
-    import_react6.default.createElement("path", { d: "M3 16.6h14", stroke: color, strokeWidth: 1.4, strokeLinecap: "round", opacity: 0.45 })
+    import_react7.default.createElement("circle", { cx: 10, cy: 13.4, r: 2.1, fill: color }),
+    import_react7.default.createElement("path", { d: "M3 16.6h14", stroke: color, strokeWidth: 1.4, strokeLinecap: "round", opacity: 0.45 })
   );
 }
 function FreshnessPill({ phase, error, fetchedAt, now }) {
@@ -4137,14 +4522,14 @@ function FreshnessPill({ phase, error, fetchedAt, now }) {
     error: { text: error?.message ? "\u7F51\u5173\u4E0D\u53EF\u8FBE" : "\u8BFB\u53D6\u5931\u8D25", fg: tone.err.fg, bg: tone.err.bg }
   };
   const item = map[phase] ?? map.loading;
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "span",
     { style: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, color: item.fg } },
-    import_react6.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: item.fg, display: "inline-block" } }),
+    import_react7.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: item.fg, display: "inline-block" } }),
     item.text
   );
 }
-var EntryBoundary = class extends import_react6.default.Component {
+var EntryBoundary = class extends import_react7.default.Component {
   constructor(props) {
     super(props);
     this.state = { error: void 0, open: false };
@@ -4163,7 +4548,7 @@ var EntryBoundary = class extends import_react6.default.Component {
     const { error, open } = this.state;
     if (!error) return this.props.children;
     const text = String(error?.stack ?? error?.message ?? error);
-    const chip = import_react6.default.createElement("button", {
+    const chip = import_react7.default.createElement("button", {
       type: "button",
       onClick: this.toggle,
       title: text,
@@ -4185,7 +4570,7 @@ var EntryBoundary = class extends import_react6.default.Component {
       }
     }, "\u26A0 \u6E20\u9053\u5165\u53E3\u5F02\u5E38");
     const detail = open ? (0, import_react_dom.createPortal)(
-      import_react6.default.createElement("div", {
+      import_react7.default.createElement("div", {
         role: "dialog",
         "aria-label": "\u6E20\u9053\u5165\u53E3\u9519\u8BEF",
         style: {
@@ -4211,40 +4596,45 @@ var EntryBoundary = class extends import_react6.default.Component {
       }, text.slice(0, 2e3)),
       document.body
     ) : null;
-    return import_react6.default.createElement(import_react6.default.Fragment, null, chip, detail);
+    return import_react7.default.createElement(import_react7.default.Fragment, null, chip, detail);
   }
 };
 function QuickEntry(props) {
-  return import_react6.default.createElement(EntryBoundary, null, import_react6.default.createElement(QuickEntryInner, props));
+  return import_react7.default.createElement(EntryBoundary, null, import_react7.default.createElement(QuickEntryInner, props));
 }
-function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, clock }) {
-  const now = import_react6.default.useMemo(() => {
+function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, clock }) {
+  const now = import_react7.default.useMemo(() => {
     if (typeof clock === "function") return clock;
     if (typeof clock === "number") return () => clock;
     return Date.now;
   }, [clock]);
-  const [snapshot, setSnapshot] = import_react6.default.useState(() => store?.getSnapshot?.());
-  const [enabled, setEnabled] = import_react6.default.useState(() => prefs ? prefs.value : true);
-  const [open, setOpen] = import_react6.default.useState(false);
-  const [anchor, setAnchor] = import_react6.default.useState();
-  const buttonRef = import_react6.default.useRef(null);
-  const rootRef = import_react6.default.useRef(null);
-  import_react6.default.useEffect(() => {
+  const [snapshot, setSnapshot] = import_react7.default.useState(() => store?.getSnapshot?.());
+  const [enabled, setEnabled] = import_react7.default.useState(() => prefs ? prefs.value : true);
+  const [open, setOpen] = import_react7.default.useState(false);
+  const [centerOpen, setCenterOpen] = import_react7.default.useState(false);
+  const [anchor, setAnchor] = import_react7.default.useState();
+  const buttonRef = import_react7.default.useRef(null);
+  const rootRef = import_react7.default.useRef(null);
+  const openCenter = import_react7.default.useCallback(() => {
+    setOpen(false);
+    setCenterOpen(true);
+  }, []);
+  import_react7.default.useEffect(() => {
     if (!store) return void 0;
     const off = store.subscribe(setSnapshot);
     store.start?.();
     return off;
   }, [store]);
-  import_react6.default.useEffect(() => {
+  import_react7.default.useEffect(() => {
     if (!prefs) return void 0;
     const sync = () => setEnabled(prefs.value);
     sync();
     return prefs.subscribe?.(sync);
   }, [prefs]);
-  import_react6.default.useEffect(() => {
+  import_react7.default.useEffect(() => {
     if (!enabled && open) setOpen(false);
   }, [enabled, open]);
-  import_react6.default.useLayoutEffect(() => {
+  import_react7.default.useLayoutEffect(() => {
     if (!open) return void 0;
     const place = () => {
       const rect = buttonRef.current?.getBoundingClientRect();
@@ -4272,10 +4662,11 @@ function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, cl
       window.removeEventListener("scroll", place, true);
     };
   }, [open]);
-  import_react6.default.useEffect(() => {
+  import_react7.default.useEffect(() => {
     if (!open) return void 0;
     const onPointerDown = (event) => {
       if (rootRef.current?.contains(event.target)) return;
+      if (buttonRef.current?.contains(event.target)) return;
       setOpen(false);
     };
     const onKeyDown = (event) => {
@@ -4290,30 +4681,58 @@ function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, cl
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
-  import_react6.default.useEffect(() => {
+  import_react7.default.useEffect(() => {
     if (!open) return;
     void store?.loadUsage?.({});
     void store?.loadAux?.({});
   }, [open, store]);
-  const prevWide = import_react6.default.useRef(wide);
-  import_react6.default.useEffect(() => {
+  const prevWide = import_react7.default.useRef(wide);
+  import_react7.default.useEffect(() => {
     if (prevWide.current !== wide) {
       prevWide.current = wide;
       setOpen(false);
     }
   }, [wide]);
+  import_react7.default.useEffect(() => {
+    if (wide !== true) return void 0;
+    const button2 = buttonRef.current;
+    if (!button2) return void 0;
+    let row = button2.parentElement;
+    const view = typeof window === "undefined" ? void 0 : window;
+    while (row && row !== (view?.document?.body ?? null)) {
+      const mine = typeof row.hasAttribute === "function" && row.hasAttribute("data-dshc-entry");
+      if (!mine && !(view && view.getComputedStyle(row).display === "contents")) break;
+      row = row.parentElement;
+    }
+    if (!row || row === view?.document?.body) return void 0;
+    const before = row.style.flexWrap;
+    row.style.flexWrap = "wrap";
+    return () => {
+      row.style.flexWrap = before;
+    };
+  }, [wide]);
+  const summary = import_react7.default.useMemo(
+    () => quickSummaryVM({ status: snapshot?.status, usage: snapshot?.usage, now: now() }),
+    [snapshot, now]
+  );
+  const shownCredits = useCountUp(summary.usableCredits);
+  const enter = useMountProgress(520);
   if (!enabled) return null;
   const rail = wide === false;
-  const summary = quickSummaryVM({
-    status: snapshot?.status,
-    usage: snapshot?.usage,
-    now: now()
-  });
   const phase = snapshot?.phase ?? "loading";
   const hasAccounts = summary.total > 0;
   const alert = phase === "error" || summary.inFlightFull > 0 || summary.total > 0 && summary.cooling > 0;
   const badgeColor = phase === "error" ? tone.err.fg : phase === "stale" ? tone.warn.fg : alert ? tone.warn.fg : tone.ok.fg;
-  const button = import_react6.default.createElement(
+  const barRows = (summary.channels ?? []).filter((row) => row.count > 0);
+  const barTotal = barRows.reduce((acc, row) => acc + row.count, 0) || 1;
+  const barTitle = barRows.map((row) => `${row.label ?? row.id} ${row.count} \u4E2A`).join(" \xB7 ");
+  const SEG_STAGGER = 0.28;
+  const segProgress = (index) => {
+    const span = 1 + SEG_STAGGER * Math.max(0, barRows.length - 1);
+    return Math.max(0, Math.min(1, enter * span - index * SEG_STAGGER));
+  };
+  const card = wide === true;
+  const button = import_react7.default.createElement(
     "button",
     {
       ref: buttonRef,
@@ -4323,36 +4742,77 @@ function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, cl
       "aria-label": "\u6E20\u9053\u8D26\u53F7",
       title: "\u6E20\u9053\u8D26\u53F7 \xB7 \u70B9\u51FB\u67E5\u770B\u8D26\u53F7\u6C60",
       onClick: () => setOpen((value) => !value),
+      ...card ? { className: "dshc-entry-card", "data-open": open ? "true" : "false" } : {},
       style: {
         font: "inherit",
         cursor: "pointer",
-        border: "none",
-        background: open ? "var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))" : "transparent",
+        // 卡片态的 1px 描边由 .dshc-entry-card 提供（内联 border 会盖掉类里的 hover 变色）
+        ...card ? {} : { border: "none" },
+        boxSizing: "border-box",
         color: "var(--dsw-alias-label-secondary,#6b7280)",
-        borderRadius: 8,
-        // foot 区那一行是**共享**的（`sidebar.footer.action` 是 list 槽：dsh-context 的
-        // 「上下文洞察」也在这里，且它自身是 `width: calc(100% + 4px)` 的整行样式）。
-        // 所以这里**不能用 width:100%** —— 那会和它互相抢宽、被挤成半行而看不清。
-        // flex:0 0 auto = 取自然宽度、永不被压扁；让整行样式的那一项去收缩。
-        flex: "0 0 auto",
+        // 展开态：外面那层行盒子占满宿主行（见下面的 entryRow），本按钮吃掉除右侧图标
+        // 之外的全部宽度 —— 文案一行读完，不再和别人抢宽。卡片背景用极浅 info 渐变 + 层底色。
+        // 注意：不要用 `var(--token)14` 这种拼十六进制后缀的写法 —— token 是 6 位 hex，
+        // 拼完在浏览器里整条 background 会被判无效（实测 backgroundImage=none）；
+        // 要半透明一律走 color-mix。
+        flex: card ? "1 1 auto" : "0 0 auto",
+        minWidth: rail ? 36 : 0,
         maxWidth: "100%",
-        height: rail ? 36 : 32,
-        padding: rail ? 0 : "0 8px",
-        minWidth: rail ? 36 : 96,
+        height: 36,
+        padding: rail ? 0 : "0 8px 0 11px",
         justifyContent: rail ? "center" : void 0,
+        position: "relative",
+        overflow: "hidden",
         display: "inline-flex",
         alignItems: "center",
         gap: 7,
-        transition: "background .15s",
-        overflow: "hidden"
+        ...card ? {
+          borderRadius: 10,
+          background: open ? "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 12%, transparent), transparent 70%), var(--dsw-alias-bg-layer-2,#f9fafb)" : "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%), var(--dsw-alias-bg-layer-1,#fff)",
+          transition: "border-color .15s, transform .15s, box-shadow .15s, background .15s"
+        } : { borderRadius: 8, background: open ? "var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))" : "transparent", transition: "background .15s" }
       }
     },
-    import_react6.default.createElement(
+    // 左侧 3px 健康色条：卡片被 overflow:hidden 裁在圆角里，正好当左侧强调边
+    card ? import_react7.default.createElement("span", {
+      "aria-hidden": "true",
+      style: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: badgeColor }
+    }) : null,
+    // 底部 3px 渠道堆叠条：一眼看出池子由哪几家渠道、各几个号（workbuddy / traework 识别色）。
+    // 入场：整体淡入 + 逐段从 0 长出（enter=1 后恢复 width 过渡，后续账号数变化平滑跟随）。
+    card && hasAccounts && phase !== "error" && barRows.length > 0 ? import_react7.default.createElement(
+      "span",
+      {
+        "aria-hidden": "true",
+        title: barTitle,
+        style: {
+          position: "absolute",
+          left: 3,
+          right: 0,
+          bottom: 0,
+          height: 3,
+          display: "flex",
+          overflow: "hidden",
+          opacity: enter >= 1 ? 1 : 0.35 + 0.65 * enter
+        }
+      },
+      ...barRows.map(
+        (row, index) => import_react7.default.createElement("span", {
+          key: row.id,
+          style: {
+            width: `${row.count / barTotal * 100 * segProgress(index)}%`,
+            background: channelColor(row.id),
+            transition: enter >= 1 ? "width .35s" : "none"
+          }
+        })
+      )
+    ) : null,
+    import_react7.default.createElement(
       "span",
       { style: { position: "relative", display: "inline-flex", flex: "0 0 auto" } },
-      import_react6.default.createElement(EntryIcon, { size: wide ? 17 : 18, color: badgeColor }),
+      import_react7.default.createElement(EntryIcon, { size: wide ? 17 : 18, color: badgeColor }),
       // 角标：rail 态唯一的异常信号
-      alert || phase === "stale" ? import_react6.default.createElement("span", {
+      alert || phase === "stale" ? import_react7.default.createElement("span", {
         style: {
           position: "absolute",
           right: -1,
@@ -4365,19 +4825,81 @@ function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, cl
         }
       }) : null
     ),
-    wide ? import_react6.default.createElement(
+    wide ? import_react7.default.createElement(
       "span",
-      { style: { display: "flex", alignItems: "baseline", gap: 6, minWidth: 0, flex: 1, justifyContent: "space-between" } },
-      import_react6.default.createElement("span", { style: { fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u6E20\u9053"),
-      import_react6.default.createElement(
+      { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1, justifyContent: "space-between" } },
+      import_react7.default.createElement("span", { style: { fontSize: 13, fontWeight: 550, color: "var(--dsw-alias-label-primary,currentColor)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
+      import_react7.default.createElement(
         "span",
-        { style: { fontSize: 11.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" } },
-        phase === "error" ? "\u4E0D\u53EF\u8FBE" : hasAccounts ? `${summary.healthy}/${summary.total} \xB7 ${formatCompact(summary.usableCredits)}` : "\u65E0\u8D26\u53F7"
+        { style: { display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0, flex: "0 0 auto" } },
+        // 健康环：把「5/5」从纯文字变成一眼可扫的占比（16px / 3px 描边；语义在 title + aria-label）
+        // 入场：从 0 扫到目标占比 + 淡入；扫出期间关掉 CSS 过渡（否则两套动画叠加会发飘）。
+        hasAccounts && phase !== "error" ? import_react7.default.createElement("span", {
+          role: "img",
+          "aria-label": `\u8D26\u53F7 ${summary.healthy}/${summary.total} \u5065\u5EB7`,
+          title: `\u8D26\u53F7 ${summary.healthy}/${summary.total} \u5065\u5EB7${summary.cooling > 0 ? ` \xB7 \u51B7\u5374 ${summary.cooling}` : ""}${summary.disabled > 0 ? ` \xB7 \u7981\u7528 ${summary.disabled}` : ""}`,
+          style: {
+            display: "inline-flex",
+            flex: "0 0 auto",
+            opacity: enter >= 1 ? 1 : 0.25 + 0.75 * enter
+          }
+        }, import_react7.default.createElement(Ring, {
+          ratio: summary.healthRatio * enter,
+          size: 16,
+          stroke: 3,
+          color: badgeColor,
+          transition: enter >= 1 ? void 0 : "none"
+        })) : null,
+        import_react7.default.createElement(
+          "span",
+          { style: { fontSize: 11.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" } },
+          phase === "error" ? "\u4E0D\u53EF\u8FBE" : hasAccounts ? `${summary.healthy}/${summary.total} \xB7 ${formatCompact(shownCredits)}` : "\u65E0\u8D26\u53F7"
+        )
       )
     ) : null
   );
+  const centerButton = wide && centerPanel ? import_react7.default.createElement("button", {
+    type: "button",
+    "aria-haspopup": "dialog",
+    "aria-expanded": centerOpen,
+    "aria-label": "\u6253\u5F00\u6E20\u9053\u4E2D\u5FC3",
+    title: "\u6253\u5F00\u6E20\u9053\u4E2D\u5FC3 \xB7 \u8D26\u53F7\u6C60 / \u4EFB\u52A1 / \u65E5\u5FD7 / \u7528\u91CF",
+    onClick: openCenter,
+    className: "dshc-entry-icon",
+    "data-open": centerOpen ? "true" : "false",
+    style: {
+      font: "inherit",
+      cursor: "pointer",
+      border: "none",
+      flex: "0 0 auto",
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      padding: 0,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "var(--dsw-alias-label-secondary,#6b7280)",
+      transition: "background .15s, color .15s"
+    }
+  }, import_react7.default.createElement(Icons.hub, { width: 17, height: 17, "aria-hidden": "true" })) : null;
+  const divider = wide && centerButton ? import_react7.default.createElement("span", {
+    "aria-hidden": "true",
+    style: { flex: "0 0 auto", width: 1, height: 18, background: "var(--dsw-alias-border-l2,#e5e7eb)" }
+  }) : null;
+  const entryRow = import_react7.default.createElement("div", {
+    "data-dshc-entry": "row",
+    style: {
+      flex: wide === true ? "0 0 100%" : "0 0 auto",
+      minWidth: 0,
+      maxWidth: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: wide ? 4 : 6
+    }
+  }, import_react7.default.createElement("style", null, ENTRY_CSS), button, divider, centerButton);
   const popover = open && anchor ? (0, import_react_dom.createPortal)(
-    import_react6.default.createElement(Popover, {
+    import_react7.default.createElement(Popover, {
       snapshot,
       summary,
       anchor,
@@ -4388,25 +4910,32 @@ function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, cl
         buttonRef.current?.focus?.();
       },
       onRefresh: () => void store?.refreshUpstream?.(),
-      // 便利入口：宿主没有 remote.settings 时不渲染「渠道中心」按钮（其余功能照常）
-      openSettings: hasOpenSettings?.() === true ? openSettings : void 0
+      openCenter: centerPanel ? openCenter : void 0
     }),
     document.body
   ) : null;
-  return import_react6.default.createElement(import_react6.default.Fragment, null, button, popover);
+  const centerModal = centerOpen && centerPanel ? (0, import_react_dom.createPortal)(
+    import_react7.default.createElement(
+      CenterModal,
+      { onClose: () => setCenterOpen(false) },
+      import_react7.default.createElement(centerPanel, centerPanelProps ?? {})
+    ),
+    document.body
+  ) : null;
+  return import_react7.default.createElement(import_react7.default.Fragment, null, entryRow, popover, centerModal);
 }
-function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, openSettings }) {
+function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, openCenter }) {
   const phase = snapshot?.phase ?? "loading";
   const error = snapshot?.error;
   const refreshing = snapshot?.refreshing === true;
   const usage = snapshot?.usage;
   const sheet = typeof window !== "undefined" && window.innerWidth < 480;
-  const seriesByUid = import_react6.default.useMemo(() => {
+  const seriesByUid = import_react7.default.useMemo(() => {
     const buckets = usage?.buckets;
     if (!Array.isArray(buckets) || buckets.length === 0) return /* @__PURE__ */ new Map();
     return usageSeriesByKey(buckets, "uid").series;
   }, [usage]);
-  const usageByUid = import_react6.default.useMemo(() => {
+  const usageByUid = import_react7.default.useMemo(() => {
     const rows = Array.isArray(usage?.by_uid) ? usage.by_uid : [];
     return new Map(rows.map((row) => [row.key, row]));
   }, [usage]);
@@ -4421,11 +4950,11 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
       now: now()
     })
   ).sort((a, b) => b.credits - a.credits || a.name.localeCompare(b.name));
-  const daySpark = import_react6.default.useMemo(() => {
+  const daySpark = import_react7.default.useMemo(() => {
     if (!Array.isArray(usage?.buckets)) return [];
     return usageBySlot(usage.buckets).map((row) => row.requests);
   }, [usage]);
-  return import_react6.default.createElement(
+  return import_react7.default.createElement(
     "div",
     {
       ref: rootRef,
@@ -4453,9 +4982,9 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
         overflow: "hidden"
       }
     },
-    import_react6.default.createElement("style", null, QUICK_CSS),
+    import_react7.default.createElement("style", null, QUICK_CSS),
     // ── 头部：品牌色渐变条 + 标题 + 新鲜度 + 关闭
-    import_react6.default.createElement(
+    import_react7.default.createElement(
       "div",
       {
         style: {
@@ -4464,22 +4993,20 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
           alignItems: "center",
           gap: 8,
           minWidth: 0,
-          background: "linear-gradient(135deg, var(--dsw-alias-button-info-fill,#4176f7)14, transparent 70%)",
+          background: "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%)",
           borderBottom: "1px solid var(--dsw-alias-border-l2,#eef1f5)"
         }
       },
-      import_react6.default.createElement("span", { style: { color: tone.info.fg, display: "inline-flex" } }, import_react6.default.createElement(EntryIcon, { size: 15, color: "currentColor" })),
-      import_react6.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
-      import_react6.default.createElement(
-        "span",
-        { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } },
-        summary.version ? `${summary.version}${summary.uptimeSec ? ` \xB7 ${uptimeText(summary.uptimeSec)}` : ""}` : ""
-      ),
-      import_react6.default.createElement(
+      import_react7.default.createElement("span", { style: { color: tone.info.fg, display: "inline-flex" } }, import_react7.default.createElement(EntryIcon, { size: 15, color: "currentColor" })),
+      import_react7.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
+      // 头部只留「标题 + 新鲜度」：网关自述名（/status 的 version）与进程 uptime 不放这里 ——
+      // 它们紧贴标题、灰字、无前缀，会被读成一条账号摘要（用户反馈）。要看这两项去
+      // 「渠道中心」的用量页（进程累计那块）。
+      import_react7.default.createElement(
         "span",
         { style: { marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 } },
-        import_react6.default.createElement(FreshnessPill, { phase, error, fetchedAt: snapshot?.fetchedAt, now: now() }),
-        import_react6.default.createElement("button", {
+        import_react7.default.createElement(FreshnessPill, { phase, error, fetchedAt: snapshot?.fetchedAt, now: now() }),
+        import_react7.default.createElement("button", {
           type: "button",
           "aria-label": "\u5173\u95ED",
           onClick: onClose,
@@ -4488,30 +5015,33 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
       )
     ),
     // ── 错误态：不显示 0、不假装有数据
-    phase === "error" ? import_react6.default.createElement(
+    phase === "error" ? import_react7.default.createElement(
       "div",
       { style: { padding: "14px 12px", display: "flex", flexDirection: "column", gap: 8 } },
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         { style: { fontSize: 12.5, color: tone.err.fg, display: "flex", alignItems: "center", gap: 6 } },
-        import_react6.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: "currentColor" } }),
+        import_react7.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: "currentColor" } }),
         error?.message ?? "\u7F51\u5173\u4E0D\u53EF\u8FBE"
       ),
-      import_react6.default.createElement("div", { style: { ...s.muted, fontSize: 11.5 } }, snapshot?.baseURL ? `\u5730\u5740 ${snapshot.baseURL}` : "\u672A\u914D\u7F6E\u7F51\u5173\u5730\u5740"),
-      import_react6.default.createElement(
+      import_react7.default.createElement("div", { style: { ...s.muted, fontSize: 11.5 } }, snapshot?.baseURL ? `\u5730\u5740 ${snapshot.baseURL}` : "\u672A\u914D\u7F6E\u7F51\u5173\u5730\u5740"),
+      import_react7.default.createElement(
         "div",
         { style: { display: "flex", gap: 8, marginTop: 2 } },
-        import_react6.default.createElement("button", { type: "button", onClick: () => onRefresh?.(), style: { ...s.btnGhost, height: 28, fontSize: 12 } }, "\u91CD\u8BD5"),
-        openSettings ? import_react6.default.createElement("button", { type: "button", onClick: openSettings, style: { ...s.btnPri, height: 28, fontSize: 12 } }, "\u6253\u5F00\u6E20\u9053\u4E2D\u5FC3") : null
+        import_react7.default.createElement("button", { type: "button", onClick: () => onRefresh?.(), style: { ...s.btnGhost, height: 28, fontSize: 12 } }, "\u91CD\u8BD5"),
+        openCenter ? import_react7.default.createElement("button", { type: "button", onClick: () => {
+          onClose?.();
+          openCenter?.();
+        }, style: { ...s.btnPri, height: 28, fontSize: 12 } }, "\u6253\u5F00\u6E20\u9053\u4E2D\u5FC3") : null
       )
-    ) : import_react6.default.createElement(
-      import_react6.default.Fragment,
+    ) : import_react7.default.createElement(
+      import_react7.default.Fragment,
       null,
       // ── 汇总：三块统计
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         { style: { display: "flex", gap: 8, padding: "10px 12px 4px" } },
-        import_react6.default.createElement(
+        import_react7.default.createElement(
           Tile,
           {
             label: "\u53EF\u7528\u79EF\u5206",
@@ -4519,55 +5049,55 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
             accent: tone.info.fg,
             hint: summary.creditsFreshness?.stale ? "\u504F\u65E7" : void 0
           },
-          import_react6.default.createElement(
+          import_react7.default.createElement(
             "div",
             { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 } },
-            import_react6.default.createElement(Ring, { ratio: summary.healthRatio, color: summary.healthy === summary.total ? tone.ok.fg : tone.warn.fg }),
-            import_react6.default.createElement(
+            import_react7.default.createElement(Ring, { ratio: summary.healthRatio, color: summary.healthy === summary.total ? tone.ok.fg : tone.warn.fg }),
+            import_react7.default.createElement(
               "span",
               { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", lineHeight: 1.35 } },
               `\u8D26\u53F7 ${summary.healthy}/${summary.total}`,
-              summary.cooling > 0 ? import_react6.default.createElement("br", null) : null,
+              summary.cooling > 0 ? import_react7.default.createElement("br", null) : null,
               summary.cooling > 0 ? `\u51B7\u5374 ${summary.cooling}` : ""
             )
           )
         ),
-        import_react6.default.createElement(
+        import_react7.default.createElement(
           Tile,
           { label: "\u8FD1 24h", value: summary.usage24h ? formatNumber(summary.usage24h.requests) : "\u2014", hint: "\u6B21" },
-          import_react6.default.createElement(
+          import_react7.default.createElement(
             "div",
             { style: { marginTop: 2, display: "flex", alignItems: "center", gap: 6, minWidth: 0 } },
-            import_react6.default.createElement(Sparkline, { values: daySpark, color: tone.info.fg, width: 92, height: 20 })
+            import_react7.default.createElement(Sparkline, { values: daySpark, color: tone.info.fg, width: 92, height: 20 })
           )
         )
       ),
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         { style: { padding: "6px 12px 10px" } },
-        import_react6.default.createElement(ChannelBar, {
+        import_react7.default.createElement(ChannelBar, {
           channels: summary.channels.map((row) => ({ ...row, color: channelColor(row.id) })),
           total: summary.total
         }),
-        summary.usage24h ? import_react6.default.createElement(
+        summary.usage24h ? import_react7.default.createElement(
           "div",
           { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
           `${formatTokens(summary.usage24h.tokens)} tokens \xB7 \u6210\u529F ${formatNumber(summary.usage24h.success)} / \u5931\u8D25 ${formatNumber(summary.usage24h.failed)}${summary.inFlight > 0 ? ` \xB7 \u5728\u9014 ${summary.inFlight}` : ""}${typeof summary.sticky === "number" ? ` \xB7 \u7C98\u6027 ${summary.sticky}` : ""}`
         ) : null
       ),
       // ── 账号列表（滚动区）
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         {
           className: "dshc-quick-scroll",
           style: { display: "flex", flexDirection: "column", gap: 2, padding: "4px 6px 8px", overflowY: "auto", minHeight: 0, flex: 1 }
         },
-        vms.length === 0 ? import_react6.default.createElement(
+        vms.length === 0 ? import_react7.default.createElement(
           "div",
           { style: { ...s.muted, padding: "10px 8px", fontSize: 11.5 } },
           "\u7F51\u5173\u8FD8\u6CA1\u6709\u8D26\u53F7 \u2014\u2014 \u5230\u300C\u6E20\u9053\u4E2D\u5FC3\u300D\u6DFB\u52A0\u540E\u8FD9\u91CC\u4F1A\u81EA\u52A8\u51FA\u73B0\u3002"
         ) : vms.map(
-          (vm) => import_react6.default.createElement(AccountQuickRow, {
+          (vm) => import_react7.default.createElement(AccountQuickRow, {
             key: vm.uid,
             vm,
             series: seriesByUid.get(vm.uid),
@@ -4576,7 +5106,7 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
         )
       ),
       // ── 底栏：新鲜度 + 动作
-      import_react6.default.createElement(
+      import_react7.default.createElement(
         "div",
         {
           style: {
@@ -4588,24 +5118,148 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
             background: "var(--dsw-alias-bg-layer-2,#fafbfc)"
           }
         },
-        import_react6.default.createElement(
+        import_react7.default.createElement(
           "span",
           { style: { ...s.muted, fontSize: 10.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
           snapshot?.refreshError ? `\u5237\u65B0\u5931\u8D25\uFF1A${snapshot.refreshError.message ?? "\u672A\u77E5\u539F\u56E0"}` : summary.creditsFreshness?.oldestISO ? `\u79EF\u5206 ${relativeTime(summary.creditsFreshness.oldestISO, now())}${summary.creditsFreshness.stale ? "\uFF08\u504F\u65E7\uFF09" : ""}` : " "
         ),
-        import_react6.default.createElement(
+        import_react7.default.createElement(
           "span",
           { style: { marginLeft: "auto", display: "inline-flex", gap: 6 } },
-          import_react6.default.createElement("button", {
+          import_react7.default.createElement("button", {
             type: "button",
             disabled: refreshing,
             onClick: onRefresh,
             title: "\u5411\u4E0A\u6E38\u91CD\u53D6\u5404\u8D26\u53F7\u4F59\u989D\uFF08\u4F1A\u771F\u6253\u4E00\u6B21\u4E0A\u6E38\uFF09",
             style: { ...s.btnGhost, height: 28, fontSize: 12, opacity: refreshing ? 0.6 : 1 }
           }, refreshing ? "\u5237\u65B0\u4E2D\u2026" : "\u5237\u65B0"),
-          openSettings ? import_react6.default.createElement("button", { type: "button", onClick: openSettings, style: { ...s.btnPri, height: 28, fontSize: 12 } }, "\u6E20\u9053\u4E2D\u5FC3") : null
+          openCenter ? import_react7.default.createElement("button", {
+            type: "button",
+            title: "\u6253\u5F00\u300C\u6E20\u9053\u4E2D\u5FC3\u300D\u9762\u677F\uFF08\u542B\u8D26\u53F7\u6C60\u3001\u4EFB\u52A1\u3001\u65E5\u5FD7\u3001\u7528\u91CF\uFF09",
+            onClick: () => {
+              onClose?.();
+              openCenter?.();
+            },
+            style: { ...s.btnPri, height: 28, fontSize: 12 }
+          }, "\u6E20\u9053\u4E2D\u5FC3") : null
         )
       )
+    )
+  );
+}
+function CenterModal({ onClose, children }) {
+  const closeRef = import_react7.default.useRef(null);
+  const sheet = typeof window !== "undefined" && window.innerWidth < 640;
+  import_react7.default.useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose?.();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const body = document.body;
+    const before = body?.style?.overflow ?? "";
+    if (body) body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (body) body.style.overflow = before;
+    };
+  }, [onClose]);
+  import_react7.default.useEffect(() => {
+    const previous = document.activeElement;
+    closeRef.current?.focus?.();
+    return () => {
+      previous?.focus?.();
+    };
+  }, []);
+  return import_react7.default.createElement(
+    "div",
+    {
+      className: "dshc-center-backdrop",
+      // 只在点到背景遮罩本身时关闭（点内容不关）
+      onMouseDown: (event) => {
+        if (event.target === event.currentTarget) onClose?.();
+      },
+      style: {
+        position: "fixed",
+        inset: 0,
+        zIndex: 80,
+        display: "flex",
+        alignItems: sheet ? "stretch" : "center",
+        justifyContent: "center",
+        padding: sheet ? 0 : 24,
+        background: "rgba(15,23,42,.45)"
+      }
+    },
+    import_react7.default.createElement(
+      "div",
+      {
+        className: "dshc-center-dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": "\u6E20\u9053\u4E2D\u5FC3",
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          width: sheet ? "100%" : "min(1040px, 100%)",
+          height: sheet ? "100%" : void 0,
+          maxHeight: sheet ? void 0 : "min(88vh, 920px)",
+          background: "var(--dsw-alias-bg-layer-1,#fff)",
+          color: "var(--dsw-alias-label-primary,currentColor)",
+          border: sheet ? "none" : "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+          borderRadius: sheet ? 0 : 16,
+          boxShadow: sheet ? "none" : "0 24px 64px rgba(15,23,42,.28), 0 2px 8px rgba(15,23,42,.10)",
+          overflow: "hidden"
+        }
+      },
+      // 头部：图标 + 标题 + 关闭（与 popover 头部同一套令牌，不写死颜色）
+      import_react7.default.createElement(
+        "div",
+        {
+          style: {
+            padding: sheet ? "12px 12px" : "10px 12px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            minWidth: 0,
+            borderBottom: "1px solid var(--dsw-alias-border-l2,#eef1f5)",
+            background: "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%)"
+          }
+        },
+        import_react7.default.createElement(
+          "span",
+          { style: { color: tone.info.fg, display: "inline-flex" } },
+          import_react7.default.createElement(Icons.hub, { width: 17, height: 17, "aria-hidden": "true" })
+        ),
+        import_react7.default.createElement("span", { style: { fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u4E2D\u5FC3"),
+        import_react7.default.createElement("button", {
+          ref: closeRef,
+          type: "button",
+          "aria-label": "\u5173\u95ED\u6E20\u9053\u4E2D\u5FC3",
+          title: "\u5173\u95ED\uFF08Esc\uFF09",
+          onClick: onClose,
+          style: {
+            font: "inherit",
+            cursor: "pointer",
+            border: "none",
+            background: "transparent",
+            color: "var(--dsw-alias-label-tertiary,#8b93a1)",
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            marginLeft: "auto",
+            lineHeight: 1,
+            flex: "0 0 auto"
+          }
+        }, "\u2715")
+      ),
+      // 主体：渠道中心面板本体（滚动区，移动端整屏）
+      import_react7.default.createElement("div", {
+        className: "dshc-center-body",
+        style: { flex: 1, minHeight: 0, overflow: "auto", padding: sheet ? "12px 12px 20px" : "12px 14px 16px" }
+      }, children)
     )
   );
 }
@@ -4972,6 +5626,7 @@ var TABS = [
   { id: "accounts", label: "\u8D26\u53F7\u6C60", icon: "chart" },
   { id: "tasks", label: "\u4EFB\u52A1", icon: "check" },
   { id: "usage", label: "\u7528\u91CF", icon: "trend" },
+  { id: "models", label: "\u6A21\u578B", icon: "cpu" },
   { id: "logs", label: "\u65E5\u5FD7", icon: "list" },
   { id: "config", label: "\u914D\u7F6E", icon: "gear" }
 ];
@@ -5018,19 +5673,19 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
           },
           React.createElement(
             "div",
-            { style: { ...s.muted, fontSize: 11 } },
+            { style: type.text.caption },
             counter.label,
             clickable ? " \u25BE" : ""
           ),
           React.createElement(
             "div",
             {
-              style: { fontSize: 20, fontWeight: 600, color: (tone[counter.tone] ?? tone.idle).fg },
+              style: { ...type.kpi, color: (tone[counter.tone] ?? tone.idle).fg },
               title: valueTitle
             },
             String(counter.value)
           ),
-          sub ? React.createElement("div", { style: { ...s.muted, fontSize: 10.5, marginTop: 2 } }, sub) : null
+          sub ? React.createElement("div", { style: { ...type.text.caption, marginTop: 2 } }, sub) : null
         );
       })
     ),
@@ -5039,10 +5694,14 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
       "div",
       { className: "dshc-row", style: { marginTop: 10, paddingLeft: 4 } },
       ...grouped.channels.map(
-        (channel) => React.createElement(Tag, {
+        (channel) => channel.count > 0 ? React.createElement(ChannelChip, {
           key: channel.id,
-          text: `${channel.label} ${channel.count} \u4E2A\u8D26\u53F7`,
-          tone: channel.count > 0 ? "info" : "idle"
+          channel: channel.id,
+          label: `${channel.label} ${channel.count} \u4E2A\u8D26\u53F7`
+        }) : React.createElement(Tag, {
+          key: channel.id,
+          text: `${channel.label} 0 \u4E2A\u8D26\u53F7`,
+          tone: "idle"
         })
       )
     ) : null,
@@ -5054,17 +5713,27 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
       ...grouped.channels.map(
         (channel) => React.createElement(
           "div",
-          { key: channel.id, className: `dshc-chancard${channel.count === 0 ? " dim" : ""}` },
-          React.createElement("div", { style: { ...s.muted, fontSize: 11 } }, channel.label),
+          {
+            key: channel.id,
+            className: `dshc-chancard${channel.count === 0 ? " dim" : ""}`,
+            // 左缘渠道身份色（与账号卡同一语言：只上形状）
+            style: { "--dshc-chan": channelPalette(channel.id).solid }
+          },
+          React.createElement(
+            "div",
+            { style: { ...type.text.caption, display: "flex", alignItems: "center", gap: 5 } },
+            React.createElement(ChannelDot, { channel: channel.id, size: 7 }),
+            channel.label
+          ),
           React.createElement(
             "div",
             {
-              style: { fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg },
+              style: { ...type.kpi, fontSize: 22, lineHeight: 1.3, color: channel.count > 0 ? tone.ok.fg : tone.idle.fg },
               title: `\u7CBE\u786E\u503C ${formatNumber(channel.credits)}`
             },
             channel.count > 0 ? formatCompact(channel.credits) : "\u2014"
           ),
-          React.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, `${channel.count} \u4E2A\u8D26\u53F7`)
+          React.createElement("div", { style: type.text.caption }, `${channel.count} \u4E2A\u8D26\u53F7`)
         )
       )
     ),
@@ -5076,10 +5745,10 @@ function OverviewCard({ status, channelOf, showDistribution, onToggleDistributio
         (realm) => React.createElement(
           "div",
           { key: realm.realm, className: "dshc-row", style: { marginBottom: 4 } },
-          React.createElement("span", { style: { ...s.muted, width: 74, flexShrink: 0 } }, realm.label),
+          React.createElement("span", { style: { ...type.text.caption, width: 74, flexShrink: 0 } }, realm.label),
           React.createElement(
             "span",
-            { style: { ...s.muted, whiteSpace: "nowrap" } },
+            { style: { ...type.text.caption, whiteSpace: "nowrap" } },
             `${realm.healthy}/${realm.total} \u53EF\u7528`
           ),
           React.createElement(
@@ -5544,7 +6213,7 @@ function AccountsTab({ status, channelOf, maxInFlight, limitOf, onAction, busy, 
           React.createElement("span", { style: { ...s.muted, marginRight: 4 } }, "\u6E20\u9053"),
           segmentButton("all", "\u5168\u90E8", filter, setFilter, accounts.length),
           ...CHANNEL_ORDER.filter((id) => (counts.get(id) ?? 0) > 0).map(
-            (id) => segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0)
+            (id) => segmentButton(id, channelLabel(id), filter, setFilter, counts.get(id) ?? 0, id)
           )
         ),
         React.createElement(ViewToggle, { view, setView })
@@ -5595,8 +6264,21 @@ function AccountsTab({ status, channelOf, maxInFlight, limitOf, onAction, busy, 
                 return React.createElement(
                   "tr",
                   { key: account.uid },
-                  React.createElement("td", null, account.nickname || account.uid.slice(0, 8)),
-                  React.createElement("td", null, channelLabel(channelOf(account)) || "\u2014"),
+                  React.createElement(
+                    "td",
+                    null,
+                    React.createElement(
+                      "span",
+                      { className: "dshc-row", style: { gap: 6 } },
+                      React.createElement(ChannelDot, { channel: channelOf(account), title: channelLabel(channelOf(account)) }),
+                      account.nickname || account.uid.slice(0, 8)
+                    )
+                  ),
+                  React.createElement(
+                    "td",
+                    null,
+                    React.createElement(ChannelChip, { channel: channelOf(account), label: channelLabel(channelOf(account)) })
+                  ),
                   React.createElement(
                     "td",
                     null,
@@ -5647,7 +6329,7 @@ function AccountDrawer({ account, maxInFlight, channel, credits, scheduleConfig,
         "div",
         { className: "dshc-row", style: { marginBottom: 12 } },
         React.createElement("span", { style: { ...s.label, fontSize: 15 } }, account.nickname || account.uid.slice(0, 8)),
-        channelLabel(channel) ? React.createElement(Tag, { text: channelLabel(channel), tone: "info" }) : null,
+        channelLabel(channel) ? React.createElement(ChannelChip, { channel, label: channelLabel(channel) }) : null,
         account.realm ? React.createElement(Tag, { text: account.realm, tone: "idle" }) : null
       ),
       // 完整明细：直接复用 AccountFold（四组折叠），保持数据面不丢；动作在抽屉里可用。
@@ -5697,7 +6379,14 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
   const lastSuccess = isZeroTime(account.last_success) ? void 0 : account.last_success;
   return React.createElement(
     "button",
-    { type: "button", className: "dshc-acctcard", onClick: onOpen, title: "\u70B9\u51FB\u67E5\u770B\u8BE6\u60C5" },
+    {
+      type: "button",
+      className: "dshc-acctcard",
+      // 左缘渠道身份色（与侧边栏浮层行的左色条同语言）：只上形状，文字仍走令牌
+      style: { "--dshc-chan": channelPalette(channel).solid },
+      onClick: onOpen,
+      title: "\u70B9\u51FB\u67E5\u770B\u8BE6\u60C5"
+    },
     // 顶行：昵称 + 状态
     React.createElement(
       "div",
@@ -5748,7 +6437,7 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
     React.createElement(
       "div",
       { className: "dshc-acctcard-foot" },
-      React.createElement("span", { className: "dshc-chip" }, channelLabel(channel) || "\u2014"),
+      React.createElement(ChannelChip, { channel, label: channelLabel(channel) || "\u2014" }),
       account.realm ? React.createElement("span", { className: "dshc-chip" }, account.realm === "global" ? "\u56FD\u9645\u7248" : "\u56FD\u5185\u7248") : null,
       expiry ? React.createElement(ExpiryChip, { expiry }) : null,
       // 成败比：新网关恒透出（零值也写），旧网关缺字段时退回在途数、不编造。
@@ -5777,7 +6466,7 @@ function ExpiryChip({ expiry }) {
     title
   }, `${prefix} ${dayText}${expiry.expired ? " \xB7 \u5DF2\u8FC7\u671F" : left <= 0 ? " \xB7 \u4ECA\u5929" : ` \xB7 ${left} \u5929`}`);
 }
-function segmentButton(id, label, active, onChange, count) {
+function segmentButton(id, label, active, onChange, count, channel) {
   const isActive = active === id;
   return React.createElement(
     "button",
@@ -5795,7 +6484,12 @@ function segmentButton(id, label, active, onChange, count) {
         fontWeight: isActive ? 600 : 400
       }
     },
-    `${label}${count === void 0 ? "" : ` ${count}`}`
+    channel ? React.createElement(
+      "span",
+      { className: "dshc-row", style: { gap: 5 } },
+      React.createElement(ChannelDot, { channel, size: 7 }),
+      `${label}${count === void 0 ? "" : ` ${count}`}`
+    ) : `${label}${count === void 0 ? "" : ` ${count}`}`
   );
 }
 function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
@@ -6722,17 +7416,17 @@ function InterfaceCard({ prefs }) {
       React.createElement(
         "div",
         { style: { minWidth: 0 } },
-        React.createElement("div", { style: { ...s.label, fontSize: 13 } }, "\u5728\u4FA7\u8FB9\u680F\u5DE6\u4E0B\u89D2\u663E\u793A\u6E20\u9053\u5165\u53E3"),
+        React.createElement("div", { style: type.text.body }, "\u5728\u4FA7\u8FB9\u680F\u5DE6\u4E0B\u89D2\u663E\u793A\u6E20\u9053\u5165\u53E3"),
         React.createElement(
           "div",
-          { style: { ...s.muted, marginTop: 3, fontSize: 11.5, lineHeight: 1.6 } },
+          { style: { ...type.text.secondary, marginTop: 3, lineHeight: 1.6 } },
           "\u663E\u793A\u300C\u6E20\u9053\u300D\u6309\u94AE\uFF0C\u70B9\u5F00\u5373\u770B\u8D26\u53F7\u6C60\u6458\u8981\u4E0E\u5404\u53F7\u53EF\u7528\u79EF\u5206\uFF08\u53EA\u8BFB\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u6253\u4E0A\u6E38\uFF09\u3002",
           React.createElement("br", null),
           "\u5173\u6389\u540E\u5165\u53E3\u9690\u85CF\uFF0C\u672C\u9762\u677F\u4E0D\u53D7\u5F71\u54CD\uFF1B\u4E5F\u53EF\u5728 DSH \u539F\u751F\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u6539\u3002"
         ),
         mode === "local" && available ? React.createElement(
           "div",
-          { style: { ...s.muted, marginTop: 4, fontSize: 11.5, lineHeight: 1.6 } },
+          { style: { ...type.text.caption, marginTop: 4, lineHeight: 1.6 } },
           "\u5F53\u524D\u9875\u9762\u4E0D\u662F\u672C\u673A\uFF08\u8FDC\u7A0B\u8BBF\u95EE\uFF09\uFF1ADSH \u53EA\u5728 127.0.0.1 \u9875\u9762\u63D0\u4F9B\u5BBF\u4E3B\u8BBE\u7F6E\u8BFB\u5199\uFF0C\u6240\u4EE5\u8FD9\u91CC\u7684\u5F00\u5173\u53EA\u4F5C\u7528\u4E8E\u672C\u6D4F\u89C8\u5668\uFF1B\u5728\u7535\u8111\u4E0A\u6253\u5F00 127.0.0.1 \u7684\u90A3\u4E2A\u9875\u9762\u6539\uFF0C\u624D\u80FD\u5168\u5C40\u751F\u6548\u3002"
         ) : null
       ),
@@ -6745,12 +7439,12 @@ function InterfaceCard({ prefs }) {
     ),
     failed ? React.createElement(
       "div",
-      { style: { ...s.muted, marginTop: 8, fontSize: 11.5, color: tone.err.fg } },
+      { style: { ...type.text.caption, marginTop: 8, color: tone.err.fg } },
       "\u4FDD\u5B58\u5931\u8D25\uFF1A\u5BBF\u4E3B\u8BBE\u7F6E\u672A\u5199\u5165\uFF0C\u5DF2\u56DE\u6EDA\u4E3A\u5F53\u524D\u503C\u3002"
     ) : null,
     !available ? React.createElement(
       "div",
-      { style: { ...s.muted, marginTop: 8, fontSize: 11.5 } },
+      { style: { ...type.text.caption, marginTop: 8 } },
       "\u5F53\u524D\u73AF\u5883\u65E2\u6CA1\u6709\u5BBF\u4E3B\u8BBE\u7F6E\u670D\u52A1\u3001\u4E5F\u6CA1\u6709\u53EF\u7528\u7684\u672C\u6D4F\u89C8\u5668\u5B58\u50A8\uFF0C\u5F00\u5173\u4E0D\u53EF\u7528\uFF1B\u5165\u53E3\u6309\u9ED8\u8BA4\uFF08\u5F00\u542F\uFF09\u663E\u793A\u3002"
     ) : null
   );
@@ -7678,6 +8372,10 @@ function ChanhubPanel({ rpcCall, prefs }) {
       channelOf,
       onRefreshAll: refresh
     }) : null,
+    activeTab === "models" ? React.createElement(ModelAbilityTab, {
+      rpcCall,
+      showToast
+    }) : null,
     activeTab === "logs" ? React.createElement(LogsTab, {
       logs,
       logChannel,
@@ -7747,14 +8445,6 @@ function apply(ctx) {
   const store = createQuickStore(rpcCall);
   effect(() => () => store.dispose(), "dsh-chanhub: sidebar quick store");
   effect(() => () => prefs.dispose?.(), "dsh-chanhub: sidebar entry prefs");
-  const remoteSettings = () => {
-    try {
-      const remote = typeof ctx.get === "function" ? ctx.get("remote") : void 0;
-      return remote?.settings;
-    } catch {
-      return void 0;
-    }
-  };
   ctx.slots.inject(
     "sidebar.footer.action",
     () => ctx.slots.register(
@@ -7766,8 +8456,8 @@ function apply(ctx) {
         inject: () => ({
           store,
           prefs,
-          hasOpenSettings: () => typeof remoteSettings()?.openSettingsDocument === "function",
-          openSettings: () => remoteSettings()?.openSettingsDocument?.()
+          centerPanel: ChanhubPanel,
+          centerPanelProps: { rpcCall, prefs }
         })
       },
       QuickEntry

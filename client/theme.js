@@ -159,12 +159,89 @@ export const tone = {
   },
   info: {
     fg: 'var(--dsw-alias-button-info-fill,#4176e6)',
-    bg: 'var(--dsw-alias-bg-layer-2,#eef2ff)',
+    bg: 'var(--dsw-alias-state-business-tertiary,#e4edfd)',
   },
   idle: {
     fg: 'var(--dsw-alias-label-secondary,#6b7280)',
     bg: 'var(--dsw-alias-bg-layer-2,#f3f4f6)',
   },
+};
+
+/**
+ * 文本三阶（标题 / 正文 / 说明）—— 统一字体层级的单一事实来源。
+ * 全部走 DSH label-primary/secondary/tertiary 变量，浅/深主题自适应，不硬编码。
+ * 用 `type.text.heading` / `type.text.body` / `type.text.caption` 取代散落的
+ * `s.muted`（说明）与无措辞的 fontSize 硬拼。
+ */
+export const type = {
+  /** 字号分档：H1 20 / H2 15 / body 13 / caption 12 / micro 11。 */
+  size: {
+    h1: 20,
+    h2: 15,
+    h3: 13,
+    body: 13,
+    caption: 12,
+    micro: 11,
+  },
+  text: {
+    heading: { color: 'var(--dsw-alias-label-primary,currentColor)', fontSize: 15, fontWeight: 600, lineHeight: 1.4 },
+    body: { color: 'var(--dsw-alias-label-primary,currentColor)', fontSize: 13, fontWeight: 400, lineHeight: 1.5 },
+    secondary: { color: 'var(--dsw-alias-label-secondary,#6b7280)', fontSize: 12, fontWeight: 400, lineHeight: 1.5 },
+    caption: { color: 'var(--dsw-alias-label-tertiary,#8b93a1)', fontSize: 11, fontWeight: 400, lineHeight: 1.5 },
+    code: {
+      fontFamily: 'ui-monospace,Menlo,monospace',
+      fontSize: 12,
+      fontWeight: 400,
+      wordBreak: 'break-all',
+      color: 'var(--dsw-alias-label-primary,currentColor)',
+    },
+    num: {
+      fontVariantNumeric: 'tabular-nums',
+      letterSpacing: '-.01em',
+      color: 'var(--dsw-alias-label-primary,currentColor)',
+    },
+    link: { color: 'var(--dsw-alias-brand-primary,#4f6ef7)', fontSize: 12, fontWeight: 500, textDecoration: 'none' },
+  },
+  /** KPI 主数值：统一给语义色（ok 绿 / warn 橙 / danger 红 / info 蓝 / idle 灰）。 */
+  kpi: {
+    fontSize: 20,
+    fontWeight: 700,
+    lineHeight: 1.2,
+    letterSpacing: '-.02em',
+    fontVariantNumeric: 'tabular-nums',
+  },
+};
+
+/**
+ * 图表序列色板（堆叠柱 / 模型占比 / 排行共用的固定商务色序）。
+ * 同模型跨图表必须同色，故用固定 hex（不在 DSH 主题变量内，避免深浅主题下
+ * 同一模型忽蓝忽红）。
+ *
+ * **7 色，且刻意不含三个渠道识别色**（`#4f6ef7` 蓝 / `#a855f7` 紫 / `#06b6d4` 青）：
+ * 渠道维度一律走 `channelPalette()`（唯一色源），分类色板让位给它，避免出现
+ * 「某渠道 = 蓝，某模型也 = 蓝」的同色不同义。
+ */
+export const SEG_COLORS = [
+  '#10b981', // 翠绿
+  '#f59e0b', // 琥珀
+  '#ef4444', // 红
+  '#84cc16', // 黄绿
+  '#ec4899', // 玫红
+  '#14b8a6', // 蓝绿
+  '#6366f1', // 靛
+];
+
+/**
+ * 语义色板（界面 / 状态 / KPI 高亮）：6 语义 × {fg,bg}，全走 DSH 变量自适应。
+ * 与 `tone` 同源但在语义命名上更完整（supportsSuccess/…），供跨 Tab 统一取色。
+ */
+export const semantic = {
+  accent: { fg: 'var(--dsw-alias-state-business-primary,#4176e6)', bg: 'var(--dsw-alias-state-business-tertiary,#e4edfd)' },
+  success: { fg: 'var(--dsw-alias-state-success-primary,#059669)', bg: 'var(--dsw-alias-state-success-tertiary,#ecfdf5)' },
+  warning: { fg: 'var(--dsw-alias-state-warn-primary,#b45309)', bg: 'var(--dsw-alias-state-warn-tertiary,#fffbeb)' },
+  danger: { fg: 'var(--dsw-alias-state-error-primary,#dc2626)', bg: 'var(--dsw-alias-interactive-bg-hover-danger,#fef2f2)' },
+  info: { fg: 'var(--dsw-alias-button-info-fill,#4176e6)', bg: 'var(--dsw-alias-state-business-tertiary,#e4edfd)' },
+  neutral: { fg: 'var(--dsw-alias-label-secondary,#6b7280)', bg: 'var(--dsw-alias-bg-layer-2,#f3f4f6)' },
 };
 
 /**
@@ -315,7 +392,7 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 /* 渠道三卡（当前可用积分：WB / Trae / Qoder） */
 .dshc-chancards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 @media (max-width: 560px) { .dshc-chancards { grid-template-columns: 1fr; } }
-.dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
+.dshc-chancard { border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-left: 3px solid var(--dshc-chan, var(--dsw-alias-border-l2,#e5e7eb)); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); min-width: 0; }
 .dshc-chancard.dim { opacity: 0.55; }
 /* 视图切换（卡片/列表） */
 .dshc-viewtoggle { display: inline-flex; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
@@ -326,7 +403,7 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 /* 账号卡：四段式纵向结构（头 / 主数值 / 在途条 / 底行），信息各归其位。
    原先只有两行且右侧挤一行 11px 小字，主体大片留白 —— 改为一列铺满，
    主数值放大占整行，元信息拆到独立底行（字号 11.5px 仍可读）。 */
-.dshc-acctcard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); cursor: pointer; min-width: 0; text-align: left; font: inherit; transition: box-shadow .15s, border-color .15s; }
+.dshc-acctcard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-left: 3px solid var(--dshc-chan, var(--dsw-alias-border-l2,#e5e7eb)); border-radius: 10px; padding: 12px 14px; background: var(--dsw-alias-bg-layer-1,#fff); cursor: pointer; min-width: 0; text-align: left; font: inherit; transition: box-shadow .15s, border-color .15s; }
 .dshc-acctcard:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); border-color: var(--dsw-alias-brand-primary,#4f6ef7); }
 .dshc-acctcard-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .dshc-acctcard-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }

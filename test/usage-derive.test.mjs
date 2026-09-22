@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import {
   accountExpiry,
+  channelPalette,
   accountShares,
   channelShares,
   creditBurn,
@@ -501,4 +502,18 @@ test('U26 kpiCards：6 张、两行三列，缓存/延迟无观测显示 — 而
   const emptyByKey = Object.fromEntries(empty.map((c) => [c.key, c]));
   assert.equal(emptyByKey.cache.value, '—');
   assert.equal(emptyByKey.latency.value, '—');
+});
+
+test('U27 channelPalette：三件套同源、soft/edge 由 identity 色派生、未知渠道回落中性灰', () => {
+  const wb = channelPalette('workbuddy');
+  assert.equal(wb.solid, '#4f6ef7', 'solid 必须是渠道识别色本体');
+  assert.match(wb.soft, /^color-mix\(in srgb, #4f6ef7 12%, transparent\)$/, 'soft = identity 12% 混透明');
+  assert.match(wb.edge, /^color-mix\(in srgb, #4f6ef7 45%, transparent\)$/, 'edge = identity 45% 混透明');
+  // 三个渠道必须彼此不同（身份色的意义就在这里）
+  const solids = ['workbuddy', 'traework', 'qoder'].map((id) => channelPalette(id).solid);
+  assert.equal(new Set(solids).size, 3, `三渠道色必须互异，实际 ${JSON.stringify(solids)}`);
+  // 未知 / 空值回落中性灰，不编品牌色（与 channelColor 同约定）
+  assert.equal(channelPalette('nope').solid, '#94a3b8');
+  assert.equal(channelPalette(undefined).solid, '#94a3b8');
+  assert.equal(channelPalette('').soft, 'color-mix(in srgb, #94a3b8 12%, transparent)');
 });

@@ -10,10 +10,12 @@
 // 两者口径不同，UI 必须分区标注，不得相减或相加。
 
 import React from 'react';
-import { s, tone } from '../theme.js';
-import { CardHead, Tag, useCountUp } from '../ui.js';
+import { SEG_COLORS, s, tone, type } from '../theme.js';
+import { CardHead, ChannelChip, ChannelDot, Tag, useCountUp } from '../ui.js';
 import {
   CHANNEL_LABEL,
+  channelColor,
+  channelPalette,
   DAY_RANGES,
   RANK_METRICS,
   formatCompact,
@@ -104,6 +106,9 @@ function KpiCard({ item }) {
   const display = noData
     ? item.value
     : formatKpi(animated, item.kind);
+  // 语义色：ok(绿)/warn(橙)/info(蓝)/idle(中性)；无观测时退中性 idle（不假装健康）。
+  const kpiTone = tone[item.tone] ?? tone.idle;
+  const color = noData ? tone.idle.fg : kpiTone.fg;
 
   return React.createElement('div', {
     className: 'dshc-ust-kpi',
@@ -114,7 +119,7 @@ function KpiCard({ item }) {
     React.createElement('div', { className: 'dshc-ust-kpi-k' }, item.label),
     React.createElement('div', {
       className: 'dshc-ust-kpi-v',
-      style: item.tone === 'ok' ? { color: tone.ok.fg } : undefined,
+      style: { color },
     }, display),
     React.createElement('div', { className: 'dshc-ust-kpi-d' }, item.detail),
   );
@@ -235,7 +240,7 @@ export function Heatmap({ rows, metric = 'requests', onMetricChange, onTip }) {
       ),
     ),
     React.createElement('div', { className: 'dshc-ust-cardfoot' },
-      React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+      React.createElement('span', { style: type.text.caption },
         hasDayData
           ? `活跃 ${grid.activeDays} 天 · 峰值 ${formatNumber(grid.max)} ${unit}/天`
           : `近 ${HEAT_WINDOW_DAYS} 天暂无按天记录`),
@@ -247,7 +252,7 @@ export function Heatmap({ rows, metric = 'requests', onMetricChange, onTip }) {
     // 数据太稀疏时补一张按小时的分布（这才是当前真实有数据的维度）
     sparseDays && hasHourData
       ? React.createElement('div', { className: 'dshc-ust-subblock' },
-          React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginBottom: 8 } },
+          React.createElement('div', { style: type.text.caption },
             hasDayData
               ? `按天记录只有 ${grid.activeDays} 天（网关小时槽只保 48 小时、日槽要跨天才产生）—— 按小时看更清楚：`
               : '近 30 天没有按天记录 —— 按小时看当前这段：'),
@@ -281,7 +286,7 @@ function HourProfile({ hours }) {
     ),
     React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: 4 } },
       ...['00', '06', '12', '18', '23'].map((label) =>
-        React.createElement('span', { key: label, style: { ...s.muted, fontSize: 10.5 } }, label)),
+        React.createElement('span', { key: label, style: type.text.caption }, label)),
     ),
   );
 }
@@ -300,18 +305,23 @@ function HourProfile({ hours }) {
  * 因此这里给一组固定色相、明度都在 500–600 档的色板：亮色底上够深、
  * 暗色底上够亮，两套主题都不糊。
  */
-export const SEG_COLORS = [
-  '#4f6ef7', // 蓝
-  '#10b981', // 翠绿
-  '#f59e0b', // 琥珀
-  '#a855f7', // 紫
-  '#06b6d4', // 青
-  '#ef4444', // 红
-  '#84cc16', // 黄绿
-  '#ec4899', // 玫红
-  '#14b8a6', // 蓝绿
-  '#6366f1', // 靛
-];
+
+
+/**
+ * 序列色：**渠道维度用渠道识别色**（与侧边栏浮层同源），其它维度才走分类色板。
+ *
+ * 判定依据：行上带 `channel` 字段（账号排行），或行的 key 本身就是渠道 id
+ * （渠道用量的 key 就是渠道）。这样同一渠道在浮层/账号池/用量页三处同色。
+ *
+ * @param item - 序列行（可带 `channel` / `key`）。
+ * @param index - 在序列里的下标（非渠道维度用它取分类色）。
+ * @returns CSS 颜色。
+ */
+export function seriesColor(item, index) {
+  const channel = item?.channel
+    ?? (typeof item?.key === 'string' && CHANNEL_LABEL[item.key] !== undefined ? item.key : undefined);
+  return channel ? channelColor(channel) : SEG_COLORS[index % SEG_COLORS.length];
+}
 
 /** 长尾合并阈值：前 5 名单独着色，其余归「其他」。 */
 const SERIES_HEAD = 5;
@@ -469,7 +479,7 @@ export function DailyBars({ byModel, metric, range, onRangeChange, onMetricChang
 export function mergeTail(series) {
   const list = Array.isArray(series) ? series : [];
   const head = list.slice(0, SERIES_HEAD).map((row, i) => ({
-    ...row, color: SEG_COLORS[i % SEG_COLORS.length], rest: false,
+    ...row, color: seriesColor(row, i), rest: false,
   }));
   const tail = list.slice(SERIES_HEAD);
   if (tail.length === 0) return head;
@@ -525,11 +535,17 @@ export function RankCards({ accounts, channels, metric = 'tokens', onMetricChang
                 React.createElement('span', { className: 'dshc-ust-rank-name' },
                   React.createElement('span', { title: row.key }, row.name),
                   row.channel
-                    ? React.createElement(Tag, { text: CHANNEL_LABEL[row.channel] ?? row.channel, tone: 'info' })
+                    ? React.createElement(ChannelChip, { channel: row.channel, label: CHANNEL_LABEL[row.channel] ?? row.channel })
                     : null,
                 ),
                 React.createElement('span', { className: 'dshc-ust-rank-bar' },
-                  React.createElement('i', { style: { width: `${Math.max(2, Math.round(row.barShare * 100))}%` } }),
+                  // 身份色只上形状：排行条按渠道着色（与侧边栏/账号池同源）
+                  React.createElement('i', {
+                    style: {
+                      width: `${Math.max(2, Math.round(row.barShare * 100))}%`,
+                      background: seriesColor(row, index),
+                    },
+                  }),
                 ),
                 React.createElement('span', {
                   className: 'dshc-ust-rank-val',
@@ -548,12 +564,18 @@ export function RankCards({ accounts, channels, metric = 'tokens', onMetricChang
             ...channels.map((row) =>
               React.createElement('div', { key: row.key, className: 'dshc-ust-rank-row' },
                 React.createElement('span', { className: 'dshc-ust-rank-name', style: { flex: 1 } },
+                  React.createElement(ChannelDot, { channel: row.key, size: 8, title: CHANNEL_LABEL[row.key] ?? row.key }),
                   React.createElement('span', null, CHANNEL_LABEL[row.key] ?? row.key),
                   // 「3 号」是内部黑话：读者会读成「3 号账号」。写明量词。
-                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, `${row.accounts} 个账号`),
+                  React.createElement('span', { style: type.text.caption }, `${row.accounts} 个账号`),
                 ),
                 React.createElement('span', { className: 'dshc-ust-rank-bar' },
-                  React.createElement('i', { style: { width: `${Math.max(2, Math.round(row.barMax * 100))}%` } }),
+                  React.createElement('i', {
+                    style: {
+                      width: `${Math.max(2, Math.round(row.barMax * 100))}%`,
+                      background: channelColor(row.key),
+                    },
+                  }),
                 ),
                 React.createElement('span', {
                   className: 'dshc-ust-rank-val',
@@ -594,7 +616,7 @@ export function ModelDonut({ rows, onTip }) {
   let offset = 0;
   const arcs = shares.map((item, index) => {
     const len = item.share * CIRC;
-    const arc = { ...item, index, len, offset, color: SEG_COLORS[index % SEG_COLORS.length] };
+    const arc = { ...item, index, len, offset, color: seriesColor(item, index) };
     offset += len;
     return arc;
   });
@@ -784,7 +806,7 @@ export function BurnPanel({ rows, stock, windowValue, burn }) {
         className: 'axt', x: W - PR, y: H - 8, textAnchor: 'end',
       }, '外推'),
     ),
-    React.createElement('div', { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
+    React.createElement('div', { style: type.text.caption },
       React.createElement('span', {
         style: { cursor: 'help' },
         title: '实线 = 窗口起点存量按已消耗逐槽回推（回推值，非逐时实测）；虚线 = 按窗口速率线性外推（非承诺，实际偏乐观）。窗口起点存量 = 当前可用存量 + 窗口内已消耗；只算可消耗额度；账本只覆盖经本网关的请求。',
@@ -868,10 +890,10 @@ export function ProcessPanel({ stats, windowTotal }) {
                   model.credits
                     ? React.createElement(Tag, { text: model.credits, tone: 'idle' })
                     : React.createElement('span', {
-                        style: { ...s.muted, fontSize: 10.5 },
+                        style: type.text.caption,
                         title: '上游未下发该模型倍率（缺失 ≠ 免费）',
                       }, '倍率 —'),
-                  React.createElement('span', { style: { ...s.muted, fontSize: 10.5, flexShrink: 0 } },
+                  React.createElement('span', { style: type.text.caption },
                     `${formatNumber(Number(model.requests) || 0)} 请求`),
                 ),
                 React.createElement('div', { className: 'dshc-mrow-detail' },
@@ -926,12 +948,12 @@ export function RatioStrip({ items }) {
   return React.createElement('div', { className: 'dshc-row', style: { gap: 14 } },
     ...list.map((item, index) =>
       React.createElement('div', { key: `${item.label}-${item.scope}-${index}`, className: 'dshc-row', style: { gap: 6 } },
-        React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, item.label),
+        React.createElement('span', { style: type.text.caption }, item.label),
         React.createElement('span', {
           style: { fontSize: 13, fontWeight: 600, color: item.tone ?? 'var(--dsw-alias-label-primary,currentColor)' },
         }, item.value),
         React.createElement('span', {
-          style: { ...s.muted, fontSize: 10.5, cursor: 'help' },
+          style: type.text.caption,
           title: item.title ?? item.scope,
         }, item.scope),
       ),

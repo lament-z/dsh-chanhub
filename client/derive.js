@@ -584,6 +584,30 @@ export function channelColor(channel) {
 }
 
 /**
+ * 渠道配色三件套（**唯一色源**：侧边栏浮层与渠道中心共用）。
+ *
+ * 为什么要有这一层：渠道识别色原来只有 `channelColor()` 一个 hex，各处各写各的 ——
+ * 浮层拿它画色条/余额条/走势线，渠道中心压根没用这套色（渠道名一律 `tone:'info'`，
+ * 三家渠道在中心里看不出区别），用量图表那边又抄了一份字面量调色板。
+ * 统一成三件套后两边拿到同一套派生色，不会再出现「同一渠道两处不同颜色」。
+ *
+ * 纪律：渠道色**只上形状**（条/点/线/底），文字一律走 `--dsw-alias-*` 令牌 ——
+ * 这三个是 500–600 档中间色，暗色主题下当正文偏暗。
+ *
+ * @param channel - 渠道 id（未知/空回落中性灰，不编造品牌色）。
+ * @returns `{solid, soft, edge}`：`solid` 身份色本体；`soft` 胶囊底/行 hover（12%）；
+ *   `edge` 描边/分隔（45%）。都用 `color-mix` 派生，亮暗两套都够淡且不会被整条丢弃。
+ */
+export function channelPalette(channel) {
+  const solid = channelColor(channel);
+  return {
+    solid,
+    soft: `color-mix(in srgb, ${solid} 12%, transparent)`,
+    edge: `color-mix(in srgb, ${solid} 45%, transparent)`,
+  };
+}
+
+/**
  * 「活跃」近似标签。
  *
  * 为什么只能近似：「本会话在用哪个账号」要会话粘性键（网关侧由首条 user 消息
@@ -1639,6 +1663,7 @@ export function kpiCards({ total, stock, days, burn }) {
       // 对已格式化字符串反解（"18.9k" → 18.9）会把单位当数量级，动效会显示 0k。
       raw: structure.total,
       kind: 'tokens',
+      tone: 'info',
       detail: `输入 ${formatTokens(structure.prompt)} · 输出 ${formatTokens(structure.completion)}`,
       title: `窗口内 prompt + completion 合计 ${formatNumber(structure.total)}（两段互斥，相加不重复计）`,
     },
@@ -1649,7 +1674,7 @@ export function kpiCards({ total, stock, days, burn }) {
       raw: credit,
       kind: 'compact',
       detail: requests > 0 ? `每请求 ${formatCredit(credit / requests)}` : '窗口内无请求',
-      tone: 'ok',
+      tone: 'warn',
       title: `窗口内真实扣费合计 ${formatCredit(credit)}（网关账本口径）`,
     },
     {
@@ -1673,6 +1698,7 @@ export function kpiCards({ total, stock, days, burn }) {
       raw: requests,
       kind: 'compact',
       detail: `成功 ${formatNumber(requests - failed)} · 失败 ${formatNumber(failed)}`,
+      tone: 'info',
       title: '网关无会话概念，故这里如实给请求数（不编造「会话数」）',
     },
     {
@@ -1685,6 +1711,7 @@ export function kpiCards({ total, stock, days, burn }) {
       detail: hit === null
         ? '窗口内无缓存观测'
         : `命中 ${formatTokens(Number(total?.cache_hit_tokens) || 0)} · 未命中 ${formatTokens(Number(total?.cache_miss_tokens) || 0)}`,
+      tone: hit !== null && hit >= 0.75 ? 'ok' : 'idle',
       title: '窗口分桶口径：命中 /（命中 + 未命中），写入不计入分母。进程累计口径的命中率见下方折叠区（两者不可混算）',
     },
     {
@@ -1694,6 +1721,7 @@ export function kpiCards({ total, stock, days, burn }) {
       raw: Number.isFinite(latency) ? latency : 0,
       kind: 'ms',
       detail: requests > 0 ? `按请求数加权 · ${formatNumber(requests)} 次` : '窗口内无请求',
+      tone: Number.isFinite(latency) && latency > 0 && latency >= 5000 ? 'warn' : 'idle',
       title: '窗口分桶口径：逐槽均值按请求数加权后的端到端耗时（与 /v1/stats 的进程累计均值是两个口径）',
     },
   ];

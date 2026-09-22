@@ -1,5 +1,166 @@
 # Changelog
 
+### 配色吸收：渠道中心改用与侧边栏同一套渠道色（唯一色源 `channelPalette`）
+
+问题：同一个渠道在侧边栏浮层是**有身份的**（蓝色条 + 余额渐变 + 走势线），到了渠道中心
+却只剩文字 —— 账号池是 `<Tag tone="info">`（三家全同一种蓝）、表格是纯 `td`、筛选项是纯文字按钮，
+**三家渠道在中心里看不出区别**；用量图表的分类色板又抄了一份含同色 hex 的字面量按下标分配。
+吸收后「同一渠道在浮层 / 账号池 / 用量页三处必然同色」变成**结构保证**，不是靠各处记得调 `channelColor`。
+
+三层落地（按方案执行，一次一处，每步全量测试）：
+
+1. **同源**：`derive.js` 新增 `channelPalette(id)` → `{solid, soft, edge}`（`solid` = 现有
+   `channelColor`；`soft` = `color-mix(solid 12%)`；`edge` = `color-mix(solid 45%)`），
+   并配单测 `U27`（三渠道互异 / soft·edge 由 identity 派生 / 未知与空值回落中性灰）。
+2. **同形**：`ui.js` 新增共享组件 `ChannelDot` / `ChannelChip`（带 `data-channel-dot` /
+   `data-channel-chip` 便于断言），浮层 `AccountQuickRow` 与渠道中心**用同一个组件**：
+   - 浮层行：原 `Chip(vm.channelLabel)` → `ChannelChip`；
+   - 账号池表格：首列加渠道圆点、渠道列改渠道胶囊；渠道筛选项每段带圆点；
+   - 账号卡：左缘渠道色走 CSS 变量 `--dshc-chan`（不内联 box-shadow，避免覆盖 hover 阴影）；
+   - 详情抽屉头部：渠道 `Tag(tone:info)` → `ChannelChip`。
+3. **同用**：
+   - 概览「渠道分布」：有号走渠道胶囊、无号保持中性灰 Tag；「三渠道积分卡」左缘渠道色 + 标题圆点；
+   - 用量 Tab：`seriesColor(item, index)` 新增 —— **渠道维度用 `channelColor`**（账号排行行按
+     `row.channel`、渠道用量行按 `row.key`），其它维度才走分类色板；两处排行条按渠道着色；
+   - `SEG_COLORS` **让位**：删掉与渠道色重复的蓝/紫/青三色（10 → 7 色），并让 `usage/cards.js`
+     改为从 `theme.js` 单一来源导入（原来两份字面量各写一遍），杜绝「某渠道=蓝、某模型也=蓝」。
+
+纪律（已锁进测试）：渠道色**只上形状**（条/点/线/底），文字一律 `--dsw-alias-*` 令牌 ——
+真机实测胶囊文字色是 `rgb(249,250,251)`（暗）/ `rgb(15,17,21)`（亮），渠道色从未出现在正文上。
+
+**两处如实不做**（没有数据就不画，不编造）：日志行的 `ch` 是**日志频道**（chat/task/sys），
+不是 provider 渠道；配置页也没有按渠道分组的字段 —— 这两处没有渠道身份可吸收，故不加渠道点。
+
+测试：`node --test test/*.test.mjs` → **227 例 / 206 通过 / 0 失败 / 21 跳过**。
+新增渲染用例「渠道身份走颜色」——断言挂在 `data-channel-*` 上（jsdom 的 CSSOM 不认 `color-mix`，
+不能用内联色断言），并**直接引用 `channelPalette()` 作为期望值**做同源校验。
+
+真机回归（无头 Chrome + 真实宿主）：
+
+| 断言 | 实测 |
+|---|---|
+| 浮层 vs 中心的同渠道色 | workbuddy `rgb(79,110,247)` 两处相等；traework `rgb(168,85,247)` 两处相等 ✓ |
+| 中心三渠道圆点 | WB/Trae/Qoder = `#4f6ef7` / `#a855f7` / `#06b6d4` |
+| 卡片左缘 | `dshc-chancard` / `dshc-acctcard` 的 `--dshc-chan` = 渠道 hex，计算后 `border-left-color` 同色 |
+| 用量排行条 | 账号行按各自渠道着色；渠道用量行 WB=蓝、Trae=紫 |
+| 亮色主题 | 胶囊 soft 底仍解析为 `color(srgb … / 0.12)`，文字随令牌变亮色 —— 无硬编码泄漏 |
+| 布局 | 桌面 / 390px 移动端横向溢出均为 0 |
+
+### 入场动效：健康环扫出 + 渠道条逐段长出 + 卡片淡入（一次性，不随轮询重播）
+
+在 `useCountUp`（数字）之外，给另外三个视觉元素补入场：
+
+- **健康环**：520ms 内从 0 扫到目标占比 + 淡入。扫出期间把 `Ring` 的 CSS 过渡关掉
+  （新增可选 `transition` prop，默认值不变），否则 JS 进度与 CSS 过渡两套动画叠加会发飘；
+  扫完交回 `stroke-dasharray .35s`，之后健康占比变化仍然平滑。
+- **3px 渠道条**：整体淡入 + **逐段错开长出**（`SEG_STAGGER = 0.28`，最后一段恰好在 enter=1 收尾）；
+  入场结束后恢复 `transition: width .35s`，后续账号数变化平滑跟随。
+- **卡片 / 图标按钮**：`ENTRY_CSS` 里一条只动 opacity 的 `dshc-entry-in .22s`（不用 transform，
+  避免和 hover 的 `translateY(-1px)` 抢同一属性）。
+
+新增 `useMountProgress(duration)` hook（放在 `quick-entry.js`，与 `Ring` 相邻），沿用 `useCountUp` 的
+**"动画必须可失败"** 纪律：无 rAF、或 `prefers-reduced-motion: reduce` → 直接返回 1（终态）；
+rAF 被节流时还有 `setTimeout(duration + 150)` 兜底落定，环/条**绝不会停在中间态**。
+动效只在挂载时播一次（effect 依赖 `[duration, canAnimate]`），60s 轮询与浮层开关引起的重渲染都不重播 —— 已实测。
+
+测试：`node --test test/*.test.mjs` → **225 例 / 204 通过 / 0 失败 / 21 跳过**。
+新增渲染用例「入场动效可失败 —— 健康环/渠道条最终必须落到真值（不停在 0 或中间态）」
+（按 fixture 的 `healthy/total` 反推期望弧长，并断言各段宽度合计≈100%）。
+真机分帧采样（无头 Chrome，每帧 ≤1ms 轮询，1.5s 共 3817 次）：
+
+| 时刻 | 环弧长 | 条不透明度 | 分段宽度 | 卡片不透明度 |
+|---|---|---|---|---|
+| 16ms | 2.3 / 40.84 | 0.39 | `[9, 0]`（第二段尚未开始） | 0.00 |
+| 342ms | 27.9 | 0.79 | `[108, 49]` | 1.00 |
+| 515ms | 40.84（满） | 1.00 | `[124, 77]` | 1.00 |
+| ≥875ms | 40.84 | 1.00 | `[124, 82]`（真值 3:2） | 1.00 |
+
+同一页面开 `prefers-reduced-motion: reduce` 后采样：**首帧即为终值**（弧 40.84、条 1.00、分段 124/82），
+确认减动效环境下不播动画、也不停在初值。另测：连开连关浮层 2 次（触发重渲染），环/条/卡片数值不变 → 无重播。
+
+### 修：侧边栏入口「点第二下收不回」（pointerdown 抢关 + click 再开）
+
+现象：点一下开账号池浮层，再点一下**关不掉**（`aria-expanded` 一直是 true），只能点外部或 Esc 才关。
+
+根因：两个处理器抢同一件事 —— 外部点击关闭挂在 `document` 的 **pointerdown**（捕获）上，入口按钮不在
+`rootRef`（浮层根）里，于是 pointerdown 先 `setOpen(false)`；紧接着同一个物理点击的 **click** 到达按钮的
+`onClick`，它做的是 `setOpen(v => !v)`，读到刚被关掉的 `false` 又切回 `true`。净效果 = 永远开着。
+
+修法：`onPointerDown` 里对**入口按钮自己的子树**（`buttonRef`，含 rail 态那颗图标）一律放行，
+把开关交给 `onClick` 独占；点外部（浮层与按钮之外）仍然由 pointerdown 关闭。
+
+测试：新增渲染用例「入口点击可开可收（第二下必须关上）」——用 pointerdown + click 两次事件
+模拟真实点击（旧的 `clickEntry` 只派发 click，抓不到这个 bug），并额外断言「点外部仍会关」。
+`node --test test/*.test.mjs` → **224 例 / 203 通过 / 0 失败 / 21 跳过**。
+真机回归（无头 Chrome）：第一下 `pop=true` → 第二下 `pop=false` → 第三下 `pop=true`；
+点主区空白 → 关；Esc → 关；浮层开着点右侧图标 → 浮层关 + 渠道中心弹窗开。
+
+### 侧边栏入口行视觉改版：卡片化 → 健康环 → 3px 渠道条 → 分隔线 → 数字动效
+
+用户嫌「5/5 · 1.02W」单调。按先给方案、选定顺序后**一次一处**落地（每步全量测试 + 真机回归）：
+
+1. **D 卡片化（骨架）**：展开态主按钮从"透明按钮"变成**卡片** —— 圆角 10、`1px var(--dsw-alias-border-l2)`
+   描边、极浅 info 渐变叠层底色、左侧 **3px 健康色条**（`overflow:hidden` 裁在圆角内），
+   标签改 `label-primary` + 550 字重；hover 上浮 1px + 阴影 + 描边升一档（`l2→l3`），
+   在行里挂一个 `ENTRY_CSS` style 节点承载 `:hover/:focus-visible`（内联写不了伪类）。
+   行高 32 → **36px**（footArea 82 → 86，会话列表少 4px；rail 仍 36×36 不变）。
+2. **A 健康环**：数字左边加 16px `Ring`（3px 描边）表示健康占比，`role="img"` +
+   `aria-label/title = 「账号 5/5 健康 · 冷却 N · 禁用 N」`；无账号或错误态**不画环**（只留文字）。
+3. **B 3px 渠道堆叠条**：卡片底边内嵌 3px 条，按渠道识别色分段（宽度 = 各渠道账号数占比），
+   `title` 注明「WB 3 个 · Trae 2 个」；无账号 / 错误态不画（不留空槽）。
+4. **F 分隔线**：卡片与右侧渠道中心图标按钮之间加 1px 令牌竖线（18px 高），行 gap 6 → 4。
+5. **E 数字动效**：积分数字走 `useCountUp` —— 初值即真值（**不在挂载时从 0 爬**），只在数值变化时
+   播一次；无 rAF / `prefers-reduced-motion` 直接落终值，绝不会停在动画中间值。
+   顺带把 `quickSummaryVM` 记忆化，并把摘要与动效 hook 挪到 `if (!enabled) return null` **之前**（Hook 顺序规则）。
+
+顺带修掉一个真 bug：`var(--token)14` 这种"给 token 拼十六进制 alpha 后缀"的写法在本主题下**整条
+background 被浏览器判无效**（实测 `backgroundImage: none`），popover 头部与渠道中心弹窗头部的渐变一直没生效。
+三处一律改成 `color-mix(in srgb, var(--token) N%, transparent)`。
+
+测试：`node --test test/*.test.mjs` → **223 例 / 202 通过 / 0 失败 / 21 跳过**。
+新增渲染用例「卡片化骨架 —— 健康环 / 3px 渠道条 / 分隔线都在，且缺数据时如实退化」。
+真机回归（无头 Chrome，1708×1334 / 900×900 / 390×844 三档）：卡片 211×36（描边 1px 令牌色、
+渐变有效、圆角 10）、健康环 16×16 @(128,1252) 带 aria、渠道条 206×3 两段（蓝 125 / 紫 84）、
+分隔线 1×18 令牌色、图标按钮 36×36；hover → `translateY(-1px)` + 阴影 + 描边 `l3`；
+亮色令牌下描边/分隔线随之变（`rgba(0,0,0,.12)`）；rail 与移动端均无卡片/图标按钮且无横向溢出；
+`[data-slot-error]` 计数 0；两次读取文案一致（动效不留中间值）。
+
+### 侧边栏「渠道账号」入口：独占一行 + 右侧图标直开渠道中心（弹窗）；网关身份更名 chanhub2api
+
+用户真机反馈，逐条落地（本条为最新）：
+
+1. **网关名 `workbuddy2api` → `chanhub2api`（网关仓库，不做双名兼容）**：`internal/server/handler.go`
+   的 `ServiceName`（`/healthz` 的 `service` 字段、`X-Service` 头、`/status` 的 `version` 同源），
+   `cmd/server/main.go` 启动日志改引该常量。插件侧 `lib/chanhub-client.js` 的探针**只认新名**
+   （用户明确要求不做兼容）：遇到旧名就报「不是本网关」并在文案里给出重建命令 ——
+   旧名等于「容器没重建」，迁就它反而把部署错位藏起来。
+   已在 `plugins/chanhub` 执行 `docker compose build` + `docker compose up -d --wait`，
+   实测 `/healthz` → `"service":"chanhub2api"`、`/status` → `version=chanhub2api`（5/5 healthy）。
+2. **入口独占一行**：`sidebar.footer.action` 是共享 list 槽（cordis 面板、dsh-context、成本计量
+   的容器都在这行），宿主那一行是**不换行**的 flex row，别人在场就把本入口挤成半行。
+   现在 `QuickEntryInner` 把宿主那一行改成 `flex-wrap: wrap`（卸载还原），本入口外面套一层
+   `data-dshc-entry` 行盒子取整行宽度（仅展开态；rail 不动），可见文案放宽为「渠道账号 5/5 · 1.02W」。
+3. **右侧加「渠道中心」图标按钮（无文字）+ 渠道中心改为弹窗**：整行宽度空出来的右侧放一枚
+   32×32 图标按钮（`Icons.hub`，`aria-label="打开渠道中心"`），点它直接开渠道中心；收起态不渲染
+   （56px 轨道放不下两个图标）。渠道中心由「主区面板」改为**本插件自己的弹窗**（`CenterModal`，
+   portal 到 body，最大 1040×920、移动端整屏 sheet，Esc / 点遮罩关闭，锁 body 滚动、焦点可回收）：
+   - 原先那条路走不通且行为也不对：`remote.settings.openSettingsDocument()` 的语义是把 settings.yaml
+     交给**原生文本编辑器**，宿主也没有 `openSettings(sectionId)` 深链（见
+     `.scratch/sidebar-quick-entry/spec.md`）；主区面板虽然能开，但会把当前会话换掉，看管理台代价过大。
+   - 面板组件由 `client/index.js` 以 `centerPanel` / `centerPanelProps` **prop 注入**给入口
+     （避免与入口文件循环 import），与设置里的「渠道中心」分区共用同一组件/数据源；没注入面板时
+     图标按钮与 popover 底栏按钮都如实不渲染（不留死按钮）。设置里那个分区入口保持不变。
+4. **popover 头部只留标题 + 新鲜度**：删掉紧贴标题的「网关名 · 进程 uptime」灰字 ——
+   它无前缀、紧贴标题，会被读成一条账号摘要（用户就是这么读的）。要看这两项去「渠道中心」用量页。
+
+测试：`node --test test/*.test.mjs` → 222 例 / 201 通过 / 0 失败 / 21 跳过（真机 e2e）。
+新增：`C4 网关身份`（只认 `chanhub2api`，旧名与其他服务一律拒绝）、渲染用例
+「渠道中心弹窗：右侧图标打开 / Esc 关闭 / 没注入面板时不渲染」。
+真机验证（无头 Chrome + 真实宿主）：入口行 256×32（主按钮 218×32 + 图标 236,1246,32×32）、
+`footerActions` 计算样式 `flex-wrap: wrap`、点图标弹出 `[role=dialog][aria-label=渠道中心]`
+（1042×922，内含真面板 `.dshc-topbar-title=渠道中心`）、Esc 关闭、popover 底栏「渠道中心」也进同一弹窗、
+rail 态回到 `nowrap` 且只剩 36×36 图标、`[data-slot-error]` 计数 0。
+
 ### 新增：侧边栏「渠道」入口（foot 区按钮 + 账号池 popover）+ 配置 Tab 的界面开关
 
 左侧栏 foot 区（设置按钮同区、在其上方）新增一个入口：平时只显示「渠道」+ `健康/总数 · 可用积分`，

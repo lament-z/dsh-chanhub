@@ -9,6 +9,8 @@
 // 面板永远停在「加载中」—— 那样断言不到任何数据相关的内容。
 
 import test from 'node:test';
+// 直接引用调色板：这样「UI 色 = channelPalette(id)」是同源断言，不是在测试里抄字面量
+import { channelPalette } from '../client/derive.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -655,6 +657,38 @@ test('渲染账号池：账号卡片带到期时间（凭证读不到时降级�
     // fixture 的 auths 没有 expiresAt → 降级取套餐明细里最早的未耗尽到期日（10-01）
     const withExpiry = cards.filter((card) => card.textContent.includes('积分到期 10-01'));
     assert.equal(withExpiry.length, cards.length, '每个账号卡片都应渲染到期时间');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染账号池：渠道身份走颜色 —— 渠道胶囊 + 首列渠道圆点 + 卡片左缘渠道色', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    // 渠道胶囊（jsdom 的 CSSOM 不认 color-mix，所以断言挂在 data 属性 + 内联色上）
+    const chips = [...document.querySelectorAll('[data-channel-chip]')];
+    assert.ok(chips.length >= 1, '账号池应至少有一个渠道胶囊');
+    assert.ok(chips.every((c) => (c.getAttribute('data-channel-chip') || '').length >= 0), '渠道胶囊要带 data-channel-chip');
+    assert.ok(chips.some((c) => c.getAttribute('data-channel-chip') === 'workbuddy'), 'fixture 里应有 workbuddy 渠道胶囊');
+    // 渠道圆点：solid 身份色（只上形状）
+    const dots = [...document.querySelectorAll('[data-channel-dot]')];
+    assert.ok(dots.length >= 1, '要有渠道圆点（身份色只上形状）');
+    // 同源断言：每个圆点的实际色必须等于 channelPalette(它自称的渠道).solid（jsdom 会把 hex 归一成 rgb()）
+    const asRgb = (hex) => `rgb(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)})`;
+    const wrong = dots.filter((d) => {
+      const want = channelPalette(d.getAttribute('data-channel-dot')).solid;
+      return d.style.background !== want && d.style.background !== asRgb(want);
+    });
+    assert.equal(wrong.length, 0, `渠道圆点色必须与 channelPalette 同源，不符：${JSON.stringify(wrong.map((d) => [d.getAttribute('data-channel-dot'), d.style.background]))}`);
+    // 账号卡左缘渠道色走 CSS 变量，避免内联 box-shadow 覆盖 hover
+    const card = document.querySelector('.dshc-acctcard');
+    assert.ok(card, '缺账号卡片');
+    assert.equal(card.style.getPropertyValue('--dshc-chan'), '#4f6ef7', '账号卡左缘渠道色必须来自 channelPalette(solid)');
+    // 纪律：渠道色不得当正文色 —— 胶囊文字色必须是令牌
+    const chipText = chips[0].querySelector('span');
+    assert.match(chipText.style.color || '', /dsw-alias-label-primary|^$/, `渠道胶囊文字必须走令牌，实际 ${chipText.style.color}`);
+    // 渠道色不得出现在胶囊文字上
+    assert.ok(!(chipText.style.color || '').includes('#4f6ef7'), '渠道色不能当正文色');
   } finally {
     await cleanup();
   }
@@ -1566,9 +1600,13 @@ async function mountQuick(options = {}) {
       wide: options.wide !== false,
       store,
       prefs,
-      openSettings: () => {},
-      // 便利入口的能力探针：默认可用；用例可传 false 验证「取不到就隐藏按钮」
-      hasOpenSettings: options.hasOpenSettings ?? (() => true),
+      // 渠道中心面板：由 client/index.js 注入（这里用桩替代真面板，只验弹窗开关）
+      centerPanel: options.centerPanel === null
+        ? undefined
+        : (options.centerPanel ?? function StubCenter() {
+            return React.createElement('div', { 'data-stub': 'center' }, '渠道中心桩面板');
+          }),
+      centerPanelProps: options.centerPanelProps ?? {},
       // 自己的时钟走独立 prop（宿主的 `now` 是数字共享时钟，撞名会 TypeError）
       clock: options.clock ?? Date.now,
       ...(options.nowProp === undefined ? {} : { now: options.nowProp }),
@@ -1606,6 +1644,34 @@ async function clickEntry(document, container) {
   return button;
 }
 
+/** 点一个具体元素（jsdom + React 的真实事件路径）。 */
+async function clickEl(document, el) {
+  await React.act(async () => {
+    el.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+  });
+  await React.act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/** 给 document 发一次 keydown（Esc 关闭弹窗那条路径）。 */
+async function pressKey(document, key) {
+  await React.act(async () => {
+    document.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key, bubbles: true }));
+  });
+  await React.act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/** 模拟一次真实点击：pointerdown 先到（外部点击关闭走这条），随后 click 到（按钮切换走这条）。 */
+async function realClick(document, el) {
+  await React.act(async () => {
+    el.dispatchEvent(new document.defaultView.MouseEvent('pointerdown', { bubbles: true }));
+  });
+  await clickEl(document, el);
+}
+
 test('渲染：宿主注入的数字 now 不会打死入口（真机 TypeError: now is not a function 的回归锁）', { skip }, async () => {
   // 宿主给每个槽位都注入共享时钟，属性名就叫 `now`，值是**数字**。
   // 之前自己的时钟也叫 now（默认 Date.now），被它覆盖后在渲染里 now() → 整条插槽变红框。
@@ -1639,7 +1705,7 @@ test('渲染：入口内部异常被自隔离 —— 出小胶囊而不是让整
   try {
     await React.act(async () => {
       root = ReactDOMClient.createRoot(host);
-      root.render(React.createElement(component, { wide: true, store: brokenStore, prefs: prefsStub(true), hasOpenSettings: () => true }));
+      root.render(React.createElement(component, { wide: true, store: brokenStore, prefs: prefsStub(true) }));
     });
     await React.act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     const html = host.innerHTML;
@@ -1677,6 +1743,83 @@ test('渲染：入口两态 —— 展开给摘要、收起只留 36px 图标', 
   }
 });
 
+test('渲染：卡片化骨架 —— 健康环 / 3px 渠道条 / 分隔线都在，且缺数据时如实退化', { skip }, async () => {
+  const status = realStatusFixture();
+  const wide = await mountQuick({ wide: true, status });
+  const empty = await mountQuick({ wide: true, status: { accounts: [], total: 0, healthy: 0 } });
+  try {
+    const card = wide.container.querySelector('.dshc-entry-card');
+    assert.ok(card, '展开态主按钮必须是卡片（.dshc-entry-card）');
+    // 左侧 3px 健康色条 + 底部 3px 渠道条 + 右侧图标按钮的分隔线
+    const strips = [...card.querySelectorAll('span[aria-hidden="true"]')];
+    assert.ok(strips.some((s) => s.style.width === '3px' && s.style.height === ''), '要有左侧 3px 健康色条');
+    assert.ok(strips.some((s) => s.style.height === '3px' && s.style.bottom === '0px'), '要有底部 3px 渠道堆叠条');
+    assert.equal(wide.container.querySelector('[data-dshc-entry="row"] span[style*="width: 1px"]') !== null, true, '卡片与图标按钮之间要有 1px 分隔线');
+    // 健康环：16px svg + role=img 语义
+    const ring = card.querySelector('[role="img"]');
+    assert.ok(ring, '有账号时要渲染健康环');
+    assert.equal(ring.getAttribute('aria-label'), `账号 ${status.healthy}/${status.total} 健康`);
+    assert.equal(ring.querySelector('svg')?.getAttribute('width'), '16', '健康环宽度 16px');
+    // 退化：没有账号时不画环、不画渠道条（卡片骨架与分隔线仍在，不出现 NaN 宽度）
+    const emptyCard = empty.container.querySelector('.dshc-entry-card');
+    assert.ok(emptyCard, '没账号也要有卡片骨架');
+    assert.equal(emptyCard.querySelector('[role="img"]'), null, '没账号时不画健康环');
+    assert.equal([...emptyCard.querySelectorAll('span[aria-hidden="true"]')].some((s) => s.style.height === '3px'), false, '没账号时不画渠道条');
+    assert.ok(empty.container.innerHTML.includes('无账号'), '没账号时如实写「无账号」');
+  } finally {
+    await wide.cleanup();
+    await empty.cleanup();
+  }
+});
+
+test('渲染：入场动效可失败 —— 健康环/渠道条最终必须落到真值（不停在 0 或中间态）', { skip }, async () => {
+  const ctx = await mountQuick({ wide: true, status: realStatusFixture(), usage: usageFixture() });
+  try {
+    // 入场动效 520ms + 150ms 兜底；等过头一点再断言终态
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 900)); });
+    const status = realStatusFixture();
+    const card = ctx.container.querySelector('.dshc-entry-card');
+    const arc = card.querySelector('svg circle:nth-of-type(2)');
+    const [drawn, full] = (arc.getAttribute('stroke-dasharray') || '').split(' ').map(Number);
+    assert.ok(full > 0, '环要有周长');
+    const want = full * (status.healthy / status.total);
+    assert.ok(Math.abs(drawn - want) < 0.5, `环必须扫到健康占比（${status.healthy}/${status.total}），实际 ${drawn}/${full}`);
+    const ringHost = card.querySelector('[role="img"]');
+    assert.equal(Number(ringHost.style.opacity), 1, '环的入场淡入要落到 1');
+    const bar = [...card.querySelectorAll('span')].find((s) => s.style.height === '3px' && s.style.bottom === '0px');
+    assert.equal(Number(bar.style.opacity), 1, '渠道条淡入要落到 1');
+    const segs = [...bar.children].map((c) => Number.parseFloat(c.style.width));
+    assert.ok(segs.length >= 1, '至少一段（fixture 只有一个渠道）');
+    assert.ok(segs.every((w) => w > 0), `每段宽度都要长出真值，实际 ${JSON.stringify(segs)}`);
+    const sum = segs.reduce((acc, w) => acc + w, 0);
+    assert.ok(sum > 95 && sum <= 100.5, `各段合计应接近 100%，实际 ${sum}`);
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('渲染：入口点击可开可收（第二下必须关上）—— pointerdown 抢关 + click 再开的回归锁', { skip }, async () => {
+  const ctx = await mountQuick({ wide: true, status: realStatusFixture(), usage: usageFixture() });
+  try {
+    const btn = ctx.container.querySelector('button[aria-label="渠道账号"]');
+    await realClick(ctx.document, btn);
+    assert.equal(ctx.document.querySelectorAll('.dshc-quick-pop').length, 1, '第一下应打开账号池浮层');
+    assert.equal(btn.getAttribute('aria-expanded'), 'true');
+    await realClick(ctx.document, btn);
+    assert.equal(ctx.document.querySelectorAll('.dshc-quick-pop').length, 0, '第二下应关上（不能被 pointerdown 关了又被 click 打开）');
+    assert.equal(btn.getAttribute('aria-expanded'), 'false');
+    await realClick(ctx.document, btn);
+    assert.equal(ctx.document.querySelectorAll('.dshc-quick-pop').length, 1, '第三下应再次打开');
+    // 点浮层外面仍然要关（这条路径是 pointerdown 负责的，别把外部点击一起放行了）
+    await React.act(async () => {
+      ctx.document.body.dispatchEvent(new ctx.document.defaultView.MouseEvent('pointerdown', { bubbles: true }));
+    });
+    assert.equal(ctx.document.querySelectorAll('.dshc-quick-pop').length, 0, '点外部应关闭');
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
 test('渲染：入口 popover 显示汇总与账号卡（可用积分/渠道/在途/到期）', { skip }, async () => {
   const ctx = await mountQuick({
     wide: true,
@@ -1692,7 +1835,9 @@ test('渲染：入口 popover 显示汇总与账号卡（可用积分/渠道/在
     assert.ok(body.includes('近 24h'), '要有近 24h 统计块（滚动窗口）');
     assert.ok(body.includes('甲'), '账号昵称应出现在账号卡里');
     assert.ok(body.includes('在途占满') || body.includes('在途'), '在途维度要有呈现');
-    assert.ok(body.includes('渠道中心'), '有能力时才渲染「打开渠道中心」入口');
+    // 底栏「渠道中心」按钮：用查询断言（body.includes 会被 QUICK_CSS 注释里的同名字样误判）
+    const centerBtn = [...ctx.document.querySelectorAll('button')].find((b) => b.textContent.trim() === '渠道中心');
+    assert.ok(centerBtn, 'popover 底栏要有「渠道中心」入口');
     assert.equal(ctx.document.querySelectorAll('[role="dialog"]').length, 1, 'popover 必须 portal 到 body 且是 dialog');
     // 免横向滚动：根节点不得出现横向 overflow
     const dialog = ctx.document.querySelector('[role="dialog"]');
@@ -1702,18 +1847,43 @@ test('渲染：入口 popover 显示汇总与账号卡（可用积分/渠道/在
   }
 });
 
-test('渲染：宿主没有 remote.settings 时隐藏「渠道中心」按钮，其余功能不受影响', { skip }, async () => {
+test('渲染：渠道中心弹窗 —— 右侧图标按钮打开、Esc 关闭；没有面板组件时不渲染', { skip }, async () => {
   const ctx = await mountQuick({
     wide: true,
     status: realStatusFixture(),
     usage: usageFixture(),
-    hasOpenSettings: () => false,
+  });
+  try {
+    // 入口行最右端有一枚无文字图标按钮
+    const iconBtn = ctx.container.querySelector('button[aria-label="打开渠道中心"]');
+    assert.ok(iconBtn, '要有「打开渠道中心」图标按钮');
+    assert.equal(iconBtn.textContent.trim(), '', '图标按钮不带文字');
+    assert.ok(!ctx.document.querySelector('[aria-label="渠道中心"]'), '未点击时不该有弹窗');
+    await clickEl(ctx.document, iconBtn);
+    const dialog = ctx.document.querySelector('[role="dialog"][aria-label="渠道中心"]');
+    assert.ok(dialog, '点击后应出现渠道中心弹窗');
+    assert.ok(dialog.textContent.includes('渠道中心桩面板'), '弹窗里应渲染注入的面板组件');
+    await pressKey(ctx.document, 'Escape');
+    assert.ok(!ctx.document.querySelector('[aria-label="渠道中心"]'), 'Esc 应关闭弹窗');
+  } finally {
+    await ctx.cleanup();
+  }
+});
+
+test('渲染：没注入面板组件时不渲染弹窗（能力缺失就如实不显示，不留死按钮）', { skip }, async () => {
+  const ctx = await mountQuick({
+    wide: true,
+    status: realStatusFixture(),
+    usage: usageFixture(),
+    centerPanel: null,
   });
   try {
     await clickEntry(ctx.document, ctx.container);
-    const body = ctx.document.body.innerHTML;
-    assert.ok(body.includes('可用积分'), '入口本身照常工作');
-    assert.ok(!body.includes('渠道中心'), '能力缺失时不渲染该按钮（不是渲染成死按钮）');
+    assert.ok(ctx.document.body.textContent.includes('可用积分'), '入口本身照常工作');
+    // 用查询断言而不是 body.includes('渠道中心')：QUICK_CSS 的注释里也含这四个字
+    assert.equal(ctx.document.querySelector('button[aria-label="打开渠道中心"]'), null, '没有面板组件时不渲染图标按钮');
+    const footerBtn = [...ctx.document.querySelectorAll('button')].find((b) => b.textContent.trim() === '渠道中心');
+    assert.equal(footerBtn, undefined, '没有面板组件时不渲染 popover 底栏的「渠道中心」按钮');
   } finally {
     await ctx.cleanup();
   }

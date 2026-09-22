@@ -368,7 +368,7 @@ test('H11 loginCallback 网关回 error 时如实透传（不让面板误以为�
 
 test('H16 probe 的 loginApi 同时反映路由存在性与渠道可用性', async () => {
   const reachable = await fakeGateway({
-    '/healthz': (req, res) => json(res, 200, { service: 'workbuddy2api', healthy: 1, total: 1 }),
+    '/healthz': (req, res) => json(res, 200, { service: 'chanhub2api', healthy: 1, total: 1 }),
     '/status': (req, res) => json(res, 200, { accounts: [] }),
     '/panel/api/channels': (req, res) => json(res, 200, {
       channels: ['workbuddy', 'traework'],
@@ -376,8 +376,9 @@ test('H16 probe 的 loginApi 同时反映路由存在性与渠道可用性', asy
       realms: ['cn'],
     }),
   });
+  // 形状较老的网关（只有 channels、没有 login_channels）—— 与 service 名无关，两边都用新名
   const legacy = await fakeGateway({
-    '/healthz': (req, res) => json(res, 200, { service: 'workbuddy2api', healthy: 1, total: 1 }),
+    '/healthz': (req, res) => json(res, 200, { service: 'chanhub2api', healthy: 1, total: 1 }),
     '/status': (req, res) => json(res, 200, { accounts: [] }),
     '/panel/api/channels': (req, res) => json(res, 200, { channels: ['workbuddy', 'traework'] }),
   });

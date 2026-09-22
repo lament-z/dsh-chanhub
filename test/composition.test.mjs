@@ -368,8 +368,8 @@ test('组合：客户端 bundle 的 slots 注册元信息正确（Loader 消费�
     },
   });
 
-  // 两个注册：设置面板（渠道中心）+ 侧边栏 foot 入口（渠道账号）
-  assert.equal(registered.length, 2, '应注册设置面板与侧边栏入口各一个');
+  // 两个注册：设置分区「渠道中心」+ 侧边栏 foot 入口「渠道账号」（弹窗面板以 prop 注入）
+  assert.equal(registered.length, 2, '应注册设置分区与侧边栏入口各一个');
   const { meta, component } = registered.find((row) => row.meta.name === 'settings.section');
   assert.equal(meta.name, 'settings.section');
   assert.equal(meta.id, 'dsh-chanhub', 'slot id 必须与插件 id 一致');
@@ -389,7 +389,9 @@ test('组合：客户端 bundle 的 slots 注册元信息正确（Loader 消费�
   assert.equal(typeof quickInjected.store?.subscribe, 'function', '入口要订阅共享快照');
   assert.equal(typeof quickInjected.store?.refreshUpstream, 'function', '手动刷新入口');
   assert.equal(typeof quickInjected.prefs?.set, 'function', '偏好要能读写');
-  assert.equal(typeof quickInjected.openSettings, 'function', '要能打开渠道中心');
-  // 便利入口必须带能力探针：宿主没有 remote.settings 时组件据此隐藏按钮
-  assert.equal(typeof quickInjected.hasOpenSettings, 'function');
+  // 渠道中心弹窗的面板组件以 prop 注入（本插件自渲染，不依赖宿主 layout / remote.settings）
+  assert.equal(typeof quickInjected.centerPanel, 'function', '要注入渠道中心面板组件');
+  assert.equal(typeof quickInjected.centerPanelProps, 'object', '面板注入属性要一起给');
+  assert.equal(typeof quickInjected.centerPanelProps.rpcCall, 'function');
+  assert.equal(typeof quickInjected.centerPanelProps.prefs, 'object');
 });

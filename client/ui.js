@@ -10,6 +10,7 @@
 
 import React from 'react';
 import { s, tone } from './theme.js';
+import { CHANNEL_LABEL, channelPalette } from './derive.js';
 
 /**
  * 内联 SVG 外壳（统一 viewBox / stroke 约定）。
@@ -74,6 +75,13 @@ export const Icons = {
         d: 'M12 2l1.6 1.2 2-.2.8 1.9 1.8.9-.3 2 1.2 1.7-1.2 1.7.3 2-1.8.9-.8 1.9-2-.2L12 22l-1.6-1.2-2 .2-.8-1.9-1.8-.9.3-2L4.9 12l1.2-1.7-.3-2 1.8-.9.8-1.9 2 .2z',
       }),
     ),
+  cpu: (props) =>
+    svg(
+      props,
+      React.createElement('rect', { key: 'r', x: 5, y: 5, width: 14, height: 14, rx: 2 }),
+      React.createElement('rect', { key: 'i', x: 9.5, y: 9.5, width: 5, height: 5, rx: 1 }),
+      React.createElement('path', { key: 'a', d: 'M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3' }),
+    ),
   refresh: (props) =>
     svg(
       { width: 13, height: 13, ...props },
@@ -131,6 +139,51 @@ export const Icons = {
  * @param props - `{text, tone, title}`。
  * @returns React 元素。
  */
+/**
+ * 渠道圆点：身份色**只上形状**（圆点/色条/线），文字一律走令牌。
+ *
+ * 侧边栏浮层与渠道中心共用同一个组件 —— 这样「同一渠道两处同色」是结构保证，
+ * 不是靠两边各自去记得用 `channelColor`。
+ *
+ * @param props - `{channel, size, title}`。
+ * @returns React 元素。
+ */
+export function ChannelDot({ channel, size = 7, title }) {
+  return React.createElement('span', {
+    'aria-hidden': 'true',
+    'data-channel-dot': channel ?? '',
+    ...(title === undefined ? {} : { title }),
+    style: {
+      width: size, height: size, borderRadius: 999, flex: '0 0 auto',
+      background: channelPalette(channel).solid, display: 'inline-block',
+    },
+  });
+}
+
+/**
+ * 渠道胶囊：`soft` 底 + `edge` 描边 + 前置圆点；**文字用令牌色**，不用渠道色当正文
+ * （500–600 档中间色在暗色主题下当正文偏暗）。
+ *
+ * @param props - `{channel, label, title}`。
+ * @returns React 元素。
+ */
+export function ChannelChip({ channel, label, title }) {
+  const palette = channelPalette(channel);
+  return React.createElement('span', {
+    'data-channel-chip': channel ?? '',
+    ...(title === undefined ? {} : { title }),
+    style: {
+      display: 'inline-flex', alignItems: 'center', gap: 5, flex: '0 0 auto',
+      padding: '1px 7px', borderRadius: 999, fontSize: 11.5, lineHeight: '17px',
+      background: palette.soft, border: `1px solid ${palette.edge}`,
+      color: 'var(--dsw-alias-label-primary,currentColor)', whiteSpace: 'nowrap',
+    },
+  },
+    React.createElement(ChannelDot, { channel, size: 6 }),
+    React.createElement('span', null, label ?? CHANNEL_LABEL[channel] ?? channel ?? '—'),
+  );
+}
+
 export function Tag({ text, tone: toneName = 'idle', title }) {
   const palette = tone[toneName] ?? tone.idle;
   return React.createElement(

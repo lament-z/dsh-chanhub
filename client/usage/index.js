@@ -17,7 +17,7 @@
 //     两个口径（窗口 / 进程）不可混排，故 KPI 换成请求数与可用积分。
 
 import React from 'react';
-import { s } from '../theme.js';
+import { s, type } from '../theme.js';
 import { Icons, Fold } from '../ui.js';
 import {
   DEFAULT_RANK_METRIC,
@@ -214,7 +214,7 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
           React.createElement('div', { className: 'dshc-ust-kpihead' },
             React.createElement('span', { className: 'dshc-ust-scope' },
               React.createElement('span', { className: 'dshc-ust-scope-tag' }, '窗口口径'),
-              React.createElement('span', { style: { ...s.muted, fontSize: 10.5 }, title: WINDOW_TIP },
+              React.createElement('span', { style: type.text.caption, title: WINDOW_TIP },
                 `近 ${range} 天 · 数据落盘 data/usage.json，重启不清零`),
             ),
           ),
@@ -263,10 +263,10 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
       ? React.createElement(LazyFold, {
           id: 'burn',
           summary: React.createElement('span', { className: 'dshc-row' },
-            React.createElement('span', { style: s.label }, '积分燃尽'),
-            React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+            React.createElement('span', { style: type.text.body }, '积分燃尽'),
+            React.createElement('span', { style: type.text.caption },
               burn ? `≈ 还可 ${burn.days > 1095 ? '>3 年' : burn.days >= 1 ? `${burn.days.toFixed(1)} 天` : `${(burn.days * 24).toFixed(1)} 小时`}` : '无法外推'),
-            React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } }, '窗口口径 · 外推'),
+            React.createElement('span', { style: type.text.caption }, '窗口口径 · 外推'),
           ),
         },
           React.createElement(BurnPanel, { rows, stock, windowValue: '720h', burn }),
@@ -277,14 +277,14 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
     React.createElement(LazyFold, {
       id: 'process',
       summary: React.createElement('span', { className: 'dshc-row' },
-        React.createElement('span', { style: s.label }, '进程口径细节'),
+        React.createElement('span', { style: type.text.body }, '进程口径细节'),
         React.createElement('span', {
-          style: { ...s.muted, fontSize: 10.5 },
+          style: { ...type.text.caption, whiteSpace: 'nowrap' },
           title: stats?.enabled === true && stats.since
-            ? `自进程启动累计，重启清零。数据起点 ${stats.since}`
-            : '自进程启动累计，重启清零',
+            ? `进程累计；自进程启动累计，重启清零。数据起点 ${stats.since}`
+            : '进程累计；自进程启动累计，重启清零',
         }, uptime ? `进程累计 · ${uptime}` : '进程累计'),
-        React.createElement('span', { style: { ...s.muted, fontSize: 10.5 } },
+        React.createElement('span', { style: type.text.caption },
           '缓存命中率 / TTFB / 吞吐 / 倍率'),
       ),
     },

@@ -38,6 +38,8 @@ export const ENDPOINTS = {
   getChannels: 'getChannels',
   serviceControl: 'serviceControl',
   revealApiKey: 'revealApiKey',
+  discoverModelsForPatch: 'discoverModelsForPatch',
+  applyModelsPatch: 'applyModelsPatch',
 };
 
 /** RPC 频道（与宿主 apply 里的 CHANNEL 一致）。 */
