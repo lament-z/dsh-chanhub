@@ -562,6 +562,9 @@ function fakeRpc(status) {
             provider: 'chanhub2api',
             models: CATALOG_MODELS,
             backup: { at: 0, count: 0 },
+            baseline: { at: 0, count: 0 },
+            // 配置里 glm-5.3 一条字段都没写（256K 现象的成因），面板要标「未写入」
+            configured: { gaps: { 'workbuddy:cn:glm-5.3': ['contextWindow', 'maxTokens', 'reasoningEfforts', 'input'] } },
           },
         };
       case 'getModelCatalog':
@@ -616,6 +619,22 @@ function fakeRpc(status) {
             },
           },
         };
+      case 'completeModelFields': {
+        const applied = payload?.dryRun === false;
+        return {
+          ok: true,
+          value: {
+            provider: 'chanhub2api',
+            dryRun: !applied,
+            wrote: applied,
+            source: { kind: 'snapshot', at: Date.now() - 60000, count: CATALOG_MODELS.length },
+            changes: [{ id: 'workbuddy:cn:glm-5.3', fields: ['contextWindow', 'maxTokens', 'reasoningEfforts', 'input'] }],
+            unchanged: CATALOG_MODELS.length - 1,
+            missingInCatalog: [],
+            warnings: applied ? [] : [{ id: 'qoder:work:deepseek-v4-pro', kind: 'max-out-gt-context', maxTokens: 384000, contextWindow: 200000 }],
+          },
+        };
+      }
       default:
         return { ok: false, error: { code: 'bad-request', message: `unknown ${endpoint}` } };
     }
@@ -2079,6 +2098,47 @@ test('渲染模型 Tab：沉淀确认项 —— 只把确认态写进基线，�
     assert.ok(calls.includes('getModelRecord'), '沉淀后重读回显（基线变了，勾选框跟着放开）');
     html = document.getElementById('app').innerHTML;
     assert.ok(html.includes('已沉淀 1 项'), '沉淀后摘要显示已沉淀数');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染模型 Tab：补齐配置字段 —— 先预览再写入，未写入的字段有标记', { skip }, async () => {
+  const rpc = fakeRpc(realStatusFixture());
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await clickTab(document, '模型');
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    let html = document.getElementById('app').innerHTML;
+
+    assert.ok(html.includes('未写入'), '配置里没写的字段要标出来（否则用户以为 1M 已生效）');
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('补齐配置字段'));
+    assert.ok(btn, '乙口时要出「补齐配置字段」按钮');
+    assert.ok(btn.textContent.includes('1'), '按钮上带缺口条目数');
+
+    // 点一次 → dry-run 预览（还没写）
+    await React.act(async () => {
+      btn.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('补齐预览'), '要有预览块');
+    assert.ok(html.includes('上下文 1'), '按字段报数量');
+    assert.ok(html.includes('推理档位 1'), '按字段报数量');
+    assert.ok(html.includes('数据源：拉取快照'), '如实标注数据源');
+    assert.ok(html.includes('网关自报异常 1 条'), '网关自报矛盾要提示');
+    assert.ok(!rpc.calls.some((c) => c.endpoint === 'completeModelFields' && c.payload?.dryRun === false), '预览阶段不得写入');
+
+    // 二次确认才写
+    const apply = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('确认写入'));
+    assert.ok(apply, '要有确认写入按钮');
+    await React.act(async () => {
+      apply.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    assert.ok(rpc.calls.some((c) => c.endpoint === 'completeModelFields' && c.payload?.dryRun === false), '确认后真写');
+    html = document.getElementById('app').innerHTML;
+    assert.ok(!html.includes('补齐预览'), '写完后预览块收起');
   } finally {
     await cleanup();
   }

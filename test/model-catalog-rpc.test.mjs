@@ -44,7 +44,8 @@ async function makeRuntime({ fetchImpl, pluginNs = {}, piModels = [], gatewayMod
   const dir = await mkdtemp(join(tmpdir(), 'chanhub-catalog-rpc-'));
   const cacheFile = join(dir, 'model-catalog.json');
   const ns = { ...SETTINGS_DEFAULTS, ...pluginNs };
-  const piNs = { providers: { [PROVIDER]: { models: piModels } } };
+  // piModels === null 表示「DSH 里根本没有该 provider 的模型配置」
+  const piNs = piModels === null ? {} : { providers: { [PROVIDER]: { models: piModels } } };
   const calls = [];
   const writes = [];
   const applyOps = (root, ops) => {
@@ -387,6 +388,152 @@ test('discoverModelsForPatch：extraVision 贯通到目录与覆盖写入', asyn
     assert.deepEqual(written[0].input, ['text', 'image']);
     assert.deepEqual(written[0].reasoningEfforts, { low: 'low', high: 'high' }, '推理档位也要写进去');
     assert.equal(written[0].contextWindow, 1000000);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+// --- 补齐配置字段（256K 的解法）--------------------------------------------
+
+const SNAP_MODELS = [
+  { id: 'workbuddy:global:deepseek-v4.1-flash', name: 'DS', ctx: 1000000, maxOut: 128000, credits: 'x1', vision: false, efforts: ['low', 'high'] },
+  { id: 'traework:cn:DeepSeek-V4-Flash-Official', name: 'DS-F', ctx: 1000000, maxOut: undefined, credits: '', vision: false, efforts: [] },
+];
+
+function snapshotText(models = SNAP_MODELS) {
+  return JSON.stringify({ at: 1234, provider: PROVIDER, count: models.length, models, hasEfforts: true });
+}
+
+/** 老快照：没有 efforts 字段、也没有 hasEfforts 标记（记录于档位采集上线前）。 */
+function snapshotOldText(models = SNAP_MODELS) {
+  return JSON.stringify({
+    at: 1234,
+    provider: PROVIDER,
+    count: models.length,
+    models: models.map(({ efforts, ...rest }) => rest),
+  });
+}
+
+test('completeModelFields：dry-run 只出预览，零写入零网关（走拉取快照）', async () => {
+  const rt = await makeRuntime({
+    pluginNs: { modelPullSnapshot: snapshotText() },
+    piModels: [{ id: 'workbuddy:global:deepseek-v4.1-flash', name: 'DS', credits: 'x1', custom: 'keep' }],
+  });
+  try {
+    const result = await rt.handle(ENDPOINTS.completeModelFields, { provider: PROVIDER, dryRun: true });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.dryRun, true);
+    assert.equal(result.value.wrote, false);
+    assert.equal(result.value.source.kind, 'snapshot');
+    assert.equal(result.value.source.staleFields, undefined, '新快照带 hasEfforts，不该误报');
+    assert.deepEqual(result.value.changes, [{
+      id: 'workbuddy:global:deepseek-v4.1-flash',
+      fields: ['contextWindow', 'maxTokens', 'reasoningEfforts'],
+    }]);
+    assert.equal(rt.calls.length, 0, '有快照就不打网关');
+    assert.equal(rt.writes.length, 0, 'dry-run 不写 settings');
+    assert.equal(rt.piNs.providers[PROVIDER].models[0].contextWindow, undefined, '配置保持原样');
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('completeModelFields：确认写入 → 条目拿到 1M 上下文 / 输出 / 推理档位', async () => {
+  const rt = await makeRuntime({
+    pluginNs: {
+      modelPullSnapshot: snapshotText(),
+      modelCapabilities: JSON.stringify({ at: 1, entries: { 'workbuddy:global:deepseek-v4.1-flash': { image: true, status: 'confirmed' } } }),
+    },
+    piModels: [
+      { id: 'workbuddy:global:deepseek-v4.1-flash', name: 'DS', credits: 'x1', custom: 'keep' },
+      { id: 'traework:cn:DeepSeek-V4-Flash-Official', name: 'DS-F' },
+    ],
+  });
+  try {
+    const result = await rt.handle(ENDPOINTS.completeModelFields, { provider: PROVIDER, dryRun: false });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.wrote, true);
+    assert.equal(result.value.source.staleFields, undefined, '带 efforts 的新快照不该报旧');
+    const written = rt.piNs.providers[PROVIDER].models;
+    const first = written.find((m) => m.id === 'workbuddy:global:deepseek-v4.1-flash');
+    assert.equal(first.contextWindow, 1000000, '256K 的解法：把网关的 1M 写进配置');
+    assert.equal(first.maxTokens, 128000);
+    assert.deepEqual(first.reasoningEfforts, { low: 'low', high: 'high' });
+    assert.deepEqual(first.input, ['text', 'image'], '基线里的确认项也一并补上视觉');
+    assert.equal(first.custom, 'keep', '额外键保留');
+    // 网关没给 maxTokens 的那条不编造
+    const second = written.find((m) => m.id === 'traework:cn:DeepSeek-V4-Flash-Official');
+    assert.equal(second.contextWindow, 1000000);
+    assert.equal('maxTokens' in second, false);
+    // 再跑一次：全部已一致 → 无改动（幂等）
+    const again = await rt.handle(ENDPOINTS.completeModelFields, { provider: PROVIDER, dryRun: false });
+    assert.deepEqual(again.value.changes, []);
+    assert.equal(again.value.unchanged, 2);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('completeModelFields：没有快照就回落到网关一次（并如实标注数据源）', async () => {
+  const rt = await makeRuntime({
+    gatewayModels: [{ id: 'a:1', name: 'A', context_length: 999000, max_output_tokens: 32000 }],
+    piModels: [{ id: 'a:1', name: 'A' }],
+  });
+  try {
+    const result = await rt.handle(ENDPOINTS.completeModelFields, { provider: PROVIDER, dryRun: true });
+    assert.equal(result.ok, true);
+    assert.equal(result.value.source.kind, 'gateway');
+    assert.deepEqual(result.value.changes, [{ id: 'a:1', fields: ['contextWindow', 'maxTokens'] }]);
+    assert.deepEqual(rt.calls, ['models']);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('completeModelFields：配置里没有模型 → 明确报错，不静默什么都不做', async () => {
+  const rt = await makeRuntime({ pluginNs: { modelPullSnapshot: snapshotText() }, piModels: null });
+  try {
+    const result = await rt.handle(ENDPOINTS.completeModelFields, { provider: PROVIDER, dryRun: false });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'no-models');
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('getModelRecord：报出「配置里缺哪些字段」，面板才能标未写入', async () => {
+  const rt = await makeRuntime({
+    pluginNs: { modelPullSnapshot: snapshotText() },
+    piModels: [
+      { id: 'workbuddy:global:deepseek-v4.1-flash', name: 'DS', contextWindow: 1000000, maxTokens: 128000, reasoningEfforts: { low: 'low' }, input: ['text', 'image'] },
+      { id: 'traework:cn:DeepSeek-V4-Flash-Official', name: 'DS-F' },
+    ],
+  });
+  try {
+    const result = await rt.handle(ENDPOINTS.getModelRecord, {});
+    assert.equal(result.ok, true);
+    const gaps = result.value.configured.gaps;
+    assert.equal(gaps['workbuddy:global:deepseek-v4.1-flash'], undefined, '四项齐全就不算缺口');
+    assert.deepEqual(gaps['traework:cn:DeepSeek-V4-Flash-Official'], ['contextWindow', 'maxTokens', 'reasoningEfforts', 'input']);
+    assert.equal(rt.calls.length, 0);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('completeModelFields：老快照（档位采集上线前）要如实说「档位补不了」', async () => {
+  const rt = await makeRuntime({
+    pluginNs: { modelPullSnapshot: snapshotOldText() },
+    piModels: [{ id: 'workbuddy:global:deepseek-v4.1-flash', name: 'DS' }],
+  });
+  try {
+    const result = await rt.handle(ENDPOINTS.completeModelFields, { provider: PROVIDER, dryRun: true });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.value.source.staleFields, ['reasoningEfforts']);
+    assert.deepEqual(result.value.changes, [{
+      id: 'workbuddy:global:deepseek-v4.1-flash',
+      fields: ['contextWindow', 'maxTokens'],
+    }], '档位补不了就不假装补');
   } finally {
     await rm(rt.dir, { recursive: true, force: true });
   }

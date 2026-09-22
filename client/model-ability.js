@@ -13,6 +13,31 @@ const DEFAULT_PROVIDER = 'chanhub2api';
 /** 差异字段的中文名（与宿主快照字段一一对应）。 */
 const FIELD_LABEL = { name: '名称', ctx: '上文', maxOut: '输出', credits: '倍率', vision: '能力' };
 
+/** 补齐配置字段时，pi-ai 字段名 → 面板文案。 */
+const COMPLETION_LABEL = {
+  contextWindow: '上下文',
+  maxTokens: '输出上限',
+  reasoningEfforts: '推理档位',
+  input: '视觉',
+};
+
+/** 配置里「未写入」的标记：DSH 会回落到 256K/32K，用户看到的面板值并不是 DSH 读到的值。 */
+function NotWrittenMark({ fields, children }) {
+  return React.createElement(
+    'span',
+    {
+      style: { display: 'inline-flex', alignItems: 'center', gap: 4 },
+      title: `DSH 配置里没写：${fields.join('、')}\n`
+        + 'pi-ai 会回落到默认值（上下文 262144 / 输出 32768），面板这里显示的是网关自报值。\n'
+        + '点「补齐配置字段」即可写入。',
+    },
+    React.createElement('span', { style: { color: tone.warn.fg } }, children),
+    React.createElement('span', {
+      style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg },
+    }, '未写入'),
+  );
+}
+
 function fmtWindow(n) {
   if (!n || n <= 0) return '—';
   if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
@@ -110,6 +135,10 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
   // 目录比对（只读）：宿主返回的三态判定 + 目录快照元信息
   const [catalog, setCatalog] = React.useState(null); // {at,sources,catalog,summary,warnings,failures,verdicts:Map}
   const [catalogBusy, setCatalogBusy] = React.useState(false);
+  // 补齐配置字段：configured=配置里缺哪些字段；completion=补齐预览（dry-run 结果）
+  const [configuredGaps, setConfiguredGaps] = React.useState({});
+  const [completion, setCompletion] = React.useState(null);
+  const [completeBusy, setCompleteBusy] = React.useState(false);
 
   const notify = (msg) => {
     if (typeof showToast === 'function') {
@@ -149,6 +178,25 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     }
   }, [rpcCall, provider, applyCatalogResult]);
 
+  // 回显：纯本地读插件 settings（快照 + 基线），**不请求网关**。
+  const reloadRecord = React.useCallback(async () => {
+    if (!rpcCall) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.getModelRecord, {});
+      if (result?.ok !== true || !result.value?.record) return;
+      const v = result.value;
+      setModels(v.models ?? []);
+      setRecord(v.record);
+      if (typeof v.provider === 'string' && v.provider !== '') setProvider(v.provider);
+      if (v.backup && v.backup.at > 0) setBackup(v.backup);
+      setConfiguredGaps(v.configured?.gaps ?? {});
+      setState({ kind: 'cached' });
+      loadCatalog(v.models ?? []);
+    } catch {
+      // 回显失败不算错误：静默留在 idle，用户点「拉取」即可。
+    }
+  }, [rpcCall, loadCatalog]);
+
   // 显式刷新在线目录（models.dev + OpenRouter）→ 宿主落盘缓存 → 同一次往返拿判定。
   const refreshCatalog = React.useCallback(async () => {
     if (!rpcCall) return;
@@ -170,6 +218,50 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
       setCatalogBusy(false);
     }
   }, [rpcCall, provider, models, applyCatalogResult]);
+
+  // 补齐配置字段：先 dry-run 出预览（零网络：走拉取快照），确认后才真写。
+  const previewCompletion = React.useCallback(async () => {
+    if (!rpcCall) return;
+    setCompleteBusy(true);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.completeModelFields, { provider, dryRun: true });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? '补齐预览失败';
+        setLastErr(msg);
+        notify(`补齐预览失败：${msg}`);
+        return;
+      }
+      setCompletion(result.value);
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+    } finally {
+      setCompleteBusy(false);
+    }
+  }, [rpcCall, provider]);
+
+  const applyCompletion = React.useCallback(async () => {
+    if (!rpcCall) return;
+    setCompleteBusy(true);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.completeModelFields, { provider, dryRun: false });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? '补齐失败';
+        setLastErr(msg);
+        notify(`补齐失败：${msg}`);
+        return;
+      }
+      const v = result.value;
+      setCompletion(null);
+      notify(`已补齐 ${(v.changes ?? []).length} 个模型的配置字段`);
+      await reloadRecord();
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+    } finally {
+      setCompleteBusy(false);
+    }
+  }, [rpcCall, provider, reloadRecord]);
 
   const load = React.useCallback(async (withOverwrite = false) => {
     if (!rpcCall) return;
@@ -213,24 +305,6 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
       setState({ kind: 'error', message: error?.message ?? String(error) });
     }
   }, [rpcCall, provider]);
-
-  // 回显：纯本地读插件 settings（快照 + 基线），**不请求网关**。
-  const reloadRecord = React.useCallback(async () => {
-    if (!rpcCall) return;
-    try {
-      const result = await rpcCall(ENDPOINTS.getModelRecord, {});
-      if (result?.ok !== true || !result.value?.record) return;
-      const v = result.value;
-      setModels(v.models ?? []);
-      setRecord(v.record);
-      if (typeof v.provider === 'string' && v.provider !== '') setProvider(v.provider);
-      if (v.backup && v.backup.at > 0) setBackup(v.backup);
-      setState({ kind: 'cached' });
-      loadCatalog(v.models ?? []);
-    } catch {
-      // 回显失败不算错误：静默留在 idle，用户点「拉取」即可。
-    }
-  }, [rpcCall, loadCatalog]);
 
   // 沉淀：把目录比对的**确认态**结论写进能力基线（只写确认项，借判/冲突不写）。
   const commitCapabilities = React.useCallback(async () => {
@@ -426,6 +500,22 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
         },
         catalogBusy ? '刷新目录中…' : '刷新能力目录',
       ),
+      models && models.length > 0 && Object.keys(configuredGaps).length > 0
+        ? React.createElement(
+            'button',
+            {
+              ...s.btnGhost,
+              style: { ...s.btnGhost, opacity: completeBusy ? 0.6 : 1 },
+              type: 'button',
+              disabled: completeBusy,
+              onClick: previewCompletion,
+              title: '给 DSH 配置里已存在的条目补上 contextWindow / maxTokens / 推理档位（+ 视觉 input）：'
+                + '只填空缺，不增不删条目，也不动你手改过的其它字段。'
+                + '缺字段时 pi-ai 会回落到 256K / 32K —— 这就是「上游 1M、DSH 显示 256K」的原因。',
+            },
+            completeBusy ? '处理中…' : `补齐配置字段（${Object.keys(configuredGaps).length}）`,
+          )
+        : null,
       catalog && (catalog.baseline?.pending ?? 0) > 0
         ? React.createElement(
             'button',
@@ -544,6 +634,56 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
             (lastOk.wrote ? '' : '（无可写变更）'),
         )
       : null,
+    // 补齐预览：dry-run 的结果 + 二次确认（写入是第二个按钮，不点不写）
+    completion
+      ? React.createElement('div', { style: { ...s.tip, display: 'flex', flexDirection: 'column', gap: 6 } },
+          React.createElement('span', { style: { fontWeight: 600 } },
+            `补齐预览：将改动 ${completion.changes.length} 个模型`
+            + `（已一致不动 ${completion.unchanged} 个）`),
+          React.createElement('span', null,
+            `数据源：${completion.source?.kind === 'gateway' ? '网关实时' : '拉取快照'}`
+            + (completion.source?.at ? ` · ${relativeTime(completion.source.at) || '—'}` : '')
+            + '；只填空缺，不增不删条目'),
+          completion.source?.staleFields?.length > 0
+            ? React.createElement('span', { style: { color: tone.warn.fg } },
+                '这份快照记录于「推理档位」采集上线之前 → 档位这次补不了：'
+                + '先把上面「覆盖」勾选框留空、点一次「拉取」刷新快照，再回来补齐。')
+            : null,
+          React.createElement('span', null,
+            Object.entries(completion.changes.reduce((acc, c) => {
+              for (const f of c.fields) acc[f] = (acc[f] ?? 0) + 1;
+              return acc;
+            }, {})).map(([f, n]) => `${COMPLETION_LABEL[f] ?? f} ${n}`).join(' · ') || '无'),
+          completion.changes.length > 0
+            ? React.createElement('span', { style: { ...type.text.caption, maxHeight: 96, overflow: 'auto' } },
+                completion.changes.slice(0, 12).map((c) => `${c.id}（${c.fields.map((f) => COMPLETION_LABEL[f] ?? f).join('/')}）`).join('；')
+                + (completion.changes.length > 12 ? ` …等 ${completion.changes.length} 个` : ''))
+            : null,
+          completion.warnings?.length > 0
+            ? React.createElement('span', { style: { color: tone.warn.fg } },
+                `网关自报异常 ${completion.warnings.length} 条（照写不改）：`
+                + completion.warnings.slice(0, 3).map((w) => `${w.id} 输出 ${w.maxTokens} > 上下文 ${w.contextWindow}`).join('；'))
+            : null,
+          completion.missingInCatalog?.length > 0
+            ? React.createElement('span', { style: { color: tone.idle.fg } },
+                `${completion.missingInCatalog.length} 个条目在目录里找不到（保持原样）：`
+                + completion.missingInCatalog.slice(0, 5).join('、'))
+            : null,
+          React.createElement('span', { style: { display: 'flex', gap: 8 } },
+            React.createElement('button', {
+              ...s.btnPri,
+              style: { ...s.btnPri, opacity: completeBusy ? 0.6 : 1 },
+              type: 'button',
+              disabled: completeBusy || completion.changes.length === 0,
+              onClick: applyCompletion,
+            }, completeBusy ? '写入中…' : `确认写入（${completion.changes.length}）`),
+            React.createElement('button', {
+              ...s.btnGhost,
+              type: 'button',
+              onClick: () => setCompletion(null),
+            }, '取消')),
+        )
+      : null,
     lastErr
       ? React.createElement('div', { style: s.err }, lastErr)
       : null,
@@ -598,8 +738,14 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                           }, `变化 ${changedFields.map((f) => FIELD_LABEL[f] ?? f).join('/')}`)
                         : null),
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, m.name),
-                  React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, fmtWindow(m.contextWindow)),
-                  React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, fmtWindow(m.maxTokens)),
+                  React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' },
+                    configuredGaps[m.id]?.includes('contextWindow')
+                      ? React.createElement(NotWrittenMark, { fields: ['contextWindow'] }, fmtWindow(m.contextWindow))
+                      : fmtWindow(m.contextWindow)),
+                  React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' },
+                    configuredGaps[m.id]?.includes('maxTokens')
+                      ? React.createElement(NotWrittenMark, { fields: ['maxTokens'] }, fmtWindow(m.maxTokens))
+                      : fmtWindow(m.maxTokens)),
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, typeof m.credits === 'string' && m.credits !== '' ? m.credits : '—'),
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, m.supportsImages === true ? React.createElement(VisionBadge) : React.createElement(TextBadge)),
                   React.createElement('td', tdStyle,

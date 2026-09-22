@@ -12,16 +12,20 @@ import assert from 'node:assert/strict';
 
 import {
   VISION_MODEL_WHITELIST,
+  buildCompletionPatch,
   buildModelsPatch,
   capabilityVisionSet,
   catalogFromSnapshot,
   isVisionModel,
   listFromGatewayBody,
+  diffModelSnapshots,
   mergeCapabilities,
   modelsFromCatalog,
   parseCapabilities,
+  parseSnapshot,
   reasoningEffortsFromGateway,
   serializeCapabilities,
+  snapshotFromCatalog,
 } from '../lib/model-patch.js';
 
 // --- 基线解析 -------------------------------------------------------------
@@ -189,4 +193,93 @@ test('modelsFromCatalog：extraVision 决定是否补 input，额外键仍保留
   assert.equal(models[0].custom, 'keep-me');
   // 网关没给档位时，旧的 reasoningEfforts 不残留（它在我们管的键里）
   assert.equal('reasoningEfforts' in models[0], false);
+});
+
+// --- 补齐配置字段（不增不删，只填空缺）------------------------------------
+
+const GATEWAY_ROW = {
+  id: 'workbuddy:global:deepseek-v4.1-flash',
+  name: '[workbuddy] DeepSeek-V4.1-Flash',
+  contextWindow: 1000000,
+  maxTokens: 128000,
+  reasoningEfforts: ['low', 'high', 'max'],
+};
+
+test('buildCompletionPatch：把缺的三个字段一次补齐', () => {
+  const plan = buildCompletionPatch([{ id: GATEWAY_ROW.id, name: 'x' }], [GATEWAY_ROW]);
+  assert.deepEqual(plan.changes, [{
+    id: GATEWAY_ROW.id,
+    fields: ['contextWindow', 'maxTokens', 'reasoningEfforts'],
+  }]);
+  assert.equal(plan.unchanged, 0);
+  const written = plan.models[0];
+  assert.equal(written.contextWindow, 1000000, '这就是 256K 的解法');
+  assert.equal(written.maxTokens, 128000);
+  assert.deepEqual(written.reasoningEfforts, { low: 'low', high: 'high', max: 'max' });
+  assert.equal(written.name, 'x', '已有字段不动');
+});
+
+test('buildCompletionPatch：默认不覆盖已有值（refresh=false）', () => {
+  const current = [{ id: GATEWAY_ROW.id, contextWindow: 200000, maxTokens: 32000, reasoningEfforts: { low: 'low' } }];
+  const plan = buildCompletionPatch(current, [GATEWAY_ROW]);
+  assert.deepEqual(plan.changes, []);
+  assert.equal(plan.unchanged, 1);
+  assert.equal(plan.models[0].contextWindow, 200000, '手填的值默认不动');
+  assert.deepEqual(plan.models[0].reasoningEfforts, { low: 'low' });
+});
+
+test('buildCompletionPatch：refresh=true 才刷新不一致的字段', () => {
+  const current = [{ id: GATEWAY_ROW.id, contextWindow: 200000, maxTokens: 128000 }];
+  const plan = buildCompletionPatch(current, [GATEWAY_ROW], { refresh: true });
+  assert.deepEqual(plan.changes, [{ id: GATEWAY_ROW.id, fields: ['contextWindow', 'reasoningEfforts'] }]);
+  assert.equal(plan.models[0].contextWindow, 1000000);
+  assert.equal(plan.models[0].maxTokens, 128000, '一致的不动');
+});
+
+test('buildCompletionPatch：不增不删条目，目录里没有的原样留着', () => {
+  const current = [{ id: 'local:only', name: '本地独有', contextWindow: 123 }];
+  const plan = buildCompletionPatch(current, [GATEWAY_ROW, { id: 'gateway:only', contextWindow: 999 }]);
+  assert.equal(plan.models.length, 1, '不新增目录里的条目');
+  assert.deepEqual(plan.missingInCatalog, ['local:only']);
+  assert.equal(plan.models[0].contextWindow, 123, '目录里没有就不动它');
+});
+
+test('buildCompletionPatch：视觉 input 只在有效视觉集合内才补', () => {
+  const current = [{ id: GATEWAY_ROW.id }];
+  assert.equal(buildCompletionPatch(current, [GATEWAY_ROW]).models[0].input, undefined);
+  const withVision = buildCompletionPatch(current, [GATEWAY_ROW], { extraVision: new Set([GATEWAY_ROW.id]) });
+  assert.deepEqual(withVision.models[0].input, ['text', 'image']);
+  assert.ok(withVision.changes[0].fields.includes('input'));
+});
+
+test('buildCompletionPatch：网关自报 maxOut > ctx 只提示不擅自改', () => {
+  const row = { id: 'qoder:work:deepseek-v4-pro', contextWindow: 200000, maxTokens: 384000 };
+  const plan = buildCompletionPatch([{ id: row.id }], [row]);
+  assert.deepEqual(plan.warnings, [{
+    id: row.id, kind: 'max-out-gt-context', maxTokens: 384000, contextWindow: 200000,
+  }]);
+  assert.equal(plan.models[0].maxTokens, 384000, '照写，不替上游改数');
+});
+
+test('buildCompletionPatch：网关没给 maxTokens 就不写该字段（不编造）', () => {
+  const row = { id: 'traework:cn:DeepSeek-V4-Flash-Official', contextWindow: 1000000 };
+  const plan = buildCompletionPatch([{ id: row.id }], [row]);
+  assert.deepEqual(plan.changes, [{ id: row.id, fields: ['contextWindow'] }]);
+  assert.equal('maxTokens' in plan.models[0], false);
+});
+
+test('快照带上推理档位，且档位变化算「变化」', () => {
+  const snap = snapshotFromCatalog([
+    { id: 'a:1', name: 'A', contextWindow: 1000, maxTokens: 100, reasoningEfforts: ['low', 'high'] },
+  ]);
+  assert.deepEqual(snap.models[0].efforts, ['low', 'high']);
+  const round = parseSnapshot(JSON.stringify(snap));
+  assert.deepEqual(round.models[0].efforts, ['low', 'high']);
+  // 还原成目录形态时档位要回来（补齐靠它）
+  assert.deepEqual(catalogFromSnapshot(round)[0].reasoningEfforts, ['low', 'high']);
+  // 网关改了档位 → 差异里要看得见
+  const next = snapshotFromCatalog([
+    { id: 'a:1', name: 'A', contextWindow: 1000, maxTokens: 100, reasoningEfforts: ['low'] },
+  ]);
+  assert.deepEqual(diffModelSnapshots(round, next).changed, [{ id: 'a:1', fields: ['efforts'] }]);
 });

@@ -2168,7 +2168,8 @@ var ENDPOINTS = {
   clearModelRecord: "clearModelRecord",
   getModelCatalog: "getModelCatalog",
   refreshModelCatalog: "refreshModelCatalog",
-  commitModelCapabilities: "commitModelCapabilities"
+  commitModelCapabilities: "commitModelCapabilities",
+  completeModelFields: "completeModelFields"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -4020,6 +4021,27 @@ function ExportMenu({ open, onToggle, payload, days, byModelDaily, modelRows, ac
 var import_react6 = __toESM(require("react"), 1);
 var DEFAULT_PROVIDER = "chanhub2api";
 var FIELD_LABEL = { name: "\u540D\u79F0", ctx: "\u4E0A\u6587", maxOut: "\u8F93\u51FA", credits: "\u500D\u7387", vision: "\u80FD\u529B" };
+var COMPLETION_LABEL = {
+  contextWindow: "\u4E0A\u4E0B\u6587",
+  maxTokens: "\u8F93\u51FA\u4E0A\u9650",
+  reasoningEfforts: "\u63A8\u7406\u6863\u4F4D",
+  input: "\u89C6\u89C9"
+};
+function NotWrittenMark({ fields, children }) {
+  return import_react6.default.createElement(
+    "span",
+    {
+      style: { display: "inline-flex", alignItems: "center", gap: 4 },
+      title: `DSH \u914D\u7F6E\u91CC\u6CA1\u5199\uFF1A${fields.join("\u3001")}
+pi-ai \u4F1A\u56DE\u843D\u5230\u9ED8\u8BA4\u503C\uFF08\u4E0A\u4E0B\u6587 262144 / \u8F93\u51FA 32768\uFF09\uFF0C\u9762\u677F\u8FD9\u91CC\u663E\u793A\u7684\u662F\u7F51\u5173\u81EA\u62A5\u503C\u3002
+\u70B9\u300C\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\u300D\u5373\u53EF\u5199\u5165\u3002`
+    },
+    import_react6.default.createElement("span", { style: { color: tone.warn.fg } }, children),
+    import_react6.default.createElement("span", {
+      style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg }
+    }, "\u672A\u5199\u5165")
+  );
+}
 function fmtWindow(n) {
   if (!n || n <= 0) return "\u2014";
   if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
@@ -4104,6 +4126,9 @@ function ModelAbilityTab({ rpcCall, showToast }) {
   const [rollbackBusy, setRollbackBusy] = import_react6.default.useState(false);
   const [catalog, setCatalog] = import_react6.default.useState(null);
   const [catalogBusy, setCatalogBusy] = import_react6.default.useState(false);
+  const [configuredGaps, setConfiguredGaps] = import_react6.default.useState({});
+  const [completion, setCompletion] = import_react6.default.useState(null);
+  const [completeBusy, setCompleteBusy] = import_react6.default.useState(false);
   const notify = (msg) => {
     if (typeof showToast === "function") {
       showToast(msg);
@@ -4134,6 +4159,22 @@ function ModelAbilityTab({ rpcCall, showToast }) {
     } catch {
     }
   }, [rpcCall, provider, applyCatalogResult]);
+  const reloadRecord = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    try {
+      const result = await rpcCall(ENDPOINTS.getModelRecord, {});
+      if (result?.ok !== true || !result.value?.record) return;
+      const v = result.value;
+      setModels(v.models ?? []);
+      setRecord(v.record);
+      if (typeof v.provider === "string" && v.provider !== "") setProvider(v.provider);
+      if (v.backup && v.backup.at > 0) setBackup(v.backup);
+      setConfiguredGaps(v.configured?.gaps ?? {});
+      setState({ kind: "cached" });
+      loadCatalog(v.models ?? []);
+    } catch {
+    }
+  }, [rpcCall, loadCatalog]);
   const refreshCatalog = import_react6.default.useCallback(async () => {
     if (!rpcCall) return;
     setCatalogBusy(true);
@@ -4153,6 +4194,47 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       setCatalogBusy(false);
     }
   }, [rpcCall, provider, models, applyCatalogResult]);
+  const previewCompletion = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    setCompleteBusy(true);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.completeModelFields, { provider, dryRun: true });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? "\u8865\u9F50\u9884\u89C8\u5931\u8D25";
+        setLastErr(msg);
+        notify(`\u8865\u9F50\u9884\u89C8\u5931\u8D25\uFF1A${msg}`);
+        return;
+      }
+      setCompletion(result.value);
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+    } finally {
+      setCompleteBusy(false);
+    }
+  }, [rpcCall, provider]);
+  const applyCompletion = import_react6.default.useCallback(async () => {
+    if (!rpcCall) return;
+    setCompleteBusy(true);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.completeModelFields, { provider, dryRun: false });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? "\u8865\u9F50\u5931\u8D25";
+        setLastErr(msg);
+        notify(`\u8865\u9F50\u5931\u8D25\uFF1A${msg}`);
+        return;
+      }
+      const v = result.value;
+      setCompletion(null);
+      notify(`\u5DF2\u8865\u9F50 ${(v.changes ?? []).length} \u4E2A\u6A21\u578B\u7684\u914D\u7F6E\u5B57\u6BB5`);
+      await reloadRecord();
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+    } finally {
+      setCompleteBusy(false);
+    }
+  }, [rpcCall, provider, reloadRecord]);
   const load = import_react6.default.useCallback(async (withOverwrite = false) => {
     if (!rpcCall) return;
     if (withOverwrite) {
@@ -4193,21 +4275,6 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       setState({ kind: "error", message: error?.message ?? String(error) });
     }
   }, [rpcCall, provider]);
-  const reloadRecord = import_react6.default.useCallback(async () => {
-    if (!rpcCall) return;
-    try {
-      const result = await rpcCall(ENDPOINTS.getModelRecord, {});
-      if (result?.ok !== true || !result.value?.record) return;
-      const v = result.value;
-      setModels(v.models ?? []);
-      setRecord(v.record);
-      if (typeof v.provider === "string" && v.provider !== "") setProvider(v.provider);
-      if (v.backup && v.backup.at > 0) setBackup(v.backup);
-      setState({ kind: "cached" });
-      loadCatalog(v.models ?? []);
-    } catch {
-    }
-  }, [rpcCall, loadCatalog]);
   const commitCapabilities = import_react6.default.useCallback(async () => {
     if (!rpcCall) return;
     setCatalogBusy(true);
@@ -4376,6 +4443,18 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         },
         catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"
       ),
+      models && models.length > 0 && Object.keys(configuredGaps).length > 0 ? import_react6.default.createElement(
+        "button",
+        {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: completeBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: completeBusy,
+          onClick: previewCompletion,
+          title: "\u7ED9 DSH \u914D\u7F6E\u91CC\u5DF2\u5B58\u5728\u7684\u6761\u76EE\u8865\u4E0A contextWindow / maxTokens / \u63A8\u7406\u6863\u4F4D\uFF08+ \u89C6\u89C9 input\uFF09\uFF1A\u53EA\u586B\u7A7A\u7F3A\uFF0C\u4E0D\u589E\u4E0D\u5220\u6761\u76EE\uFF0C\u4E5F\u4E0D\u52A8\u4F60\u624B\u6539\u8FC7\u7684\u5176\u5B83\u5B57\u6BB5\u3002\u7F3A\u5B57\u6BB5\u65F6 pi-ai \u4F1A\u56DE\u843D\u5230 256K / 32K \u2014\u2014 \u8FD9\u5C31\u662F\u300C\u4E0A\u6E38 1M\u3001DSH \u663E\u793A 256K\u300D\u7684\u539F\u56E0\u3002"
+        },
+        completeBusy ? "\u5904\u7406\u4E2D\u2026" : `\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\uFF08${Object.keys(configuredGaps).length}\uFF09`
+      ) : null,
       catalog && (catalog.baseline?.pending ?? 0) > 0 ? import_react6.default.createElement(
         "button",
         {
@@ -4481,6 +4560,65 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       { style: { ...s.tip, color: tone.ok.fg } },
       `\u5DF2\u5E94\u7528\uFF1A\u7ED9 ${lastOk.added.length} \u4E2A\u6A21\u578B\u8865\u591A\u6A21\u6001\u80FD\u529B` + (lastOk.skipped.length ? `\uFF1B\u5FFD\u7565 ${lastOk.skipped.length} \u4E2A\u672A\u627E\u5230\u7684 id` : "") + (lastOk.wrote ? "" : "\uFF08\u65E0\u53EF\u5199\u53D8\u66F4\uFF09")
     ) : null,
+    // 补齐预览：dry-run 的结果 + 二次确认（写入是第二个按钮，不点不写）
+    completion ? import_react6.default.createElement(
+      "div",
+      { style: { ...s.tip, display: "flex", flexDirection: "column", gap: 6 } },
+      import_react6.default.createElement(
+        "span",
+        { style: { fontWeight: 600 } },
+        `\u8865\u9F50\u9884\u89C8\uFF1A\u5C06\u6539\u52A8 ${completion.changes.length} \u4E2A\u6A21\u578B\uFF08\u5DF2\u4E00\u81F4\u4E0D\u52A8 ${completion.unchanged} \u4E2A\uFF09`
+      ),
+      import_react6.default.createElement(
+        "span",
+        null,
+        `\u6570\u636E\u6E90\uFF1A${completion.source?.kind === "gateway" ? "\u7F51\u5173\u5B9E\u65F6" : "\u62C9\u53D6\u5FEB\u7167"}` + (completion.source?.at ? ` \xB7 ${relativeTime(completion.source.at) || "\u2014"}` : "") + "\uFF1B\u53EA\u586B\u7A7A\u7F3A\uFF0C\u4E0D\u589E\u4E0D\u5220\u6761\u76EE"
+      ),
+      completion.source?.staleFields?.length > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.warn.fg } },
+        "\u8FD9\u4EFD\u5FEB\u7167\u8BB0\u5F55\u4E8E\u300C\u63A8\u7406\u6863\u4F4D\u300D\u91C7\u96C6\u4E0A\u7EBF\u4E4B\u524D \u2192 \u6863\u4F4D\u8FD9\u6B21\u8865\u4E0D\u4E86\uFF1A\u5148\u628A\u4E0A\u9762\u300C\u8986\u76D6\u300D\u52FE\u9009\u6846\u7559\u7A7A\u3001\u70B9\u4E00\u6B21\u300C\u62C9\u53D6\u300D\u5237\u65B0\u5FEB\u7167\uFF0C\u518D\u56DE\u6765\u8865\u9F50\u3002"
+      ) : null,
+      import_react6.default.createElement(
+        "span",
+        null,
+        Object.entries(completion.changes.reduce((acc, c) => {
+          for (const f of c.fields) acc[f] = (acc[f] ?? 0) + 1;
+          return acc;
+        }, {})).map(([f, n]) => `${COMPLETION_LABEL[f] ?? f} ${n}`).join(" \xB7 ") || "\u65E0"
+      ),
+      completion.changes.length > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { ...type.text.caption, maxHeight: 96, overflow: "auto" } },
+        completion.changes.slice(0, 12).map((c) => `${c.id}\uFF08${c.fields.map((f) => COMPLETION_LABEL[f] ?? f).join("/")}\uFF09`).join("\uFF1B") + (completion.changes.length > 12 ? ` \u2026\u7B49 ${completion.changes.length} \u4E2A` : "")
+      ) : null,
+      completion.warnings?.length > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.warn.fg } },
+        `\u7F51\u5173\u81EA\u62A5\u5F02\u5E38 ${completion.warnings.length} \u6761\uFF08\u7167\u5199\u4E0D\u6539\uFF09\uFF1A` + completion.warnings.slice(0, 3).map((w) => `${w.id} \u8F93\u51FA ${w.maxTokens} > \u4E0A\u4E0B\u6587 ${w.contextWindow}`).join("\uFF1B")
+      ) : null,
+      completion.missingInCatalog?.length > 0 ? import_react6.default.createElement(
+        "span",
+        { style: { color: tone.idle.fg } },
+        `${completion.missingInCatalog.length} \u4E2A\u6761\u76EE\u5728\u76EE\u5F55\u91CC\u627E\u4E0D\u5230\uFF08\u4FDD\u6301\u539F\u6837\uFF09\uFF1A` + completion.missingInCatalog.slice(0, 5).join("\u3001")
+      ) : null,
+      import_react6.default.createElement(
+        "span",
+        { style: { display: "flex", gap: 8 } },
+        import_react6.default.createElement("button", {
+          ...s.btnPri,
+          style: { ...s.btnPri, opacity: completeBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: completeBusy || completion.changes.length === 0,
+          onClick: applyCompletion
+        }, completeBusy ? "\u5199\u5165\u4E2D\u2026" : `\u786E\u8BA4\u5199\u5165\uFF08${completion.changes.length}\uFF09`),
+        import_react6.default.createElement("button", {
+          ...s.btnGhost,
+          type: "button",
+          onClick: () => setCompletion(null)
+        }, "\u53D6\u6D88")
+      )
+    ) : null,
     lastErr ? import_react6.default.createElement("div", { style: s.err }, lastErr) : null,
     // 表格
     models && models.length > 0 ? import_react6.default.createElement(
@@ -4541,8 +4679,16 @@ function ModelAbilityTab({ rpcCall, showToast }) {
                 }, `\u53D8\u5316 ${changedFields.map((f) => FIELD_LABEL[f] ?? f).join("/")}`) : null
               ),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.name),
-              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.contextWindow)),
-              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, fmtWindow(m.maxTokens)),
+              import_react6.default.createElement(
+                "td",
+                { ...tdStyle, whiteSpace: "nowrap" },
+                configuredGaps[m.id]?.includes("contextWindow") ? import_react6.default.createElement(NotWrittenMark, { fields: ["contextWindow"] }, fmtWindow(m.contextWindow)) : fmtWindow(m.contextWindow)
+              ),
+              import_react6.default.createElement(
+                "td",
+                { ...tdStyle, whiteSpace: "nowrap" },
+                configuredGaps[m.id]?.includes("maxTokens") ? import_react6.default.createElement(NotWrittenMark, { fields: ["maxTokens"] }, fmtWindow(m.maxTokens)) : fmtWindow(m.maxTokens)
+              ),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, typeof m.credits === "string" && m.credits !== "" ? m.credits : "\u2014"),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge)),
               import_react6.default.createElement(

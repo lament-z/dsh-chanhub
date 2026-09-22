@@ -46,6 +46,7 @@ export const ENDPOINTS = {
   getModelCatalog: 'getModelCatalog',
   refreshModelCatalog: 'refreshModelCatalog',
   commitModelCapabilities: 'commitModelCapabilities',
+  completeModelFields: 'completeModelFields',
 };
 
 /** RPC 频道（与宿主 apply 里的 CHANNEL 一致）。 */
