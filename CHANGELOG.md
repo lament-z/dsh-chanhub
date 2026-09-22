@@ -37,6 +37,18 @@ rail（56px）态只留图标 + 异常角标；点开是一个自带 popover，�
 远程页/无服务时退回 localStorage（只作用于本浏览器，标「仅本浏览器」并给出说明文字）。
 这样入口开关在远程页也能真正生效，而不是只能吃默认值。
 
+**入口自隔离（拿到真机红框后补的护栏）**
+
+真机截图里那一行是一块**红框**（DSH 对「插槽入口渲染崩溃」的占位，
+文案形如 `your entry in slot "…" crashed while React rendered it: …`，
+由 `dsh-cordis-client-runner` 的 `onEntryError → reportRenderFailure` 产生），
+红框替代了整个入口，用户只看到一块红、拿不到原因，而这条插槽还是共享的。
+
+现在 `QuickEntry` 外面套了一层错误边界（类组件）：本插件自己抛错时退化为一个小胶囊
+「⚠ 渠道入口异常」，**点开就地显示错误原文**（手机没有控制台，这是唯一能读到原因的地方），
+不再让整条插槽变红框，也不影响同行其它入口。配套渲染用例：注入一个 throw 的 store
+→ 断言出现胶囊且 `title` 带错误原文。
+
 **foot 行是共享槽位（真机反馈后修正）**
 
 - 那一行（`.footerActions`）里已有 dsh-context 的「上下文洞察」（`order:10`，自身

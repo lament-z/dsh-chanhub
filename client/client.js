@@ -4144,7 +4144,80 @@ function FreshnessPill({ phase, error, fetchedAt, now }) {
     item.text
   );
 }
-function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
+var EntryBoundary = class extends import_react6.default.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: void 0, open: false };
+    this.toggle = () => this.setState((prev) => ({ open: !prev.open }));
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error) {
+    try {
+      console.error("[dsh-chanhub] \u4FA7\u8FB9\u680F\u5165\u53E3\u6E32\u67D3\u5931\u8D25\uFF1A", error);
+    } catch {
+    }
+  }
+  render() {
+    const { error, open } = this.state;
+    if (!error) return this.props.children;
+    const text = String(error?.stack ?? error?.message ?? error);
+    const chip = import_react6.default.createElement("button", {
+      type: "button",
+      onClick: this.toggle,
+      title: text,
+      style: {
+        font: "inherit",
+        cursor: "pointer",
+        border: "1px solid var(--dsw-alias-state-error-primary,#dc2626)",
+        background: "transparent",
+        color: "var(--dsw-alias-state-error-primary,#dc2626)",
+        borderRadius: 8,
+        height: 28,
+        padding: "0 8px",
+        fontSize: 12,
+        maxWidth: "100%",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        flex: "0 0 auto"
+      }
+    }, "\u26A0 \u6E20\u9053\u5165\u53E3\u5F02\u5E38");
+    const detail = open ? (0, import_react_dom.createPortal)(
+      import_react6.default.createElement("div", {
+        role: "dialog",
+        "aria-label": "\u6E20\u9053\u5165\u53E3\u9519\u8BEF",
+        style: {
+          position: "fixed",
+          left: 8,
+          right: 8,
+          bottom: 8,
+          zIndex: 70,
+          maxHeight: "60vh",
+          overflow: "auto",
+          padding: "10px 12px",
+          borderRadius: 12,
+          fontSize: 11.5,
+          lineHeight: 1.6,
+          fontFamily: "ui-monospace,Menlo,monospace",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          background: "var(--dsw-alias-bg-layer-1,#fff)",
+          color: "var(--dsw-alias-label-primary,currentColor)",
+          border: "1px solid var(--dsw-alias-state-error-primary,#dc2626)",
+          boxShadow: "0 18px 48px rgba(15,23,42,.2)"
+        }
+      }, text.slice(0, 2e3)),
+      document.body
+    ) : null;
+    return import_react6.default.createElement(import_react6.default.Fragment, null, chip, detail);
+  }
+};
+function QuickEntry(props) {
+  return import_react6.default.createElement(EntryBoundary, null, import_react6.default.createElement(QuickEntryInner, props));
+}
+function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
   const [snapshot, setSnapshot] = import_react6.default.useState(() => store?.getSnapshot?.());
   const [enabled, setEnabled] = import_react6.default.useState(() => prefs ? prefs.value : true);
   const [open, setOpen] = import_react6.default.useState(false);

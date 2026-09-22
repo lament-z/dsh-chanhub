@@ -341,6 +341,9 @@ test('组合：客户端 bundle 的 slots 注册元信息正确（Loader 消费�
     useMemo: () => {},
     useState: () => [null, () => {}],
     useRef: () => ({ current: null }),
+    // 侧边栏入口外面套了错误边界（class extends React.Component）——
+    // 类体在**模块求值期**就会读 React.Component，桩里缺它会让整个 bundle 起不来。
+    Component: class Component {},
   };
   const mod = factory((id) => {
     if (id === 'react') return React;

@@ -268,12 +268,87 @@ function FreshnessPill({ phase, error, fetchedAt, now }) {
 }
 
 /**
- * 侧边栏快捷入口主体。
+ * 入口自隔离边界（React 类组件；只有类能做错误边界）。
+ *
+ * 为什么必须有：插槽里某个入口抛错时，DSH 会把**整个入口**换成一块红框
+ * 「your entry in slot "..." crashed while React rendered it: …」（
+ * `dsh-cordis-client-runner` 的 onEntryError → reportRenderFailure），
+ * 用户只看到一块红框、拿不到原因，而且这条插槽是共享的。
+ * 有了这层：本插件自己的异常退化成一个小胶囊，点开就能看到错误原文
+ * （手机上没有控制台，这是唯一能读到原因的地方），其余功能与同行其它入口不受影响。
+ */
+class EntryBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: undefined, open: false };
+    this.toggle = () => this.setState((prev) => ({ open: !prev.open }));
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    try {
+      console.error('[dsh-chanhub] 侧边栏入口渲染失败：', error);
+    } catch {
+      /* 控制台不可用就算了 */
+    }
+  }
+
+  render() {
+    const { error, open } = this.state;
+    if (!error) return this.props.children;
+    const text = String(error?.stack ?? error?.message ?? error);
+    const chip = React.createElement('button', {
+      type: 'button',
+      onClick: this.toggle,
+      title: text,
+      style: {
+        font: 'inherit', cursor: 'pointer', border: '1px solid var(--dsw-alias-state-error-primary,#dc2626)',
+        background: 'transparent', color: 'var(--dsw-alias-state-error-primary,#dc2626)',
+        borderRadius: 8, height: 28, padding: '0 8px', fontSize: 12, maxWidth: '100%',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '0 0 auto',
+      },
+    }, '⚠ 渠道入口异常');
+    const detail = open
+      ? createPortal(
+          React.createElement('div', {
+            role: 'dialog',
+            'aria-label': '渠道入口错误',
+            style: {
+              position: 'fixed', left: 8, right: 8, bottom: 8, zIndex: 70, maxHeight: '60vh', overflow: 'auto',
+              padding: '10px 12px', borderRadius: 12, fontSize: 11.5, lineHeight: 1.6,
+              fontFamily: 'ui-monospace,Menlo,monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'var(--dsw-alias-label-primary,currentColor)',
+              border: '1px solid var(--dsw-alias-state-error-primary,#dc2626)',
+              boxShadow: '0 18px 48px rgba(15,23,42,.2)',
+            },
+          }, text.slice(0, 2000)),
+          document.body,
+        )
+      : null;
+    return React.createElement(React.Fragment, null, chip, detail);
+  }
+}
+
+/**
+ * 侧边栏快捷入口（对外导出；内含自隔离边界）。
+ *
+ * @param props - `{wide, store, prefs, openSettings, hasOpenSettings, now}`。
+ * @returns React 元素。
+ */
+export function QuickEntry(props) {
+  return React.createElement(EntryBoundary, null, React.createElement(QuickEntryInner, props));
+}
+
+/**
+ * 入口主体（真正实现；异常由上面的边界兜住）。
  *
  * @param props - `{wide, store, prefs, openSettings, now}`。
  * @returns React 元素。
  */
-export function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
+function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
   const [snapshot, setSnapshot] = React.useState(() => store?.getSnapshot?.());
   const [enabled, setEnabled] = React.useState(() => (prefs ? prefs.value : true));
   const [open, setOpen] = React.useState(false);

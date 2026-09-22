@@ -1604,6 +1604,40 @@ async function clickEntry(document, container) {
   return button;
 }
 
+test('渲染：入口内部异常被自隔离 —— 出小胶囊而不是让整条插槽变红框', { skip }, async () => {
+  const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>', {
+    pretendToBeVisual: true,
+    url: 'http://127.0.0.1:7866/',
+  });
+  const { window } = dom;
+  const saved = captureGlobals(['document', 'window', 'HTMLElement', 'Node', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout']);
+  globalThis.document = window.document;
+  globalThis.window = window;
+  globalThis.HTMLElement = window.HTMLElement;
+  globalThis.Node = window.Node;
+  const { component } = registeredQuickEntry(async () => ({ ok: false }), window);
+  const boom = new Error('boom: 故意在渲染里抛错');
+  const brokenStore = { getSnapshot: () => { throw boom; }, subscribe: () => () => {}, start: () => {}, loadUsage: () => {}, loadAux: () => {}, refreshUpstream: async () => true, dispose: () => {} };
+  const host = window.document.getElementById('app');
+  let root;
+  try {
+    await React.act(async () => {
+      root = ReactDOMClient.createRoot(host);
+      root.render(React.createElement(component, { wide: true, store: brokenStore, prefs: prefsStub(true), hasOpenSettings: () => true }));
+    });
+    await React.act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    const html = host.innerHTML;
+    assert.ok(html.includes('渠道入口异常'), `应退化为自隔离胶囊，实际：${html.slice(0, 200)}`);
+    assert.ok(html.includes('⚠'), '胶囊要带警示图标（一眼可见）');
+    const chip = host.querySelector('button');
+    assert.match(chip.getAttribute('title'), /boom: 故意在渲染里抛错/, '错误原文要能读到（手机没有控制台）');
+  } finally {
+    try { await React.act(async () => root.unmount()); } catch {}
+    restoreGlobals(saved);
+    dom.window.close();
+  }
+});
+
 test('渲染：入口两态 —— 展开给摘要、收起只留 36px 图标', { skip }, async () => {
   const status = realStatusFixture();
   const wide = await mountQuick({ wide: true, status });
