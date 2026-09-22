@@ -348,7 +348,16 @@ export function QuickEntry(props) {
  * @param props - `{wide, store, prefs, openSettings, now}`。
  * @returns React 元素。
  */
-function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
+function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, clock }) {
+  // 真机踩坑（TypeError: now is not a function）：宿主给**每个槽位**都会注入一个
+  // 共享时钟，属性名就叫 `now`，值是**数字**。之前我用 `now = Date.now` 接自己的时钟，
+  // 结果被宿主的数字覆盖，`now()` 当场抛错 —— 整条 sidebar.footer.action 变成红框。
+  // 现在自己的时钟走独立名字 `clock`（仅测试用），并且对传数字也兼容。
+  const now = React.useMemo(() => {
+    if (typeof clock === 'function') return clock;
+    if (typeof clock === 'number') return () => clock;
+    return Date.now;
+  }, [clock]);
   const [snapshot, setSnapshot] = React.useState(() => store?.getSnapshot?.());
   const [enabled, setEnabled] = React.useState(() => (prefs ? prefs.value : true));
   const [open, setOpen] = React.useState(false);

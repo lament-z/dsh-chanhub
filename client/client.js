@@ -4217,7 +4217,12 @@ var EntryBoundary = class extends import_react6.default.Component {
 function QuickEntry(props) {
   return import_react6.default.createElement(EntryBoundary, null, import_react6.default.createElement(QuickEntryInner, props));
 }
-function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, now = Date.now() }) {
+function QuickEntryInner({ wide, store, prefs, openSettings, hasOpenSettings, clock }) {
+  const now = import_react6.default.useMemo(() => {
+    if (typeof clock === "function") return clock;
+    if (typeof clock === "number") return () => clock;
+    return Date.now;
+  }, [clock]);
   const [snapshot, setSnapshot] = import_react6.default.useState(() => store?.getSnapshot?.());
   const [enabled, setEnabled] = import_react6.default.useState(() => prefs ? prefs.value : true);
   const [open, setOpen] = import_react6.default.useState(false);

@@ -1569,7 +1569,9 @@ async function mountQuick(options = {}) {
       openSettings: () => {},
       // 便利入口的能力探针：默认可用；用例可传 false 验证「取不到就隐藏按钮」
       hasOpenSettings: options.hasOpenSettings ?? (() => true),
-      now: Date.now,
+      // 自己的时钟走独立 prop（宿主的 `now` 是数字共享时钟，撞名会 TypeError）
+      clock: options.clock ?? Date.now,
+      ...(options.nowProp === undefined ? {} : { now: options.nowProp }),
     }));
   });
   await React.act(async () => {
@@ -1603,6 +1605,20 @@ async function clickEntry(document, container) {
   });
   return button;
 }
+
+test('渲染：宿主注入的数字 now 不会打死入口（真机 TypeError: now is not a function 的回归锁）', { skip }, async () => {
+  // 宿主给每个槽位都注入共享时钟，属性名就叫 `now`，值是**数字**。
+  // 之前自己的时钟也叫 now（默认 Date.now），被它覆盖后在渲染里 now() → 整条插槽变红框。
+  const ctx = await mountQuick({ wide: true, status: realStatusFixture(), nowProp: 1790000000000 });
+  try {
+    const html = ctx.container.innerHTML;
+    assert.ok(html.includes('渠道'), `数字 now 下入口仍须正常渲染，实际：${html.slice(0, 160)}`);
+    assert.match(html, /\d+\/\d+ · /, '摘要也要在');
+    assert.ok(!html.includes('渠道入口异常'), '不能退化成错误胶囊');
+  } finally {
+    await ctx.cleanup();
+  }
+});
 
 test('渲染：入口内部异常被自隔离 —— 出小胶囊而不是让整条插槽变红框', { skip }, async () => {
   const dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>', {
