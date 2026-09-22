@@ -276,7 +276,7 @@ export function Fold({ summary, children, open = false, id }) {
 
 /** 渠道展示名（短名，表格/标签用）。 */
 export function channelLabel(channel) {
-  return { workbuddy: 'WB', traework: 'Trae', qoder: 'Qoder' }[channel] ?? '';
+  return { workbuddy: 'WB', traework: 'Trae', qoder: 'Qoder', qodercn: 'QCN', qodercom: 'QCOM' }[channel] ?? '';
 }
 
 /** 绝对时间展示。 */

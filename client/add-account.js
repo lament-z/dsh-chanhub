@@ -16,7 +16,13 @@ import React from 'react';
 import { s, tone } from './theme.js';
 
 /** 渠道 → 展示名（与账号池的渠道标签同源口径）。 */
-const CHANNEL_LABEL = { workbuddy: 'WorkBuddy', traework: 'TraeWork', qoder: 'QoderWork' };
+const CHANNEL_LABEL = {
+  workbuddy: 'WorkBuddy',
+  traework: 'TraeWork',
+  qoder: 'QoderWork',
+  qodercn: 'QoderCN',
+  qodercom: 'QoderCOM',
+};
 
 /**
  * 渠道 → 可选域。
@@ -29,6 +35,10 @@ const CHANNEL_REALMS = {
   ],
   traework: [{ id: 'cn', label: '默认', note: 'trae.cn' }],
   qoder: [{ id: 'cn', label: '默认', note: 'qoder.com.cn' }],
+  // QoderCN 与 QoderWork 同域名但为不同产品线（凭据不通用），单独列渠道。
+  qodercn: [{ id: 'cn', label: '默认', note: 'qoder.com.cn' }],
+  // 国际版：业务 openapi.qoder.sh / 推理 api1.qoder.sh / 模型表 api2.qoder.sh。
+  qodercom: [{ id: 'cn', label: '国际版', note: 'openapi.qoder.sh' }],
 };
 
 /** 轮询间隔（毫秒）。设备授权是人在浏览器里操作，2.5s 足够快也不打网关。 */

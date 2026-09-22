@@ -12,10 +12,12 @@ export const CHANNEL_LABEL = {
   workbuddy: 'WB',
   traework: 'Trae',
   qoder: 'Qoder',
+  qodercn: 'QoderCN',
+  qodercom: 'QoderCOM',
 };
 
 /** 渠道展示顺序（与用户要求的 WB / Trae / Qoder 一致）。 */
-export const CHANNEL_ORDER = ['workbuddy', 'traework', 'qoder'];
+export const CHANNEL_ORDER = ['workbuddy', 'traework', 'qoder', 'qodercn', 'qodercom'];
 
 /** 六类排程的展示定义（顺序即 UI 顺序）。 */
 export const SCHEDULE_ITEMS = [
@@ -572,6 +574,10 @@ export const CHANNEL_COLOR = {
   workbuddy: '#4f6ef7',
   traework: '#a855f7',
   qoder: '#06b6d4',
+  // QoderCN 紫 / QoderCOM 橙金：与上游 wild-work 的渠道主题一致，
+  // 便于两个 Qoder 渠道在同屏下区分（同域名、不同产品线）。
+  qodercn: '#6d28d9',
+  qodercom: '#b45309',
 };
 
 /**
@@ -803,7 +809,15 @@ export function resolveChannel(explicit, domain) {
   //     会与网关实际选路不符（D2 测试抓到过这条偏差）。
   const trimmed = typeof explicit === 'string' ? explicit.trim().toLowerCase() : '';
   if (trimmed !== '') {
-    if (trimmed === 'workbuddy' || trimmed === 'traework' || trimmed === 'qoder') return trimmed;
+    if (
+      trimmed === 'workbuddy' ||
+      trimmed === 'traework' ||
+      trimmed === 'qoder' ||
+      trimmed === 'qodercn' ||
+      trimmed === 'qodercom'
+    ) {
+      return trimmed;
+    }
     return 'workbuddy';
   }
   const value = typeof domain === 'string' ? domain.trim().toLowerCase() : '';

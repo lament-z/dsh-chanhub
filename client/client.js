@@ -891,9 +891,11 @@ function formatFieldValue(field, value) {
 var CHANNEL_LABEL = {
   workbuddy: "WB",
   traework: "Trae",
-  qoder: "Qoder"
+  qoder: "Qoder",
+  qodercn: "QoderCN",
+  qodercom: "QoderCOM"
 };
-var CHANNEL_ORDER = ["workbuddy", "traework", "qoder"];
+var CHANNEL_ORDER = ["workbuddy", "traework", "qoder", "qodercn", "qodercom"];
 var SCHEDULE_ITEMS = [
   { id: "checkin", icon: "\u{1F4C5}", label: "\u7B7E\u5230", hoursKey: "checkin_hours", enabledKey: "checkin_enabled" },
   { id: "activity", icon: "\u{1F5FA}", label: "\u6D3B\u8DC3\u5730\u56FE", hoursKey: "activity_hours", enabledKey: "activity_enabled" },
@@ -1220,7 +1222,11 @@ function realmLimitOf(gatewayConfig, realm) {
 var CHANNEL_COLOR = {
   workbuddy: "#4f6ef7",
   traework: "#a855f7",
-  qoder: "#06b6d4"
+  qoder: "#06b6d4",
+  // QoderCN 紫 / QoderCOM 橙金：与上游 wild-work 的渠道主题一致，
+  // 便于两个 Qoder 渠道在同屏下区分（同域名、不同产品线）。
+  qodercn: "#6d28d9",
+  qodercom: "#b45309"
 };
 function channelColor(channel) {
   return CHANNEL_COLOR[channel] ?? "#94a3b8";
@@ -1360,7 +1366,9 @@ function channelResolver(authFiles) {
 function resolveChannel(explicit, domain) {
   const trimmed = typeof explicit === "string" ? explicit.trim().toLowerCase() : "";
   if (trimmed !== "") {
-    if (trimmed === "workbuddy" || trimmed === "traework" || trimmed === "qoder") return trimmed;
+    if (trimmed === "workbuddy" || trimmed === "traework" || trimmed === "qoder" || trimmed === "qodercn" || trimmed === "qodercom") {
+      return trimmed;
+    }
     return "workbuddy";
   }
   const value = typeof domain === "string" ? domain.trim().toLowerCase() : "";
@@ -2057,7 +2065,7 @@ function Fold({ summary, children, open = false, id }) {
   );
 }
 function channelLabel(channel) {
-  return { workbuddy: "WB", traework: "Trae", qoder: "Qoder" }[channel] ?? "";
+  return { workbuddy: "WB", traework: "Trae", qoder: "Qoder", qodercn: "QCN", qodercom: "QCOM" }[channel] ?? "";
 }
 function formatAbsolute(iso) {
   const value = Date.parse(iso);
@@ -2151,14 +2159,24 @@ var CHANNEL = "/dsh-chanhub";
 
 // client/add-account.js
 var import_react2 = __toESM(require("react"), 1);
-var CHANNEL_LABEL2 = { workbuddy: "WorkBuddy", traework: "TraeWork", qoder: "QoderWork" };
+var CHANNEL_LABEL2 = {
+  workbuddy: "WorkBuddy",
+  traework: "TraeWork",
+  qoder: "QoderWork",
+  qodercn: "QoderCN",
+  qodercom: "QoderCOM"
+};
 var CHANNEL_REALMS = {
   workbuddy: [
     { id: "cn", label: "\u56FD\u5185\u7248", note: "copilot.tencent.com" },
     { id: "global", label: "\u56FD\u9645\u7248", note: "www.workbuddy.ai" }
   ],
   traework: [{ id: "cn", label: "\u9ED8\u8BA4", note: "trae.cn" }],
-  qoder: [{ id: "cn", label: "\u9ED8\u8BA4", note: "qoder.com.cn" }]
+  qoder: [{ id: "cn", label: "\u9ED8\u8BA4", note: "qoder.com.cn" }],
+  // QoderCN 与 QoderWork 同域名但为不同产品线（凭据不通用），单独列渠道。
+  qodercn: [{ id: "cn", label: "\u9ED8\u8BA4", note: "qoder.com.cn" }],
+  // 国际版：业务 openapi.qoder.sh / 推理 api1.qoder.sh / 模型表 api2.qoder.sh。
+  qodercom: [{ id: "cn", label: "\u56FD\u9645\u7248", note: "openapi.qoder.sh" }]
 };
 var POLL_INTERVAL_MS = 2500;
 var MAX_POLL_ATTEMPTS = 360;
