@@ -81,16 +81,29 @@ function RadioRow({ label, options, value, onChange }) {
 /**
  * 「添加账号」弹窗。
  *
- * @param props - `{channels, realms, onStart, onPoll, onCallback, onClose, onDone}`。
+ * @param props - `{channels, realms, onStart, onPoll, onCallback, onClose, onDone, knownUids}`。
  *   - channels：网关支持**交互登录**的渠道（来自 /panel/api/channels，不是协议全集）；
  *   - realms：网关声明的域集合（当前恒含 cn）；
  *   - onStart(channel, realm, callbackBase) → `{url, callback_url?, external?}`；
  *   - onPoll(channel) → `{status,...}`；
  *   - onCallback(channel, callback) → `{status:'received'|'error'}`（粘贴完成）；
- *   - onDone()：登录成功后回调（面板据此刷新账号池）。
+ *   - onDone()：登录成功后回调（面板据此刷新账号池）；
+ *   - knownUids：发起登录那一刻池中已有的 uid 列表。用于在 done 阶段区分「新增账号」
+ *     与「同一个号重新登录」—— 两者都回 status=done，若一律写「已添加」，用户会以为
+ *     反复登录能不断加出新号（实测踩到：同一 uid 被回「已添加」5 次，用户据此得出
+ *     「保存成功了却没显示出来」）。
  * @returns React 元素。
  */
-export function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClose, onDone }) {
+export function AddAccountDialog({
+  channels,
+  realms,
+  onStart,
+  onPoll,
+  onCallback,
+  onClose,
+  onDone,
+  knownUids,
+}) {
   // 默认选中第一个可用渠道，且必须是**真的能登录**的（旧网关的 workbuddy 会 400）。
   const available = Array.isArray(channels) && channels.length > 0 ? channels : [];
   const [channel, setChannel] = React.useState(available[0] ?? '');
@@ -113,6 +126,10 @@ export function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback
   // poll 世代号：换渠道/重新发起后，丢弃前一轮在途的 poll 结果
   //（否则上一轮的 done 会覆盖新一轮的 idle）。与主面板的 creditsGeneration 同手法。
   const generation = React.useRef(0);
+  // 「发起登录那一刻」的池内 uid 冻结快照（点在按钮上时取，而不是渲染时取）：
+  // done 阶段若 uid 已在其中 = 这次登录只是给已有账号换凭证，没有新增账号。
+  // null = 调用方没给清单，判断不了（不要用空集合冒充「池子是空的」）。
+  const knownAtStart = React.useRef(null);
 
   /** 清掉在途轮询（切渠道、重发起、卸载都必须调用，否则定时器泄漏）。 */
   const stopPolling = React.useCallback(() => {
@@ -180,6 +197,10 @@ export function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback
     generation.current += 1;
     const gen = generation.current;
     attempts.current = 0;
+    // 冻结「此刻池内已有的 uid」：done 阶段据此区分新增账号与同号重登。
+    // 必须在发起这一刻取，不能用完成时的列表 —— 完成时新号已经进去了，
+    // 再比就会把新增误判成已存在。没传清单则记 null（判断不了）。
+    knownAtStart.current = Array.isArray(knownUids) ? new Set(knownUids) : null;
     setPhase('idle');
     setError('');
     setResult(null);
@@ -217,7 +238,7 @@ export function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback
       setMessage('');
       setError(err?.message ?? String(err));
     }
-  }, [channel, realm, onStart, pollOnce, stopPolling]);
+  }, [channel, realm, onStart, pollOnce, stopPolling, knownUids]);
 
   /**
    * 粘贴兜底：把用户从地址栏复制的回调交给网关。
@@ -292,6 +313,15 @@ export function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback
   // 网关明确不支持的域（如 config 关闭 global 时）。
   const allowedRealms = Array.isArray(realms) && realms.length > 0 ? realms : ['cn'];
   const visibleRealmOptions = realmOptions.filter((o) => allowedRealms.includes(o.id));
+
+  // 「新增」还是「同号重登」：网关新版本会在 done 里带 existing（权威口径），
+  // 旧网关没有该字段 → 回落到发起登录那一刻的池内 uid 快照（只有拿到清单时才敢判）。
+  // undefined = 判断不了 → 退回中性文案「已添加」，不编造结论。
+  const existingAccount = typeof result?.existing === 'boolean'
+    ? result.existing
+    : result?.uid && knownAtStart.current
+      ? knownAtStart.current.has(result.uid)
+      : undefined;
 
   return React.createElement(
     'div',
@@ -434,7 +464,12 @@ export function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback
             'div',
             { style: { ...s.card, marginTop: 12, marginBottom: 0, padding: '12px 14px' } },
             React.createElement('div', { className: 'dshc-row', style: { gap: 8, marginBottom: 6 } },
-              React.createElement('span', { style: { ...s.label } }, '✓ 已添加'),
+              React.createElement('span', { style: { ...s.label } },
+                existingAccount === true
+                  ? '✓ 账号已存在'
+                  : existingAccount === false
+                    ? '✓ 已新增账号'
+                    : '✓ 已添加'),
               result.nickname
                 ? React.createElement('span', { style: s.muted }, result.nickname)
                 : null,
@@ -447,7 +482,12 @@ export function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback
               typeof result.credits === 'number' && result.credits >= 0
                 ? React.createElement('div', null, `积分　${result.credits}`)
                 : null,
-              React.createElement('div', null, '凭证已落盘并热加载进池，无需重启网关。'),
+              // 「同号重登」必须说清没有新增 —— 否则用户反复登录、每次都看到「已添加」，
+              // 却数不到新账号，只会得出「保存成功了但没显示」的结论（实测踩到）。
+              React.createElement('div', null,
+                existingAccount === true
+                  ? '该账号此前已在池中：本次只是重新登录并更新了凭证，没有新增账号。'
+                  : '凭证已落盘并热加载进池，无需重启网关。'),
             ),
             message ? React.createElement('div', { style: { ...s.muted, marginTop: 6 } }, message) : null,
           )

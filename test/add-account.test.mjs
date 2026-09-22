@@ -779,3 +779,90 @@ dialogTests('D10 非外部回调渠道不渲染粘贴框（workbuddy 无回调�
     await cleanup();
   }
 });
+
+// ---- D11+：「新增账号」与「同号重登」必须说清（真机踩到）----
+//
+// 缺陷原状：无论这一次登录是不是把已有账号又登了一遍，done 一律渲染「✓ 已添加」。
+// 用户因此反复点「添加账号」（实测同一 uid 被回「已添加」5 次），每次都说保存成功、
+// 池子里却数不到新账号，只能得出「保存成功了但账号没显示出来」的结论。
+
+dialogTests('D11 已有账号再次登录：文案必须是「账号已存在」，并明说没有新增账号', async () => {
+  const doneCalls = [];
+  const { container, act, cleanup } = await mountDialog({
+    channels: ['workbuddy'],
+    realms: ['global'],
+    // 发起登录时池里已经有 uid-9 → 这次是同一个号重登。
+    knownUids: ['uid-1', 'uid-9'],
+    onStart: async () => ({ ok: true, value: { url: 'https://www.workbuddy.ai/auth' } }),
+    onPoll: async () => ({
+      ok: true,
+      value: { status: 'done', uid: 'uid-9', nickname: 'lament_z', realm: 'global', credits: 350 },
+    }),
+    onClose: () => {},
+    onDone: () => { doneCalls.push(1); },
+  });
+  try {
+    await act(async () => { buttonByText(container, '获取授权链接').click(); });
+    await waitFor(act, 2700);
+
+    const text = container.textContent;
+    assert.match(text, /账号已存在/);
+    assert.match(text, /没有新增账号/);
+    assert.doesNotMatch(text, /已新增账号/, '同号重登绝不能报「已新增」');
+    assert.match(text, /uid-9/);
+    assert.ok(doneCalls.length >= 1, 'onDone 仍必须被调用（账号池要刷新）');
+  } finally {
+    await cleanup();
+  }
+});
+
+dialogTests('D12 全新 uid：文案是「已新增账号」，与同号重登可区分', async () => {
+  const { container, act, cleanup } = await mountDialog({
+    channels: ['workbuddy'],
+    realms: ['global'],
+    knownUids: ['uid-1', 'uid-9'],
+    onStart: async () => ({ ok: true, value: { url: 'https://www.workbuddy.ai/auth' } }),
+    onPoll: async () => ({
+      ok: true,
+      value: { status: 'done', uid: 'uid-new', nickname: 'lament-z', realm: 'global', credits: 350 },
+    }),
+    onClose: () => {},
+    onDone: () => {},
+  });
+  try {
+    await act(async () => { buttonByText(container, '获取授权链接').click(); });
+    await waitFor(act, 2700);
+
+    const text = container.textContent;
+    assert.match(text, /已新增账号/);
+    assert.doesNotMatch(text, /账号已存在/);
+    assert.match(text, /uid-new/);
+  } finally {
+    await cleanup();
+  }
+});
+
+dialogTests('D13 网关自带 existing 时以网关为准（面板快照口径可能滞后）', async () => {
+  const { container, act, cleanup } = await mountDialog({
+    channels: ['workbuddy'],
+    realms: ['global'],
+    // 面板快照里没有这个 uid（例如账号是别的入口刚加进来、面板还没刷到），
+    // 但网关明确说已存在 → 必须按「已存在」渲染，而不是按快照猜「已新增」。
+    knownUids: [],
+    onStart: async () => ({ ok: true, value: { url: 'https://www.workbuddy.ai/auth' } }),
+    onPoll: async () => ({
+      ok: true,
+      value: { status: 'done', uid: 'uid-9', nickname: 'lament_z', realm: 'global', existing: true },
+    }),
+    onClose: () => {},
+    onDone: () => {},
+  });
+  try {
+    await act(async () => { buttonByText(container, '获取授权链接').click(); });
+    await waitFor(act, 2700);
+
+    assert.match(container.textContent, /账号已存在/);
+  } finally {
+    await cleanup();
+  }
+});

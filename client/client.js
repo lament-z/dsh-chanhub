@@ -2202,7 +2202,16 @@ function RadioRow({ label, options, value, onChange }) {
     )
   );
 }
-function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClose, onDone }) {
+function AddAccountDialog({
+  channels,
+  realms,
+  onStart,
+  onPoll,
+  onCallback,
+  onClose,
+  onDone,
+  knownUids
+}) {
   const available = Array.isArray(channels) && channels.length > 0 ? channels : [];
   const [channel, setChannel] = import_react2.default.useState(available[0] ?? "");
   const [realm, setRealm] = import_react2.default.useState("cn");
@@ -2219,6 +2228,7 @@ function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClo
   const timer = import_react2.default.useRef(null);
   const attempts = import_react2.default.useRef(0);
   const generation = import_react2.default.useRef(0);
+  const knownAtStart = import_react2.default.useRef(null);
   const stopPolling = import_react2.default.useCallback(() => {
     if (timer.current !== null) {
       clearTimeout(timer.current);
@@ -2275,6 +2285,7 @@ function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClo
     generation.current += 1;
     const gen = generation.current;
     attempts.current = 0;
+    knownAtStart.current = Array.isArray(knownUids) ? new Set(knownUids) : null;
     setPhase("idle");
     setError("");
     setResult(null);
@@ -2309,7 +2320,7 @@ function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClo
       setMessage("");
       setError(err?.message ?? String(err));
     }
-  }, [channel, realm, onStart, pollOnce, stopPolling]);
+  }, [channel, realm, onStart, pollOnce, stopPolling, knownUids]);
   const submitPasted = import_react2.default.useCallback(async () => {
     const raw = pasted.trim();
     if (raw === "") {
@@ -2371,6 +2382,7 @@ function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClo
   const realmOptions = CHANNEL_REALMS[channel] ?? [{ id: "cn", label: "\u9ED8\u8BA4", note: "" }];
   const allowedRealms = Array.isArray(realms) && realms.length > 0 ? realms : ["cn"];
   const visibleRealmOptions = realmOptions.filter((o) => allowedRealms.includes(o.id));
+  const existingAccount = typeof result?.existing === "boolean" ? result.existing : result?.uid && knownAtStart.current ? knownAtStart.current.has(result.uid) : void 0;
   return import_react2.default.createElement(
     "div",
     null,
@@ -2511,7 +2523,11 @@ function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClo
         import_react2.default.createElement(
           "div",
           { className: "dshc-row", style: { gap: 8, marginBottom: 6 } },
-          import_react2.default.createElement("span", { style: { ...s.label } }, "\u2713 \u5DF2\u6DFB\u52A0"),
+          import_react2.default.createElement(
+            "span",
+            { style: { ...s.label } },
+            existingAccount === true ? "\u2713 \u8D26\u53F7\u5DF2\u5B58\u5728" : existingAccount === false ? "\u2713 \u5DF2\u65B0\u589E\u8D26\u53F7" : "\u2713 \u5DF2\u6DFB\u52A0"
+          ),
           result.nickname ? import_react2.default.createElement("span", { style: s.muted }, result.nickname) : null,
           result.realm ? import_react2.default.createElement("span", { style: s.muted }, result.realm === "global" ? "\u56FD\u9645\u7248" : "\u56FD\u5185\u7248") : null
         ),
@@ -2520,7 +2536,13 @@ function AddAccountDialog({ channels, realms, onStart, onPoll, onCallback, onClo
           { style: s.muted },
           import_react2.default.createElement("div", null, `UID\u3000${result.uid}`),
           typeof result.credits === "number" && result.credits >= 0 ? import_react2.default.createElement("div", null, `\u79EF\u5206\u3000${result.credits}`) : null,
-          import_react2.default.createElement("div", null, "\u51ED\u8BC1\u5DF2\u843D\u76D8\u5E76\u70ED\u52A0\u8F7D\u8FDB\u6C60\uFF0C\u65E0\u9700\u91CD\u542F\u7F51\u5173\u3002")
+          // 「同号重登」必须说清没有新增 —— 否则用户反复登录、每次都看到「已添加」，
+          // 却数不到新账号，只会得出「保存成功了但没显示」的结论（实测踩到）。
+          import_react2.default.createElement(
+            "div",
+            null,
+            existingAccount === true ? "\u8BE5\u8D26\u53F7\u6B64\u524D\u5DF2\u5728\u6C60\u4E2D\uFF1A\u672C\u6B21\u53EA\u662F\u91CD\u65B0\u767B\u5F55\u5E76\u66F4\u65B0\u4E86\u51ED\u8BC1\uFF0C\u6CA1\u6709\u65B0\u589E\u8D26\u53F7\u3002" : "\u51ED\u8BC1\u5DF2\u843D\u76D8\u5E76\u70ED\u52A0\u8F7D\u8FDB\u6C60\uFF0C\u65E0\u9700\u91CD\u542F\u7F51\u5173\u3002"
+          )
         ),
         message ? import_react2.default.createElement("div", { style: { ...s.muted, marginTop: 6 } }, message) : null
       ) : null,
@@ -7814,7 +7836,7 @@ function TabBar({ active, onChange, statusText, onAdd }) {
     }, "\uFF0B \u6DFB\u52A0\u8D26\u53F7") : null
   );
 }
-function ChanhubPanel({ rpcCall, prefs }) {
+function ChanhubPanel({ rpcCall, prefs, store }) {
   const [activeTab, setActiveTab] = React.useState("accounts");
   const [data, setData] = React.useState(null);
   const [configInfo, setConfigInfo] = React.useState(null);
@@ -8101,12 +8123,13 @@ function ChanhubPanel({ rpcCall, prefs }) {
           const fileError = result?.value?.file_error;
           showToast(fileError ? `\u5DF2\u51FA\u6C60\uFF0C\u4F46\u51ED\u8BC1\u6587\u4EF6\u5220\u9664\u5931\u8D25\uFF1A${fileError}` : `\u300C${label}\u300D\u5DF2\u79FB\u9664\u3002`);
           await refresh();
+          void store?.loadStatus?.();
         }
       } catch (error) {
         showToast(`\u79FB\u9664\u5F02\u5E38\uFF1A${error?.message ?? error}`);
       }
     },
-    [rpcCall, refresh, showToast]
+    [rpcCall, refresh, showToast, store]
   );
   const onLoginStart = React.useCallback(
     async (channel, realm) => {
@@ -8415,6 +8438,10 @@ function ChanhubPanel({ rpcCall, prefs }) {
     addOpen ? React.createElement(AddAccountDialog, {
       channels: loginChannels ?? [],
       realms: loginRealms,
+      // 发起登录那一刻池里的 uid：弹窗据此区分「新增账号」与「同号重登」。
+      // 还没拉到 /status 时传 undefined（= 判断不了，弹窗回中性文案）——
+      // 传空数组会被当成「池子是空的」，把已存在的号误报成「已新增账号」。
+      knownUids: data?.status?.accounts ? data.status.accounts.map((a) => a.uid) : void 0,
       onStart: onLoginStart,
       onPoll: onLoginPoll,
       onCallback: onLoginCallback,
@@ -8424,8 +8451,13 @@ function ChanhubPanel({ rpcCall, prefs }) {
       onClose: () => {
         setAddOpen(false);
         void refresh();
+        void store?.loadStatus?.();
       },
-      onDone: refresh
+      // 池子变了：面板自己重拉，同时让侧边栏浮层立刻跟上（读操作，不打上游）。
+      onDone: () => {
+        void refresh();
+        void store?.loadStatus?.();
+      }
     }) : null,
     // 轻量提示条
     toast ? React.createElement(
@@ -8475,7 +8507,8 @@ function apply(ctx) {
           store,
           prefs,
           centerPanel: ChanhubPanel,
-          centerPanelProps: { rpcCall, prefs }
+          // store 一并注入：面板在添加/移除账号后主动让侧边栏浮层对齐一次。
+          centerPanelProps: { rpcCall, prefs, store }
         })
       },
       QuickEntry

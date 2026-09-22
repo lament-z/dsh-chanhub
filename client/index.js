@@ -2469,10 +2469,14 @@ function TabBar({ active, onChange, statusText, onAdd }) {
 
 /**
  * 主面板。
- * @param props - `{rpcCall}`。
+ * @param props - `{rpcCall, prefs, store}`。
+ *   - store（可选）：侧边栏「渠道账号」入口那份共享 quick-store。面板在**改变账号池
+ *     集合**的操作（添加/移除账号）之后顺手让它重拉一次 /status —— 否则侧边栏浮层要
+ *     等自己那 60s 轮询才更新，用户刚加完号在浮层里看不到，会以为没生效。
+ *     设置页里渲染同一组件时不传 store（那里没有侧边栏浮层），故一律用可选调用。
  * @returns React 元素。
  */
-function ChanhubPanel({ rpcCall, prefs }) {
+function ChanhubPanel({ rpcCall, prefs, store }) {
   const [activeTab, setActiveTab] = React.useState('accounts');
   const [data, setData] = React.useState(null);
   const [configInfo, setConfigInfo] = React.useState(null);
@@ -2824,12 +2828,14 @@ function ChanhubPanel({ rpcCall, prefs }) {
           const fileError = result?.value?.file_error;
           showToast(fileError ? `已出池，但凭证文件删除失败：${fileError}` : `「${label}」已移除。`);
           await refresh();
+          // 池子少了号：侧边栏浮层同样立刻对齐（否则最多要等 60s 才掉）。
+          void store?.loadStatus?.();
         }
       } catch (error) {
         showToast(`移除异常：${error?.message ?? error}`);
       }
     },
-    [rpcCall, refresh, showToast],
+    [rpcCall, refresh, showToast, store],
   );
 
   /**
@@ -3192,6 +3198,12 @@ function ChanhubPanel({ rpcCall, prefs }) {
       ? React.createElement(AddAccountDialog, {
           channels: loginChannels ?? [],
           realms: loginRealms,
+          // 发起登录那一刻池里的 uid：弹窗据此区分「新增账号」与「同号重登」。
+          // 还没拉到 /status 时传 undefined（= 判断不了，弹窗回中性文案）——
+          // 传空数组会被当成「池子是空的」，把已存在的号误报成「已新增账号」。
+          knownUids: data?.status?.accounts
+            ? data.status.accounts.map((a) => a.uid)
+            : undefined,
           onStart: onLoginStart,
           onPoll: onLoginPoll,
           onCallback: onLoginCallback,
@@ -3201,8 +3213,14 @@ function ChanhubPanel({ rpcCall, prefs }) {
           onClose: () => {
             setAddOpen(false);
             void refresh();
+            // 侧边栏那份 store 是被动轮询的（60s），这里主动对齐一次。
+            void store?.loadStatus?.();
           },
-          onDone: refresh,
+          // 池子变了：面板自己重拉，同时让侧边栏浮层立刻跟上（读操作，不打上游）。
+          onDone: () => {
+            void refresh();
+            void store?.loadStatus?.();
+          },
         })
       : null,
 
@@ -3277,7 +3295,8 @@ function apply(ctx) {
           store,
           prefs,
           centerPanel: ChanhubPanel,
-          centerPanelProps: { rpcCall, prefs },
+          // store 一并注入：面板在添加/移除账号后主动让侧边栏浮层对齐一次。
+          centerPanelProps: { rpcCall, prefs, store },
         }),
       },
       QuickEntry,
