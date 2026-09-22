@@ -311,66 +311,118 @@ export function createQuickStore(rpcCall, options = {}) {
 }
 
 /**
- * 侧边栏入口偏好（宿主 settings 命名空间 `dsh-chanhub` 的 `sidebarEntry`）。
+ * 侧边栏入口偏好。
  *
- * 为什么走宿主 settings 而不是 localStorage：settings.yaml 是跨浏览器/跨设备的
- * 同一份真值，且这个命名空间已注册（schema 里加一个 boolean 即可），
- * 客户端用现成的 `ctx.settingsScope.bind()` 读写，**不需要新端点**。
+ * 两级存储，**这是被真机逼出来的**：
+ *   - 本机页面（loopback）：宿主 settings（`settings.yaml`，跨浏览器一致）。
+ *   - 远程页面（非 loopback）：DSH 客户端把设置持久化降级为 `memory` ——
+ *     见 `dsh-client-ui-settings/lib/client.js:1345`
+ *     `const persistence = ctx.remote.$host.isLoopback ? "host" : "memory";`
+ *     memory 模式下 scope 快照恒为 `{status:'unavailable', value:undefined, writable:false}`，
+ *     **读不到也写不了宿主设置**（同页其它插件也受影响：dsh-context 的
+ *     「上下文洞察入口=隐藏」在远程页就是因此失效）。所以远程页退回 localStorage：
+ *     至少让本浏览器能自己关掉/打开入口，而不是只能吃默认值。
  *
- * @param settingsScope - 客户端 settingsScope 服务（可能不存在 → 降级为只读默认值）。
- * @param options - `{ namespace, key, defaultValue }`。
+ * @param settingsScope - 客户端 settingsScope 服务（可能不存在）。
+ * @param options - `{ namespace, key, defaultValue, storage }`。
  * @returns `{ available, writable, mode, value, set, subscribe, dispose }`。
+ *   `mode`: `'host'`（本机页，写 settings.yaml）| `'local'`（远程页/无服务，写本浏览器）。
  */
 export function createSidebarPrefs(settingsScope, options = {}) {
   const namespace = options.namespace ?? 'dsh-chanhub';
   const key = options.key ?? 'sidebarEntry';
   const defaultValue = options.defaultValue ?? true;
+  const storage = options.storage ?? (typeof localStorage === 'undefined' ? undefined : localStorage);
+  const storageKey = `dsh-chanhub.${key}`;
 
-  if (!settingsScope || typeof settingsScope.bind !== 'function') {
-    return {
-      available: false,
-      writable: false,
-      mode: 'unavailable',
-      value: defaultValue,
-      set: async () => false,
-      subscribe: () => () => {},
-      dispose: () => {},
-    };
+  const listeners = new Set();
+  const notify = () => {
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch {
+        /* 单个订阅者抛错不影响其它 */
+      }
+    }
+  };
+  const readLocal = () => {
+    try {
+      const raw = storage?.getItem?.(storageKey);
+      if (raw === 'true') return true;
+      if (raw === 'false') return false;
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const writeLocal = (next) => {
+    try {
+      storage?.setItem?.(storageKey, String(next));
+      notify();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const scope = typeof settingsScope?.bind === 'function' ? settingsScope.bind({ namespace }) : undefined;
+  const snapshotOf = () => scope?.getSnapshot?.() ?? {};
+  /** 宿主设置此刻是否真的可读写（本机页才有）。 */
+  const hostReady = () => {
+    const snap = snapshotOf();
+    return snap.mode === 'host' && snap.writable === true;
+  };
+  const read = () => {
+    const value = snapshotOf()?.value?.[key];
+    if (typeof value === 'boolean') return value;
+    const local = readLocal();
+    // 宿主不可写时（远程页/memory 模式）优先用本浏览器记录；否则吃默认值。
+    if (local !== undefined && !hostReady()) return local;
+    return defaultValue;
+  };
+
+  // 跨标签页同步（远程页的兜底存储）——storage 事件只在别的标签页改时触发
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('storage', (event) => {
+      if (event?.key === storageKey) notify();
+    });
   }
 
-  const scope = settingsScope.bind({ namespace });
-  const read = () => {
-    const snap = scope.getSnapshot?.() ?? {};
-    const value = snap?.value?.[key];
-    return typeof value === 'boolean' ? value : defaultValue;
-  };
   return {
     available: true,
     get writable() {
-      const snap = scope.getSnapshot?.() ?? {};
-      return snap.writable === true && snap.mode === 'host';
+      // 本机页写宿主设置；远程页写本浏览器 —— 两种都算"能改"
+      return true;
     },
     get mode() {
-      return scope.getSnapshot?.()?.mode ?? 'unknown';
+      return hostReady() ? 'host' : 'local';
     },
     get value() {
       return read();
     },
-    /** 写宿主设置；返回是否成功（失败时不改本地判断，交给订阅回流）。 */
+    /** 能写宿主就写宿主（跨设备一致），否则退到本浏览器；返回是否成功。 */
     async set(next) {
-      try {
-        await scope.set?.(key, next);
-        return true;
-      } catch {
-        return false;
+      if (hostReady()) {
+        try {
+          await scope.set?.(key, next);
+          return true;
+        } catch {
+          return writeLocal(next);
+        }
       }
+      return writeLocal(next);
     },
     subscribe(listener) {
-      const off = scope.subscribe?.(listener);
-      return typeof off === 'function' ? off : () => {};
+      listeners.add(listener);
+      const off = scope?.subscribe?.(() => notify());
+      return () => {
+        listeners.delete(listener);
+        if (typeof off === 'function') off();
+      };
     },
     dispose() {
-      scope.dispose?.();
+      listeners.clear();
+      scope?.dispose?.();
     },
   };
 }

@@ -1966,6 +1966,7 @@ function InterfaceCard({ prefs }) {
 
   const available = prefs?.available === true;
   const writable = prefs?.writable === true;
+  const mode = prefs?.mode ?? 'local';
   const enabled = prefs ? prefs.value : true;
   const [busy, setBusy] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
@@ -1987,8 +1988,10 @@ function InterfaceCard({ prefs }) {
           '界面'),
       ),
       React.createElement(Tag, {
-        text: !available ? '宿主不支持' : writable ? '可修改' : '只读',
-        tone: !available ? 'idle' : writable ? 'ok' : 'warn',
+        // mode: host = 写宿主 settings.yaml（跨浏览器一致）；local = 只写本浏览器
+        // （远程页面：DSH 把设置持久化降级为 memory，宿主设置读不到也写不了）
+        text: !available ? '不可用' : mode === 'host' ? '可修改' : '仅本浏览器',
+        tone: !available ? 'idle' : mode === 'host' ? 'ok' : 'warn',
       }),
     ),
     React.createElement('div', {
@@ -2001,6 +2004,11 @@ function InterfaceCard({ prefs }) {
           '显示「渠道」按钮，点开即看账号池摘要与各号可用积分（只读，不会自动打上游）。',
           React.createElement('br', null),
           '关掉后入口隐藏，本面板不受影响；也可在 DSH 原生插件设置里改。'),
+        mode === 'local' && available
+          ? React.createElement('div', { style: { ...s.muted, marginTop: 4, fontSize: 11.5, lineHeight: 1.6 } },
+              '当前页面不是本机（远程访问）：DSH 只在 127.0.0.1 页面提供宿主设置读写，'
+              + '所以这里的开关只作用于本浏览器；在电脑上打开 127.0.0.1 的那个页面改，才能全局生效。')
+          : null,
       ),
       React.createElement(Switch, {
         checked: enabled,
@@ -2015,7 +2023,7 @@ function InterfaceCard({ prefs }) {
       : null,
     !available
       ? React.createElement('div', { style: { ...s.muted, marginTop: 8, fontSize: 11.5 } },
-          '当前宿主没有 settingsScope 服务，无法在此开关；入口按默认（开启）显示。')
+          '当前环境既没有宿主设置服务、也没有可用的本浏览器存储，开关不可用；入口按默认（开启）显示。')
       : null,
   );
 }

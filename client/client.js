@@ -4787,53 +4787,88 @@ function createSidebarPrefs(settingsScope, options = {}) {
   const namespace = options.namespace ?? "dsh-chanhub";
   const key = options.key ?? "sidebarEntry";
   const defaultValue = options.defaultValue ?? true;
-  if (!settingsScope || typeof settingsScope.bind !== "function") {
-    return {
-      available: false,
-      writable: false,
-      mode: "unavailable",
-      value: defaultValue,
-      set: async () => false,
-      subscribe: () => () => {
-      },
-      dispose: () => {
+  const storage2 = options.storage ?? (typeof localStorage === "undefined" ? void 0 : localStorage);
+  const storageKey = `dsh-chanhub.${key}`;
+  const listeners = /* @__PURE__ */ new Set();
+  const notify = () => {
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch {
       }
-    };
-  }
-  const scope = settingsScope.bind({ namespace });
-  const read = () => {
-    const snap = scope.getSnapshot?.() ?? {};
-    const value = snap?.value?.[key];
-    return typeof value === "boolean" ? value : defaultValue;
+    }
   };
+  const readLocal = () => {
+    try {
+      const raw = storage2?.getItem?.(storageKey);
+      if (raw === "true") return true;
+      if (raw === "false") return false;
+      return void 0;
+    } catch {
+      return void 0;
+    }
+  };
+  const writeLocal = (next) => {
+    try {
+      storage2?.setItem?.(storageKey, String(next));
+      notify();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const scope = typeof settingsScope?.bind === "function" ? settingsScope.bind({ namespace }) : void 0;
+  const snapshotOf = () => scope?.getSnapshot?.() ?? {};
+  const hostReady = () => {
+    const snap = snapshotOf();
+    return snap.mode === "host" && snap.writable === true;
+  };
+  const read = () => {
+    const value = snapshotOf()?.value?.[key];
+    if (typeof value === "boolean") return value;
+    const local = readLocal();
+    if (local !== void 0 && !hostReady()) return local;
+    return defaultValue;
+  };
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("storage", (event) => {
+      if (event?.key === storageKey) notify();
+    });
+  }
   return {
     available: true,
     get writable() {
-      const snap = scope.getSnapshot?.() ?? {};
-      return snap.writable === true && snap.mode === "host";
+      return true;
     },
     get mode() {
-      return scope.getSnapshot?.()?.mode ?? "unknown";
+      return hostReady() ? "host" : "local";
     },
     get value() {
       return read();
     },
-    /** 写宿主设置；返回是否成功（失败时不改本地判断，交给订阅回流）。 */
+    /** 能写宿主就写宿主（跨设备一致），否则退到本浏览器；返回是否成功。 */
     async set(next) {
-      try {
-        await scope.set?.(key, next);
-        return true;
-      } catch {
-        return false;
+      if (hostReady()) {
+        try {
+          await scope.set?.(key, next);
+          return true;
+        } catch {
+          return writeLocal(next);
+        }
       }
+      return writeLocal(next);
     },
     subscribe(listener) {
-      const off = scope.subscribe?.(listener);
-      return typeof off === "function" ? off : () => {
+      listeners.add(listener);
+      const off = scope?.subscribe?.(() => notify());
+      return () => {
+        listeners.delete(listener);
+        if (typeof off === "function") off();
       };
     },
     dispose() {
-      scope.dispose?.();
+      listeners.clear();
+      scope?.dispose?.();
     }
   };
 }
@@ -6565,6 +6600,7 @@ function InterfaceCard({ prefs }) {
   }, [prefs]);
   const available = prefs?.available === true;
   const writable = prefs?.writable === true;
+  const mode = prefs?.mode ?? "local";
   const enabled = prefs ? prefs.value : true;
   const [busy, setBusy] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
@@ -6593,8 +6629,10 @@ function InterfaceCard({ prefs }) {
         )
       ),
       React.createElement(Tag, {
-        text: !available ? "\u5BBF\u4E3B\u4E0D\u652F\u6301" : writable ? "\u53EF\u4FEE\u6539" : "\u53EA\u8BFB",
-        tone: !available ? "idle" : writable ? "ok" : "warn"
+        // mode: host = 写宿主 settings.yaml（跨浏览器一致）；local = 只写本浏览器
+        // （远程页面：DSH 把设置持久化降级为 memory，宿主设置读不到也写不了）
+        text: !available ? "\u4E0D\u53EF\u7528" : mode === "host" ? "\u53EF\u4FEE\u6539" : "\u4EC5\u672C\u6D4F\u89C8\u5668",
+        tone: !available ? "idle" : mode === "host" ? "ok" : "warn"
       })
     ),
     React.createElement(
@@ -6613,7 +6651,12 @@ function InterfaceCard({ prefs }) {
           "\u663E\u793A\u300C\u6E20\u9053\u300D\u6309\u94AE\uFF0C\u70B9\u5F00\u5373\u770B\u8D26\u53F7\u6C60\u6458\u8981\u4E0E\u5404\u53F7\u53EF\u7528\u79EF\u5206\uFF08\u53EA\u8BFB\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u6253\u4E0A\u6E38\uFF09\u3002",
           React.createElement("br", null),
           "\u5173\u6389\u540E\u5165\u53E3\u9690\u85CF\uFF0C\u672C\u9762\u677F\u4E0D\u53D7\u5F71\u54CD\uFF1B\u4E5F\u53EF\u5728 DSH \u539F\u751F\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u6539\u3002"
-        )
+        ),
+        mode === "local" && available ? React.createElement(
+          "div",
+          { style: { ...s.muted, marginTop: 4, fontSize: 11.5, lineHeight: 1.6 } },
+          "\u5F53\u524D\u9875\u9762\u4E0D\u662F\u672C\u673A\uFF08\u8FDC\u7A0B\u8BBF\u95EE\uFF09\uFF1ADSH \u53EA\u5728 127.0.0.1 \u9875\u9762\u63D0\u4F9B\u5BBF\u4E3B\u8BBE\u7F6E\u8BFB\u5199\uFF0C\u6240\u4EE5\u8FD9\u91CC\u7684\u5F00\u5173\u53EA\u4F5C\u7528\u4E8E\u672C\u6D4F\u89C8\u5668\uFF1B\u5728\u7535\u8111\u4E0A\u6253\u5F00 127.0.0.1 \u7684\u90A3\u4E2A\u9875\u9762\u6539\uFF0C\u624D\u80FD\u5168\u5C40\u751F\u6548\u3002"
+        ) : null
       ),
       React.createElement(Switch, {
         checked: enabled,
@@ -6630,7 +6673,7 @@ function InterfaceCard({ prefs }) {
     !available ? React.createElement(
       "div",
       { style: { ...s.muted, marginTop: 8, fontSize: 11.5 } },
-      "\u5F53\u524D\u5BBF\u4E3B\u6CA1\u6709 settingsScope \u670D\u52A1\uFF0C\u65E0\u6CD5\u5728\u6B64\u5F00\u5173\uFF1B\u5165\u53E3\u6309\u9ED8\u8BA4\uFF08\u5F00\u542F\uFF09\u663E\u793A\u3002"
+      "\u5F53\u524D\u73AF\u5883\u65E2\u6CA1\u6709\u5BBF\u4E3B\u8BBE\u7F6E\u670D\u52A1\u3001\u4E5F\u6CA1\u6709\u53EF\u7528\u7684\u672C\u6D4F\u89C8\u5668\u5B58\u50A8\uFF0C\u5F00\u5173\u4E0D\u53EF\u7528\uFF1B\u5165\u53E3\u6309\u9ED8\u8BA4\uFF08\u5F00\u542F\uFF09\u663E\u793A\u3002"
     ) : null
   );
 }

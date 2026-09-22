@@ -25,6 +25,18 @@ rail（56px）态只留图标 + 异常角标；点开是一个自带 popover，�
 - 活跃只给证据：`in_flight>0` → 「占用中」，`last_success<90s` → 「刚用过」，否则不显示（「本会话在用哪个
   账号」需要会话粘性键，浏览器侧拿不到，本轮不做）。
 
+**入口偏好转为两级存储（远程页也能开关）**
+
+真机发现：DSH 客户端只在**本机页面**提供宿主设置读写 ——
+`dsh-client-ui-settings/lib/client.js:1345`
+`const persistence = ctx.remote.$host.isLoopback ? "host" : "memory";`
+非 loopback（手机/局域网远程访问）时 scope 恒为 `{status:'unavailable', value:undefined, writable:false}`，
+宿主设置**读不到也写不了**（dsh-context 的「上下文洞察入口=隐藏」在远程页失效也是同一个原因）。
+
+改动：`createSidebarPrefs` 变成两级 —— 本机页写宿主 settings（跨设备一致，标「可修改」）；
+远程页/无服务时退回 localStorage（只作用于本浏览器，标「仅本浏览器」并给出说明文字）。
+这样入口开关在远程页也能真正生效，而不是只能吃默认值。
+
 **foot 行是共享槽位（真机反馈后修正）**
 
 - 那一行（`.footerActions`）里已有 dsh-context 的「上下文洞察」（`order:10`，自身

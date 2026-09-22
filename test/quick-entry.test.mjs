@@ -256,16 +256,47 @@ test('B7 quickFreshness 四态与陈旧阈值', () => {
 // C. 偏好（宿主 settings 命名空间）
 // ---------------------------------------------------------------------------
 
-test('C1 没有 settingsScope（旧宿主）→ 降级：默认开启、不可写、不抛', async () => {
-  const prefs = createSidebarPrefs(undefined, { namespace: 'dsh-chanhub' });
-  assert.equal(prefs.available, false);
-  assert.equal(prefs.writable, false);
-  assert.equal(prefs.value, true, '缺服务时按默认开启');
-  assert.equal(await prefs.set(false), false, '写不进去也不能抛');
-  assert.equal(typeof prefs.subscribe(() => {}), 'function');
+test('C1 远程页/memory 模式：退回本浏览器存储，仍可开关（DSH 只在 loopback 提供宿主设置）', async () => {
+  // 复刻 dsh-client-ui-settings 的 memory 模式快照（非 loopback 页面就是它）
+  const memoryScope = {
+    getSnapshot: () => ({ status: 'unavailable', value: undefined, writable: false, mode: 'memory' }),
+    subscribe: () => () => {},
+    set: async () => {
+      throw new Error('memory 模式不可写');
+    },
+    dispose: () => {},
+  };
+  const store = new Map();
+  const storage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+  };
+  const prefs = createSidebarPrefs(
+    { bind: () => memoryScope },
+    { namespace: 'dsh-chanhub', storage },
+  );
+  assert.equal(prefs.available, true);
+  assert.equal(prefs.mode, 'local', 'memory 模式视为 local（只作用于本浏览器）');
+  assert.equal(prefs.writable, true, '本浏览器存储可写');
+  assert.equal(prefs.value, true, '没记录时吃默认值（入口默认开）');
+  assert.equal(await prefs.set(false), true);
+  assert.equal(prefs.value, false, '写入本浏览器存储后立即可读');
+  assert.equal(store.get('dsh-chanhub.sidebarEntry'), 'false');
 });
 
-test('C2 有 settingsScope → 读值/可写判定/写入/订阅都走宿主快照', async () => {
+test('C2 没有 settingsScope 时同样退化为本浏览器存储（不抛、可用）', async () => {
+  const store = new Map();
+  const prefs = createSidebarPrefs(undefined, {
+    namespace: 'dsh-chanhub',
+    storage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) },
+  });
+  assert.equal(prefs.available, true);
+  assert.equal(prefs.mode, 'local');
+  assert.equal(await prefs.set(false), true);
+  assert.equal(prefs.value, false);
+});
+
+test('C3 本机页（host）：读宿主值、写宿主设置，host 优先于本浏览器记录', async () => {
   const listeners = new Set();
   let value = { sidebarEntry: false };
   const scope = {
@@ -280,10 +311,14 @@ test('C2 有 settingsScope → 读值/可写判定/写入/订阅都走宿主快�
     },
     dispose: () => listeners.clear(),
   };
-  const prefs = createSidebarPrefs({ bind: () => scope }, { namespace: 'dsh-chanhub' });
-  assert.equal(prefs.available, true);
+  const store = new Map([['dsh-chanhub.sidebarEntry', 'true']]); // 本浏览器残留 true，但宿主说 false
+  const prefs = createSidebarPrefs({ bind: () => scope }, {
+    namespace: 'dsh-chanhub',
+    storage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) },
+  });
+  assert.equal(prefs.mode, 'host');
   assert.equal(prefs.writable, true);
-  assert.equal(prefs.value, false, '读到宿主的 false');
+  assert.equal(prefs.value, false, 'host 模式以宿主值为准（跨设备一致）');
   let changes = 0;
   prefs.subscribe(() => {
     changes += 1;
@@ -291,16 +326,6 @@ test('C2 有 settingsScope → 读值/可写判定/写入/订阅都走宿主快�
   assert.equal(await prefs.set(true), true);
   assert.equal(prefs.value, true, '写入后经订阅回流');
   assert.equal(changes, 1);
+  assert.equal(store.has('dsh-chanhub.sidebarEntry'), true, 'host 模式不写本浏览器存储');
   prefs.dispose();
-});
-
-test('C3 非 host 持久化（内存模式）→ 视为只读，界面据此禁用开关', () => {
-  const scope = {
-    getSnapshot: () => ({ value: { sidebarEntry: true }, writable: false, mode: 'memory' }),
-    subscribe: () => () => {},
-    set: async () => {},
-  };
-  const prefs = createSidebarPrefs({ bind: () => scope }, { namespace: 'dsh-chanhub' });
-  assert.equal(prefs.writable, false);
-  assert.equal(prefs.mode, 'memory');
 });
