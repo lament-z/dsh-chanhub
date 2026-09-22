@@ -4233,18 +4233,23 @@ var import_react7 = __toESM(require("react"), 1);
 var import_react_dom = require("react-dom");
 var ENTRY_CSS = `
 @keyframes dshc-entry-in { from{opacity:0} to{opacity:1} }
-.dshc-entry-card { border:1px solid var(--dsw-alias-border-l2,#e5e7eb); animation:dshc-entry-in .22s ease-out both; }
-.dshc-entry-card:hover { border-color:var(--dsw-alias-border-l3,#d1d5db); transform:translateY(-1px); box-shadow:0 4px 12px rgba(15,23,42,.08); }
-.dshc-entry-card[data-open="true"] { border-color:var(--dsw-alias-border-l3,#d1d5db); }
-.dshc-entry-card:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:1px; }
-.dshc-entry-icon { background:transparent; animation:dshc-entry-in .22s ease-out both; }
+/* \u5361\u7247 = \u6574\u884C\u76D2\u5B50\uFF08\u6E20\u9053\u4E2D\u5FC3\u6309\u94AE\u6846\u5728\u5361\u5185\uFF09\uFF1Bhover/focus-within \u65F6\u6574\u5F20\u5361\u62AC\u624B */
+/* hover \u53EA\u7ED9\u63CF\u8FB9 + \u9634\u5F71\u53CD\u9988\uFF0C**\u4E0D\u505A\u4F4D\u79FB**\uFF08\u7528\u6237\u660E\u786E\u4E0D\u8981\u5361\u7247\u968F\u9F20\u6807\u52A8\uFF09 */
+.dshc-entry-card { border:1px solid var(--dsw-alias-border-l2,#e5e7eb); animation:dshc-entry-in .22s ease-out both; transition:border-color .15s, box-shadow .15s; }
+.dshc-entry-card:hover { border-color:var(--dsw-alias-border-l3,#d1d5db); box-shadow:0 2px 10px rgba(15,23,42,.08); }
+.dshc-entry-card:focus-within { border-color:var(--dsw-alias-border-l3,#d1d5db); }
+/* \u5361\u5185\u4E24\u4E2A\u70B9\u51FB\u533A\uFF1A\u5404\u81EA hover/open \u5E95\u8272\uFF08\u4E0D\u63A8\u8FDB\u5185\u8054\uFF0C\u5426\u5219\u7C7B\u89C4\u5219\u88AB\u5185\u8054\u8986\u76D6\uFF09 */
+.dshc-entry-cell { background:transparent; transition:background .15s; }
+.dshc-entry-cell:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.05)); }
+.dshc-entry-cell[data-open="true"] { background:var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06)); }
+.dshc-entry-cell:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:-2px; }
+.dshc-entry-icon { background:transparent; transition:background .15s, color .15s; }
 .dshc-entry-icon:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.05)); color:var(--dsw-alias-label-primary,#1f2328); }
 .dshc-entry-icon[data-open="true"] { background:var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06)); }
-.dshc-entry-icon:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:1px; }
+.dshc-entry-icon:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:-2px; }
 @media (prefers-reduced-motion:reduce){
   .dshc-entry-card{transition:none; animation:none}
-  .dshc-entry-card:hover{transform:none}
-  .dshc-entry-icon{animation:none}
+  .dshc-entry-icon,.dshc-entry-cell{transition:none}
 }
 `;
 var QUICK_CSS = `
@@ -4778,71 +4783,31 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       "aria-label": "\u6E20\u9053\u8D26\u53F7",
       title: "\u6E20\u9053\u8D26\u53F7 \xB7 \u70B9\u51FB\u67E5\u770B\u8D26\u53F7\u6C60",
       onClick: () => setOpen((value) => !value),
-      ...card ? { className: "dshc-entry-card", "data-open": open ? "true" : "false" } : {},
+      className: card ? "dshc-entry-cell" : void 0,
+      "data-open": open ? "true" : "false",
       style: {
         font: "inherit",
         cursor: "pointer",
-        // 卡片态的 1px 描边由 .dshc-entry-card 提供（内联 border 会盖掉类里的 hover 变色）
-        ...card ? {} : { border: "none" },
+        border: "none",
         boxSizing: "border-box",
         color: "var(--dsw-alias-label-secondary,#6b7280)",
-        // 展开态：外面那层行盒子占满宿主行（见下面的 entryRow），本按钮吃掉除右侧图标
-        // 之外的全部宽度 —— 文案一行读完，不再和别人抢宽。卡片背景用极浅 info 渐变 + 层底色。
-        // 注意：不要用 `var(--token)14` 这种拼十六进制后缀的写法 —— token 是 6 位 hex，
-        // 拼完在浏览器里整条 background 会被判无效（实测 backgroundImage=none）；
-        // 要半透明一律走 color-mix。
+        // 卡内主按钮：底与描边都在卡片上，自身透明（hover/open 的底色由 ENTRY_CSS 给）
         flex: card ? "1 1 auto" : "0 0 auto",
         minWidth: rail ? 36 : 0,
         maxWidth: "100%",
-        height: 36,
-        padding: rail ? 0 : "0 8px 0 11px",
-        justifyContent: rail ? "center" : void 0,
-        position: "relative",
-        overflow: "hidden",
+        height: card ? "100%" : 36,
+        padding: card ? "0 6px 0 0" : 0,
+        borderRadius: 8,
+        justifyContent: card ? void 0 : "center",
+        ...card ? {} : {
+          background: open ? "var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))" : "transparent",
+          transition: "background .15s"
+        },
         display: "inline-flex",
         alignItems: "center",
-        gap: 7,
-        ...card ? {
-          borderRadius: 10,
-          background: open ? "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 12%, transparent), transparent 70%), var(--dsw-alias-bg-layer-2,#f9fafb)" : "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%), var(--dsw-alias-bg-layer-1,#fff)",
-          transition: "border-color .15s, transform .15s, box-shadow .15s, background .15s"
-        } : { borderRadius: 8, background: open ? "var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))" : "transparent", transition: "background .15s" }
+        gap: 7
       }
     },
-    // 左侧 3px 健康色条：卡片被 overflow:hidden 裁在圆角里，正好当左侧强调边
-    card ? import_react7.default.createElement("span", {
-      "aria-hidden": "true",
-      style: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: badgeColor }
-    }) : null,
-    // 底部 3px 渠道堆叠条：一眼看出池子由哪几家渠道、各几个号（workbuddy / traework 识别色）。
-    // 入场：整体淡入 + 逐段从 0 长出（enter=1 后恢复 width 过渡，后续账号数变化平滑跟随）。
-    card && hasAccounts && phase !== "error" && barRows.length > 0 ? import_react7.default.createElement(
-      "span",
-      {
-        "aria-hidden": "true",
-        title: barTitle,
-        style: {
-          position: "absolute",
-          left: 3,
-          right: 0,
-          bottom: 0,
-          height: 3,
-          display: "flex",
-          overflow: "hidden",
-          opacity: enter >= 1 ? 1 : 0.35 + 0.65 * enter
-        }
-      },
-      ...barRows.map(
-        (row, index) => import_react7.default.createElement("span", {
-          key: row.id,
-          style: {
-            width: `${row.count / barTotal * 100 * segProgress(index)}%`,
-            background: channelColor(row.id),
-            transition: enter >= 1 ? "width .35s" : "none"
-          }
-        })
-      )
-    ) : null,
     import_react7.default.createElement(
       "span",
       { style: { position: "relative", display: "inline-flex", flex: "0 0 auto" } },
@@ -4894,7 +4859,7 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       )
     ) : null
   );
-  const centerButton = wide && centerPanel ? import_react7.default.createElement("button", {
+  const centerButton = card && centerPanel ? import_react7.default.createElement("button", {
     type: "button",
     "aria-haspopup": "dialog",
     "aria-expanded": centerOpen,
@@ -4908,32 +4873,82 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       cursor: "pointer",
       border: "none",
       flex: "0 0 auto",
-      width: 36,
-      height: 36,
-      borderRadius: 10,
+      alignSelf: "center",
+      width: 30,
+      height: 30,
+      borderRadius: 8,
       padding: 0,
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      color: "var(--dsw-alias-label-secondary,#6b7280)",
-      transition: "background .15s, color .15s"
+      color: "var(--dsw-alias-label-secondary,#6b7280)"
     }
   }, import_react7.default.createElement(Icons.hub, { width: 17, height: 17, "aria-hidden": "true" })) : null;
-  const divider = wide && centerButton ? import_react7.default.createElement("span", {
+  const divider = centerButton ? import_react7.default.createElement("span", {
     "aria-hidden": "true",
-    style: { flex: "0 0 auto", width: 1, height: 18, background: "var(--dsw-alias-border-l2,#e5e7eb)" }
+    style: { flex: "0 0 auto", alignSelf: "center", width: 1, height: 18, background: "var(--dsw-alias-border-l2,#e5e7eb)" }
   }) : null;
+  const decorations = [];
+  if (card) {
+    decorations.push(import_react7.default.createElement("span", {
+      key: "strip",
+      "aria-hidden": "true",
+      style: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: badgeColor }
+    }));
+    if (hasAccounts && phase !== "error" && barRows.length > 0) {
+      decorations.push(import_react7.default.createElement(
+        "span",
+        {
+          key: "bar",
+          "aria-hidden": "true",
+          title: barTitle,
+          style: {
+            position: "absolute",
+            left: 3,
+            right: 0,
+            bottom: 0,
+            height: 3,
+            display: "flex",
+            overflow: "hidden",
+            opacity: enter >= 1 ? 1 : 0.35 + 0.65 * enter
+          }
+        },
+        ...barRows.map(
+          (row, index) => import_react7.default.createElement("span", {
+            key: row.id,
+            style: {
+              width: `${row.count / barTotal * 100 * segProgress(index)}%`,
+              background: channelColor(row.id),
+              transition: enter >= 1 ? "width .35s" : "none"
+            }
+          })
+        )
+      ));
+    }
+  }
   const entryRow = import_react7.default.createElement("div", {
     "data-dshc-entry": "row",
+    ...card ? { className: "dshc-entry-card" } : {},
+    "data-open": open ? "true" : "false",
     style: {
-      flex: wide === true ? "0 0 100%" : "0 0 auto",
+      flex: card ? "0 0 100%" : "0 0 auto",
       minWidth: 0,
       maxWidth: "100%",
+      boxSizing: "border-box",
       display: "flex",
-      alignItems: "center",
-      gap: wide ? 4 : 6
+      alignItems: "stretch",
+      gap: card ? 2 : 6,
+      ...card ? {
+        height: 36,
+        padding: "0 3px 0 11px",
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 10,
+        // 半透明一律 color-mix：`var(--token)14` 这种拼十六进制后缀会被浏览器整条丢弃
+        background: open ? "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 12%, transparent), transparent 70%), var(--dsw-alias-bg-layer-2,#f9fafb)" : "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%), var(--dsw-alias-bg-layer-1,#fff)"
+      } : {}
     }
-  }, import_react7.default.createElement("style", null, ENTRY_CSS), button, divider, centerButton);
+  }, import_react7.default.createElement("style", null, ENTRY_CSS), ...decorations, button, divider, centerButton);
   const popover = open && anchor ? (0, import_react_dom.createPortal)(
     import_react7.default.createElement(Popover, {
       snapshot,

@@ -42,18 +42,23 @@ import {
 /** 入口行样式（hover / focus / 展开态。内联样式写不了伪类，所以在行里挂一个 style 节点）。 */
 export const ENTRY_CSS = `
 @keyframes dshc-entry-in { from{opacity:0} to{opacity:1} }
-.dshc-entry-card { border:1px solid var(--dsw-alias-border-l2,#e5e7eb); animation:dshc-entry-in .22s ease-out both; }
-.dshc-entry-card:hover { border-color:var(--dsw-alias-border-l3,#d1d5db); transform:translateY(-1px); box-shadow:0 4px 12px rgba(15,23,42,.08); }
-.dshc-entry-card[data-open="true"] { border-color:var(--dsw-alias-border-l3,#d1d5db); }
-.dshc-entry-card:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:1px; }
-.dshc-entry-icon { background:transparent; animation:dshc-entry-in .22s ease-out both; }
+/* 卡片 = 整行盒子（渠道中心按钮框在卡内）；hover/focus-within 时整张卡抬手 */
+/* hover 只给描边 + 阴影反馈，**不做位移**（用户明确不要卡片随鼠标动） */
+.dshc-entry-card { border:1px solid var(--dsw-alias-border-l2,#e5e7eb); animation:dshc-entry-in .22s ease-out both; transition:border-color .15s, box-shadow .15s; }
+.dshc-entry-card:hover { border-color:var(--dsw-alias-border-l3,#d1d5db); box-shadow:0 2px 10px rgba(15,23,42,.08); }
+.dshc-entry-card:focus-within { border-color:var(--dsw-alias-border-l3,#d1d5db); }
+/* 卡内两个点击区：各自 hover/open 底色（不推进内联，否则类规则被内联覆盖） */
+.dshc-entry-cell { background:transparent; transition:background .15s; }
+.dshc-entry-cell:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.05)); }
+.dshc-entry-cell[data-open="true"] { background:var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06)); }
+.dshc-entry-cell:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:-2px; }
+.dshc-entry-icon { background:transparent; transition:background .15s, color .15s; }
 .dshc-entry-icon:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.05)); color:var(--dsw-alias-label-primary,#1f2328); }
 .dshc-entry-icon[data-open="true"] { background:var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06)); }
-.dshc-entry-icon:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:1px; }
+.dshc-entry-icon:focus-visible { outline:2px solid var(--dsw-alias-button-info-fill,#4176f7); outline-offset:-2px; }
 @media (prefers-reduced-motion:reduce){
   .dshc-entry-card{transition:none; animation:none}
-  .dshc-entry-card:hover{transform:none}
-  .dshc-entry-icon{animation:none}
+  .dshc-entry-icon,.dshc-entry-cell{transition:none}
 }
 `;
 
@@ -610,9 +615,13 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
     return Math.max(0, Math.min(1, enter * span - index * SEG_STAGGER));
   };
 
-  // ── 主按钮：展开态是「卡片」（圆角 10 + 1px 令牌描边 + 左侧 3px 健康色条 + 极浅渐变），
-  // 收起态仍是 36×36 的扁平图标（宿主 rail 那一行是居中布局，不能带卡片边框）。
+  // ── 展开态：**一张卡片**（圆角 10 + 1px 令牌描边 + 左侧 3px 健康色条 + 底部 3px 渠道条
+  // + 极浅 info 渐变），卡内是**两个独立点击区**：账号池主按钮（吃掉剩余宽度）与右侧无文字
+  // 「渠道中心」图标按钮，中间 1px 令牌竖线分开。
+  // 为什么不再把图标按钮摆在卡片外面：两个盒子并排看着像两块拼在一起（用户反馈「割裂」）。
+  // 收起态（rail）不套卡片：56px 轨道只容得下一个 36×36 图标（宿主 CSS 是居中布局）。
   const card = wide === true;
+
   const button = React.createElement('button', {
     ref: buttonRef,
     type: 'button',
@@ -621,65 +630,24 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
     'aria-label': '渠道账号',
     title: '渠道账号 · 点击查看账号池',
     onClick: () => setOpen((value) => !value),
-    ...(card ? { className: 'dshc-entry-card', 'data-open': open ? 'true' : 'false' } : {}),
+    className: card ? 'dshc-entry-cell' : undefined,
+    'data-open': open ? 'true' : 'false',
     style: {
-      font: 'inherit', cursor: 'pointer',
-      // 卡片态的 1px 描边由 .dshc-entry-card 提供（内联 border 会盖掉类里的 hover 变色）
-      ...(card ? {} : { border: 'none' }),
-      boxSizing: 'border-box',
+      font: 'inherit', cursor: 'pointer', border: 'none', boxSizing: 'border-box',
       color: 'var(--dsw-alias-label-secondary,#6b7280)',
-      // 展开态：外面那层行盒子占满宿主行（见下面的 entryRow），本按钮吃掉除右侧图标
-      // 之外的全部宽度 —— 文案一行读完，不再和别人抢宽。卡片背景用极浅 info 渐变 + 层底色。
-      // 注意：不要用 `var(--token)14` 这种拼十六进制后缀的写法 —— token 是 6 位 hex，
-      // 拼完在浏览器里整条 background 会被判无效（实测 backgroundImage=none）；
-      // 要半透明一律走 color-mix。
+      // 卡内主按钮：底与描边都在卡片上，自身透明（hover/open 的底色由 ENTRY_CSS 给）
       flex: card ? '1 1 auto' : '0 0 auto', minWidth: rail ? 36 : 0, maxWidth: '100%',
-      height: 36, padding: rail ? 0 : '0 8px 0 11px',
-      justifyContent: rail ? 'center' : undefined,
-      position: 'relative', overflow: 'hidden',
-      display: 'inline-flex', alignItems: 'center', gap: 7,
+      height: card ? '100%' : 36, padding: card ? '0 6px 0 0' : 0,
+      borderRadius: 8, justifyContent: card ? undefined : 'center',
       ...(card
-        ? {
-            borderRadius: 10,
-            background: open
-              ? 'linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 12%, transparent), transparent 70%), var(--dsw-alias-bg-layer-2,#f9fafb)'
-              : 'linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%), var(--dsw-alias-bg-layer-1,#fff)',
-            transition: 'border-color .15s, transform .15s, box-shadow .15s, background .15s',
-          }
-        : { borderRadius: 8, background: open ? 'var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))' : 'transparent', transition: 'background .15s' }),
+        ? {}
+        : {
+            background: open ? 'var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))' : 'transparent',
+            transition: 'background .15s',
+          }),
+      display: 'inline-flex', alignItems: 'center', gap: 7,
     },
   },
-    // 左侧 3px 健康色条：卡片被 overflow:hidden 裁在圆角里，正好当左侧强调边
-    card
-      ? React.createElement('span', {
-          'aria-hidden': 'true',
-          style: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: badgeColor },
-        })
-      : null,
-    // 底部 3px 渠道堆叠条：一眼看出池子由哪几家渠道、各几个号（workbuddy / traework 识别色）。
-    // 入场：整体淡入 + 逐段从 0 长出（enter=1 后恢复 width 过渡，后续账号数变化平滑跟随）。
-    card && hasAccounts && phase !== 'error' && barRows.length > 0
-      ? React.createElement('span', {
-          'aria-hidden': 'true',
-          title: barTitle,
-          style: {
-            position: 'absolute', left: 3, right: 0, bottom: 0, height: 3,
-            display: 'flex', overflow: 'hidden',
-            opacity: enter >= 1 ? 1 : 0.35 + 0.65 * enter,
-          },
-        },
-          ...barRows.map((row, index) =>
-            React.createElement('span', {
-              key: row.id,
-              style: {
-                width: `${(row.count / barTotal) * 100 * segProgress(index)}%`,
-                background: channelColor(row.id),
-                transition: enter >= 1 ? 'width .35s' : 'none',
-              },
-            }),
-          ),
-        )
-      : null,
     React.createElement('span', { style: { position: 'relative', display: 'inline-flex', flex: '0 0 auto' } },
       React.createElement(EntryIcon, { size: wide ? 17 : 18, color: badgeColor }),
       // 角标：rail 态唯一的异常信号
@@ -727,10 +695,9 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       : null,
   );
 
-  // 渠道中心图标按钮（无文字）：钉在本行最右端，点一下开弹窗。
-  // 收起态（rail）不渲染：56px 轨道里放不下两个图标，会让两个都糊在一起。
-  // 没有面板组件时也不渲染 —— 能力缺失就如实不显示，不留死按钮。
-  const centerButton = wide && centerPanel
+  // 渠道中心图标按钮（无文字）：**卡内**最右端，点一下开弹窗。
+  // 收起态（rail）不渲染：56px 轨道放不下两个图标；没有面板组件时也不渲染（不留死按钮）。
+  const centerButton = card && centerPanel
     ? React.createElement('button', {
         type: 'button',
         'aria-haspopup': 'dialog',
@@ -741,30 +708,77 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
         className: 'dshc-entry-icon',
         'data-open': centerOpen ? 'true' : 'false',
         style: {
-          font: 'inherit', cursor: 'pointer', border: 'none', flex: '0 0 auto',
-          width: 36, height: 36, borderRadius: 10, padding: 0,
+          font: 'inherit', cursor: 'pointer', border: 'none', flex: '0 0 auto', alignSelf: 'center',
+          width: 30, height: 30, borderRadius: 8, padding: 0,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--dsw-alias-label-secondary,#6b7280)', transition: 'background .15s, color .15s',
+          color: 'var(--dsw-alias-label-secondary,#6b7280)',
         },
       }, React.createElement(Icons.hub, { width: 17, height: 17, 'aria-hidden': 'true' }))
     : null;
 
-  // 本入口的整行盒子：占满宿主行（配合把宿主行改成 wrap 的 effect），右侧给图标按钮留位。
-  // 入口行样式（hover / focus-visible）跟着行盒子挂一次即可，不额外占布局。
-  // 两个按钮之间用 1px 令牌竖线分开，避免"两块贴在一起"的糊感。
-  const divider = wide && centerButton
+  // 两个点击区之间的 1px 令牌竖线（同一张卡内分区，不是两块盒子）
+  const divider = centerButton
     ? React.createElement('span', {
         'aria-hidden': 'true',
-        style: { flex: '0 0 auto', width: 1, height: 18, background: 'var(--dsw-alias-border-l2,#e5e7eb)' },
+        style: { flex: '0 0 auto', alignSelf: 'center', width: 1, height: 18, background: 'var(--dsw-alias-border-l2,#e5e7eb)' },
       })
     : null;
+
+  // 卡内装饰（只展开态有卡片）：左侧 3px 健康色条 + 底部 3px 渠道条，都被卡片的
+  // overflow:hidden 裁在圆角里；入场时条整体淡入、逐段从 0 长出。
+  const decorations = [];
+  if (card) {
+    decorations.push(React.createElement('span', {
+      key: 'strip',
+      'aria-hidden': 'true',
+      style: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: badgeColor },
+    }));
+    if (hasAccounts && phase !== 'error' && barRows.length > 0) {
+      decorations.push(React.createElement('span', {
+        key: 'bar',
+        'aria-hidden': 'true',
+        title: barTitle,
+        style: {
+          position: 'absolute', left: 3, right: 0, bottom: 0, height: 3,
+          display: 'flex', overflow: 'hidden',
+          opacity: enter >= 1 ? 1 : 0.35 + 0.65 * enter,
+        },
+      },
+        ...barRows.map((row, index) =>
+          React.createElement('span', {
+            key: row.id,
+            style: {
+              width: `${(row.count / barTotal) * 100 * segProgress(index)}%`,
+              background: channelColor(row.id),
+              transition: enter >= 1 ? 'width .35s' : 'none',
+            },
+          }),
+        ),
+      ));
+    }
+  }
+
+  // 整行盒子：展开态**就是那张卡片**（把渠道中心按钮框在里面）；收起态是无边框的 36×36 图标盒。
   const entryRow = React.createElement('div', {
     'data-dshc-entry': 'row',
+    ...(card ? { className: 'dshc-entry-card' } : {}),
+    'data-open': open ? 'true' : 'false',
     style: {
-      flex: wide === true ? '0 0 100%' : '0 0 auto', minWidth: 0, maxWidth: '100%',
-      display: 'flex', alignItems: 'center', gap: wide ? 4 : 6,
+      flex: card ? '0 0 100%' : '0 0 auto', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box',
+      display: 'flex', alignItems: 'stretch', gap: card ? 2 : 6,
+      ...(card
+        ? {
+            height: 36,
+            padding: '0 3px 0 11px',
+            position: 'relative', overflow: 'hidden', borderRadius: 10,
+            // 半透明一律 color-mix：`var(--token)14` 这种拼十六进制后缀会被浏览器整条丢弃
+            background: open
+              ? 'linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 12%, transparent), transparent 70%), var(--dsw-alias-bg-layer-2,#f9fafb)'
+              : 'linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%), var(--dsw-alias-bg-layer-1,#fff)',
+          }
+        : {}),
     },
-  }, React.createElement('style', null, ENTRY_CSS), button, divider, centerButton);
+  }, React.createElement('style', null, ENTRY_CSS), ...decorations, button, divider, centerButton);
 
   const popover = open && anchor
     ? createPortal(

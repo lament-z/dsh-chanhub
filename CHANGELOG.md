@@ -1,5 +1,27 @@
 # Changelog
 
+### 侧边栏入口：把「渠道中心」图标按钮收进卡片（一张卡两个点击区）
+
+现象（用户反馈）：卡片 + 1px 分隔线 + 独立图标按钮是**三个并排盒子**，看着割裂。
+
+改法：展开态的**整行盒子就是那张卡片**（描边/圆角/渐变/左健康色条/底部渠道条全在它身上，
+`overflow:hidden` 把装饰裁在圆角里），卡内是两个独立点击区 —— 账号池主按钮（`flex:1 1 auto`，
+透明底）与右侧 30×30 无文字图标按钮（`Icons.hub`），中间 1px 令牌竖线分区。
+- hover **任意一处**：整卡描边升一档（`l2→l3`）+ 轻阴影，同时被 hover 的那个点击区出底色；
+  **不做位移**（早先 D 步的 `translateY(-1px)` 已按用户要求去掉 —— 卡片不该随鼠标动）；
+  键盘聚焦用 `:focus-within` 抬描边 —— 即"一张卡"而不是"两块"。
+- 半透明底色一律走 `color-mix`（`var(--token)14` 会被浏览器整条丢弃）；
+  卡内两个点击区的 hover/open 底色改由 `ENTRY_CSS` 的 `.dshc-entry-cell` / `.dshc-entry-icon` 提供
+  （内联 background 会盖掉类规则）。
+- rail（56px 轨道）不变：没有卡片，只有一个 36×36 图标。
+
+测试：新增断言「渠道中心图标按钮必须框在卡片内（`iconBtn.parentElement === card`）、
+主按钮也在卡内、卡内有 1px 分隔线」。全量 `node --test test/*.test.mjs` → 233 例 / 212 通过 / 0 失败 / 21 跳过。
+真机实测：卡片 `256×36 @(12,1242)`（1px 令牌描边、圆角 10）、主按钮 `205×34 @(24,1243)`、
+图标 `30×30 @(234,1245)` 且 `card.contains(icon)=true`、左健康条 `3×34`、底部渠道条 `251×3`（3 段）；
+hover 图标 → 卡片位置不变（`transform: none`，矩形仍是 `12,1242,256,36`）+ 描边 `l3` + 图标底色；点图标开弹窗、点主区开浮层；
+rail 仍 `36×36`；横向溢出 0、`[data-slot-error]` 计数 0。
+
 ### 配色吸收：渠道中心改用与侧边栏同一套渠道色（唯一色源 `channelPalette`）
 
 问题：同一个渠道在侧边栏浮层是**有身份的**（蓝色条 + 余额渐变 + 走势线），到了渠道中心
@@ -56,7 +78,7 @@
 - **3px 渠道条**：整体淡入 + **逐段错开长出**（`SEG_STAGGER = 0.28`，最后一段恰好在 enter=1 收尾）；
   入场结束后恢复 `transition: width .35s`，后续账号数变化平滑跟随。
 - **卡片 / 图标按钮**：`ENTRY_CSS` 里一条只动 opacity 的 `dshc-entry-in .22s`（不用 transform，
-  避免和 hover 的 `translateY(-1px)` 抢同一属性）。
+  避免和 hover 的 `translateY(-1px)` 抢同一属性；**该上浮后经用户要求已撤销**，见最新一条）。
 
 新增 `useMountProgress(duration)` hook（放在 `quick-entry.js`，与 `Ring` 相邻），沿用 `useCountUp` 的
 **"动画必须可失败"** 纪律：无 rAF、或 `prefers-reduced-motion: reduce` → 直接返回 1（终态）；

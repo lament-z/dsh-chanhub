@@ -1754,7 +1754,14 @@ test('渲染：卡片化骨架 —— 健康环 / 3px 渠道条 / 分隔线都�
     const strips = [...card.querySelectorAll('span[aria-hidden="true"]')];
     assert.ok(strips.some((s) => s.style.width === '3px' && s.style.height === ''), '要有左侧 3px 健康色条');
     assert.ok(strips.some((s) => s.style.height === '3px' && s.style.bottom === '0px'), '要有底部 3px 渠道堆叠条');
-    assert.equal(wide.container.querySelector('[data-dshc-entry="row"] span[style*="width: 1px"]') !== null, true, '卡片与图标按钮之间要有 1px 分隔线');
+    // 渠道中心图标按钮必须**在卡片内部**（用户反馈：摆在卡片外面看着像两块拼在一起）
+    const iconBtn = wide.container.querySelector('button[aria-label="打开渠道中心"]');
+    assert.ok(iconBtn, '要有渠道中心图标按钮');
+    assert.equal(card.contains(iconBtn), true, '渠道中心图标按钮必须框在卡片内');
+    assert.equal(iconBtn.parentElement, card, '图标按钮要直接挂在卡片上（不再是卡片外的兄弟盒子）');
+    assert.equal(wide.container.querySelector('[data-dshc-entry="row"] span[style*="width: 1px"]') !== null, true, '卡内两个点击区之间要有 1px 分隔线');
+    // 两个点击区都在卡内：主按钮 + 图标按钮
+    assert.equal(card.contains(card.querySelector('button[aria-label="渠道账号"]')), true, '主按钮也在卡内');
     // 健康环：16px svg + role=img 语义
     const ring = card.querySelector('[role="img"]');
     assert.ok(ring, '有账号时要渲染健康环');
