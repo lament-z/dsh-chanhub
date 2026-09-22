@@ -1604,7 +1604,7 @@ async function clickEntry(document, container) {
   return button;
 }
 
-test('渲染：侧边栏入口 wide 态给出「健康/总数 · 可用积分」，rail 态只剩图标', { skip }, async () => {
+test('渲染：入口只在展开态渲染，并给出「健康/总数 · 可用积分」摘要', { skip }, async () => {
   const status = realStatusFixture();
   const wide = await mountQuick({ wide: true, status });
   const rail = await mountQuick({ wide: false, status });
@@ -1613,11 +1613,8 @@ test('渲染：侧边栏入口 wide 态给出「健康/总数 · 可用积分」
     assert.ok(wideHtml.includes('渠道'), 'wide 态应带标签');
     assert.match(wideHtml, /\d+\/\d+ · /, 'wide 态应显示「健康/总数 · 可用积分」摘要');
     assert.ok(wideHtml.includes('<svg'), '应画出入口图标（不依赖 emoji）');
-
-    const railHtml = rail.container.innerHTML;
-    assert.ok(railHtml.includes('<svg'), 'rail 态保留图标');
-    assert.ok(!/\d+\/\d+ · /.test(railHtml), 'rail 态（56px）不放摘要数字，避免溢出');
-    assert.equal(rail.container.querySelectorAll('button').length, 1, 'rail 态只有一个按钮');
+    // foot 行是共享 list 槽：56px 轨道只够一个图标（上下文洞察），多塞会被裁一半。
+    assert.equal(rail.container.innerHTML, '', '收起态不渲染主入口（避免两个图标各被裁一半）');
   } finally {
     await wide.cleanup();
     await rail.cleanup();

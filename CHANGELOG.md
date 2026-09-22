@@ -25,6 +25,16 @@ rail（56px）态只留图标 + 异常角标；点开是一个自带 popover，�
 - 活跃只给证据：`in_flight>0` → 「占用中」，`last_success<90s` → 「刚用过」，否则不显示（「本会话在用哪个
   账号」需要会话粘性键，浏览器侧拿不到，本轮不做）。
 
+**foot 行是共享槽位（真机反馈后修正）**
+
+- 那一行（`.footerActions`）里已有 dsh-context 的「上下文洞察」（`order:10`，自身
+  `width: calc(100% + 4px)` 的整行样式）。本入口原先也写 `width:100%` → 两项互相抢宽、
+  各被压到半行（260px 侧边栏实测 119px），看起来像"没加进来"。
+  现在改为 `flex: 0 0 auto` + `min-width: 96`：本项取自然宽度、永不被压扁，让整行样式的那项去收缩。
+- 收起态（56px 轨道）扣掉内边距只剩 ~36px，**只够一个图标**；两个图标会各被裁一半。
+  故 `wide === false` 时本入口不渲染（展开侧边栏才出现），避免把别人的图标也弄花。
+  实测脚本：`.scratch/sidebar-quick-entry/`（真实 sidebar CSS + 真实 lc-ov-entry 宽度复现）。
+
 **浮层实现**
 
 - `createPortal` 到 `body`（侧边栏 grid track 会裁剪子内容）；锚点用按钮 rect，**按上下可用空间收敛

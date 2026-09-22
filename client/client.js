@@ -4225,6 +4225,7 @@ function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = D
     }
   }, [wide]);
   if (!enabled) return null;
+  if (wide === false) return null;
   const summary = quickSummaryVM({
     status: snapshot?.status,
     usage: snapshot?.usage,
@@ -4251,14 +4252,20 @@ function QuickEntry({ wide, store, prefs, openSettings, hasOpenSettings, now = D
         background: open ? "var(--dsw-alias-interactive-bg-active,rgba(0,0,0,.06))" : "transparent",
         color: "var(--dsw-alias-label-secondary,#6b7280)",
         borderRadius: 8,
+        // foot 区那一行是**共享**的（`sidebar.footer.action` 是 list 槽：dsh-context 的
+        // 「上下文洞察」也在这里，且它自身是 `width: calc(100% + 4px)` 的整行样式）。
+        // 所以这里**不能用 width:100%** —— 那会和它互相抢宽、被挤成半行而看不清。
+        // flex:0 0 auto = 取自然宽度、永不被压扁；让整行样式的那一项去收缩。
+        flex: "0 0 auto",
+        maxWidth: "100%",
         height: 32,
         padding: wide ? "0 8px" : 0,
-        width: wide ? "100%" : 32,
+        minWidth: wide ? 96 : 32,
         display: "inline-flex",
         alignItems: "center",
         gap: 7,
-        minWidth: 0,
-        transition: "background .15s"
+        transition: "background .15s",
+        overflow: "hidden"
       }
     },
     import_react6.default.createElement(
