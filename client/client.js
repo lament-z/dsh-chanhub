@@ -4762,7 +4762,17 @@ function ModelAbilityTab({ rpcCall, showToast }) {
                 { ...tdStyle, whiteSpace: "nowrap" },
                 configuredGaps[m.id]?.includes("maxTokens") ? import_react6.default.createElement(NotWrittenMark, { fields: ["maxTokens"] }, fmtWindow(m.maxTokens)) : fmtWindow(m.maxTokens)
               ),
-              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, typeof m.credits === "string" && m.credits !== "" ? m.credits : "\u2014"),
+              import_react6.default.createElement(
+                "td",
+                { ...tdStyle, whiteSpace: "nowrap" },
+                typeof m.credits === "string" && m.credits !== "" ? m.credits : "\u2014",
+                // 倍率补充（qoder 错峰折扣等）：小字跟在倍率下面，
+                // 长说明（含折扣时段）进 tooltip。上游没给就整块不渲染。
+                typeof m.creditsNote === "string" && m.creditsNote !== "" ? import_react6.default.createElement("div", {
+                  style: { ...type.text.caption, color: tone.info.fg, marginTop: 2 },
+                  title: typeof m.creditsNoteDetail === "string" && m.creditsNoteDetail !== "" ? m.creditsNoteDetail : m.creditsNote
+                }, m.creditsNote) : null
+              ),
               import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge)),
               import_react6.default.createElement(
                 "td",

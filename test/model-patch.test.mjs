@@ -116,8 +116,8 @@ test('snapshotFromCatalog：字段都存（id/name/ctx/maxOut/credits/vision）�
   assert.equal(snap.at, 123);
   assert.equal(snap.provider, 'chanhub2api');
   assert.equal(snap.count, 2);
-  assert.deepEqual(snap.models[0], { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', ctx: 1000000, maxOut: 64000, credits: 'x0.06', vision: true });
-  assert.deepEqual(snap.models[1], { id: 'traework:cn:glm-5.3', name: 'B', ctx: 200000, maxOut: undefined, credits: '', vision: false });
+  assert.deepEqual(snap.models[0], { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', ctx: 1000000, maxOut: 64000, credits: 'x0.06', note: '', noteDetail: '', vision: true });
+  assert.deepEqual(snap.models[1], { id: 'traework:cn:glm-5.3', name: 'B', ctx: 200000, maxOut: undefined, credits: '', note: '', noteDetail: '', vision: false });
 });
 
 test('parseSnapshot：坏 JSON / 形状不对一律降级为 null（不抛）', () => {
@@ -179,9 +179,65 @@ test('catalogFromSnapshot：短名还原回目录名，视觉能力随 vision �
   const snap = snapshotFromCatalog(CAT, { at: 7, provider: 'p' });
   const out = catalogFromSnapshot(snap);
   assert.deepEqual(out, [
-    { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', supportsImages: true },
-    { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, maxTokens: undefined, credits: undefined, supportsImages: false },
+    { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: true },
+    { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false },
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// 倍率补充（qoder 错峰折扣）—— 网关 credits_note → 面板 → 快照往返
+// ---------------------------------------------------------------------------
+
+test('listFromGatewayBody：读网关的 credits_note / credits_note_detail', () => {
+  const out = listFromGatewayBody({
+    data: [
+      {
+        id: 'qoder:work:qwen3.8-max',
+        name: '[qoder:work] Qwen3.8-Max',
+        credits: 'x0.20',
+        credits_note: '错峰 4 折 · 原 x0.50',
+        credits_note_detail: '错峰时段4折优惠（10 PM-8 AM UTC+8）',
+      },
+      // 无折扣的模型：两个键都不写（不是空串）—— 面板据此不渲染那一格。
+      { id: 'qoder:work:glm-5.3', name: 'GLM-5.3', credits: 'x0.80' },
+    ],
+  });
+  assert.equal(out[0].credits, 'x0.20');
+  assert.equal(out[0].creditsNote, '错峰 4 折 · 原 x0.50');
+  assert.equal(out[0].creditsNoteDetail, '错峰时段4折优惠（10 PM-8 AM UTC+8）');
+  assert.equal(out[1].creditsNote, undefined, '上游没给折扣就不该编一个空串出来');
+  assert.equal(out[1].creditsNoteDetail, undefined);
+});
+
+test('折扣说明能穿过快照往返（打开面板回显时不丢）', () => {
+  const catalog = listFromGatewayBody({
+    data: [{
+      id: 'qoder:work:qwen3.8-max',
+      name: 'Qwen3.8-Max',
+      credits: 'x0.20',
+      credits_note: '错峰 4 折 · 原 x0.50',
+      credits_note_detail: '错峰时段4折优惠（10 PM-8 AM UTC+8）',
+    }],
+  });
+  // catalog → 快照 → 解析 → 还原，四步之后折扣仍在。
+  const restored = catalogFromSnapshot(parseSnapshot(JSON.stringify(snapshotFromCatalog(catalog, { at: 1, provider: 'p' }))));
+  assert.equal(restored[0].creditsNote, '错峰 4 折 · 原 x0.50');
+  assert.equal(restored[0].creditsNoteDetail, '错峰时段4折优惠（10 PM-8 AM UTC+8）');
+});
+
+test('错峰折扣**不进**差异比对（按小时切换，不该天天报「变化」）', () => {
+  const withPromo = listFromGatewayBody({
+    data: [{ id: 'qoder:work:m', name: 'M', credits: 'x0.20', credits_note: '错峰 4 折 · 原 x0.50' }],
+  });
+  // 倍率与折扣一起变（错峰开始/结束）—— 差异只应报 credits 一项，不重复报折扣。
+  const withoutPromo = listFromGatewayBody({
+    data: [{ id: 'qoder:work:m', name: 'M', credits: 'x0.50' }],
+  });
+  const d = diffModelSnapshots(
+    snapshotFromCatalog(withoutPromo, { at: 1, provider: 'p' }),
+    snapshotFromCatalog(withPromo, { at: 2, provider: 'p' }),
+  );
+  assert.deepEqual(d.changed, [{ id: 'qoder:work:m', fields: ['credits'] }]);
 });
 
 test('catalogFromSnapshot：catalog→snapshot→catalog 往返不丢展示字段', () => {
@@ -196,6 +252,6 @@ test('catalogFromSnapshot：空/坏输入一律给空数组，且名称缺失回
   assert.deepEqual(catalogFromSnapshot({}), []);
   assert.deepEqual(catalogFromSnapshot({ models: null }), []);
   assert.deepEqual(catalogFromSnapshot({ models: [{ id: '' }, null, { id: 'x' }] }), [
-    { id: 'x', name: 'x', contextWindow: undefined, maxTokens: undefined, credits: undefined, supportsImages: false },
+    { id: 'x', name: 'x', contextWindow: undefined, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false },
   ]);
 });

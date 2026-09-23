@@ -850,7 +850,18 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                     configuredGaps[m.id]?.includes('maxTokens')
                       ? React.createElement(NotWrittenMark, { fields: ['maxTokens'] }, fmtWindow(m.maxTokens))
                       : fmtWindow(m.maxTokens)),
-                  React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, typeof m.credits === 'string' && m.credits !== '' ? m.credits : '—'),
+                  React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' },
+                    typeof m.credits === 'string' && m.credits !== '' ? m.credits : '—',
+                    // 倍率补充（qoder 错峰折扣等）：小字跟在倍率下面，
+                    // 长说明（含折扣时段）进 tooltip。上游没给就整块不渲染。
+                    typeof m.creditsNote === 'string' && m.creditsNote !== ''
+                      ? React.createElement('div', {
+                          style: { ...type.text.caption, color: tone.info.fg, marginTop: 2 },
+                          title: typeof m.creditsNoteDetail === 'string' && m.creditsNoteDetail !== ''
+                            ? m.creditsNoteDetail
+                            : m.creditsNote,
+                        }, m.creditsNote)
+                      : null),
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, m.supportsImages === true ? React.createElement(VisionBadge) : React.createElement(TextBadge)),
                   React.createElement('td', tdStyle,
                     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
