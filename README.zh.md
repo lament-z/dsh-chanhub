@@ -6,7 +6,7 @@ DeepSeek Harness 客户端插件：在「设置」侧边栏接入 **chanhub**（
 
 ## 功能
 
-5 个 Tab，数据来自网关真实端点（`GET /status`、`GET /v1/models`、`GET /v1/stats/buckets`、
+6 个 Tab，数据来自网关真实端点（`GET /status`、`GET /v1/models`、`GET /v1/stats/buckets`、
 `GET /admin/tasks/status` 等，见下表）与网关 `config.json`：
 
 | Tab | 内容 |
@@ -14,6 +14,7 @@ DeepSeek Harness 客户端插件：在「设置」侧边栏接入 **chanhub**（
 | 账号池 | 概览五联、按域可用性、**赚得积分**（累计获得，覆盖度如实标注）、按渠道的当前可用积分、渠道筛选、**批量任务触发**（网关真实端点）、账号卡片（含到期时间）、账号折叠面板（健康 / 质量 / 积分 / 排程区块） |
 | 任务 | 任务磁贴（点即触发，状态就地显示）、签到结果（摘要常驻 + 明细折起）、开学季子任务、成长任务进度（后两者均可切换账号） |
 | 用量 | 单页卡片流：6 张 KPI（Tokens消耗 / 积分消耗 / 可用积分 · 请求数 / 缓存命中 / 平均延迟）、活跃热力图、每日按模型堆叠、账号与渠道排行（**维度可切，默认按用量 Tokens**）、模型占比；一次拉 720h 前端切片，`/v1/stats` 局限如实标注 |
+| 模型 | DSH 模型配置与多模态能力治理：拉取网关目录 / 覆盖 / 回滚备份、**能力目录三态比对**（原厂 > 云托管 > 转售，借判不写配置）、**补齐缺失字段**（`contextWindow` / `maxTokens` / 推理档位 / 视觉 `input`，只填空缺、预演后确认）、**实测探针**（真发一张带「颜色 + 数字」的图，答对才算看见）、**能力基线沉淀**（L0 实测压过目录标注） |
 | 日志 | 实时日志环形缓冲 + 频道筛选（对话 / 任务 / 系统） |
 | 配置 | 53 项网关配置，分组折叠 + 校验 + 危险语义标注 + 服务控制 |
 
@@ -80,8 +81,6 @@ if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
 > 400 `unknown channel` —— 而绝大多数部署的账号正是 workbuddy。这就是「面板能移除账号却不能新增账号」的根因。
 > 对应网关侧改动见 chanhub 仓库 `internal/routeapi/login_workbuddy.go` 与
 > `internal/channel/login/trae/login.go`（外部回调 + TTL）。
-
-### 消费的网关端点
 
 ### 消费的网关端点
 
@@ -175,6 +174,8 @@ if(!W || !Z || !/^http:\/\/127\.0\.0\.1:(\d+)\/authorize$/.test(Z)){
 | `authDir` | `""` | 网关凭证目录（用于渠道推断） |
 | `restartCommand` | `""` | 重启命令，只接受 `docker restart …` / `docker compose … restart …` / `docker-compose restart …` / `./dev.sh restart`（可执行文件允许写绝对路径）；**找不到 docker 时会自动到 Docker Desktop 自带 CLI 目录找**，见下方「重启网关」 |
 | `allowServiceControl` | `false` | 必须显式开启才会执行重启命令 |
+| `modelPullSnapshot` | `""` | 上次「拉取」记录的网关模型目录快照（JSON；`hasEfforts` 标记是否含推理档位），「覆盖」与「补齐」的依据，也用于回滚比对 |
+| `modelCapabilities` | `""` | **能力基线**（JSON，`{at, entries:{id:{image,status,tier,how,at}}}`）。只沉淀**确认态**（借判/冲突/别名/无收录一律不写）；等级 L0 实测 > L1 原厂 > L2 云托管 > L3 转售，低等级不得覆盖高等级 —— 有效视觉集合 = 人工白名单 ∪ 基线里的 `image` 项 |
 
 ### 重启网关（`docker: command not found` 怎么办）
 
@@ -235,13 +236,19 @@ DSHC_REACT_DIR=/tmp/dshc-render npm test
 | `lib/gateway-config.js` | 网关 `config.json` 读写（原子写 + fail-fast 预检） |
 | `lib/config-spec.js` | 53 项配置规格表（宿主校验与前端表单共用） |
 | `lib/auths.js` | 凭证文件只读盘点（渠道判定的唯一来源） |
+| `lib/model-catalog.js` | 多模态能力目录：pi-ai 离线目录 + models.dev + OpenRouter → 归一化/剥后缀/模糊匹配 + 三态投票判定（纯逻辑，可离线测） |
+| `lib/model-patch.js` | 模型配置补丁：白名单、能力基线（`mergeCapabilities` 含等级保护）、拉取快照、补齐计划（`buildCompletionPatch`） |
+| `lib/model-probe.js` | 视觉能力**实测**探针：自绘 PNG（背景色 + 数字）、行为化判定、请求级归因、串行批量 |
 | `client/index.js` | 浏览器侧面板：5 Tab 界面 |
 | `client/add-account.js` | 「添加账号」弹窗（设备授权三段状态机 + 轮询生命周期） |
+| `client/model-ability.js` | 「模型」Tab：能力目录徽章、实测按钮与「与目录矛盾」告警、补齐预演、沉淀 |
 | `client/derive.js` | 纯派生逻辑（状态判定 / 分组 / 归纳），可在 node 下直接测 |
 | `client/theme.js` | DSH 视觉令牌与折叠 CSS |
 | `client/build.mjs` | esbuild 打包脚本（与 dsh-bridge-gateway 一致） |
 | `cordis.patch.yml` | cordis bundle patch（单一 row） |
 | `dsh-plugin.naming.json` | 命名声明（经 `plugin-write` 校验） |
+| `docs/vision-probe-measured.md` | 全量 107 个模型的视觉能力实测结果（逐条依据 + 目录漏判/错判清单） |
+| `docs/apply-model-fix.mjs` | 命令行版「沉淀 + 补齐」（面板按钮的等价物，`--apply` 前先预演） |
 
 ## 协议
 

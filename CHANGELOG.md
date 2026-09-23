@@ -1,5 +1,93 @@
 # Changelog
 
+### 新增：模型能力治理 —— 目录三态比对 → 能力基线 → 补齐配置字段（解「上游 1M、DSH 只有 256K」）
+
+现象（用户提问）：上游标注 `deepseek-v4.1-flash` 上下文 1M，DSH 里只显示 256K。
+根因在 `dsh-llm-pi-ai`：`entry.contextWindow ?? base?.contextWindow ?? request.defaultContextWindow`，
+配置里没写就落到 `DEFAULT_CONTEXT_WINDOW = 262144`。**不是上游标错，是我们没把真实上限写进配置。**
+
+改法：一条从「证据」到「写入」的链路，每一层都可单独叫停。
+- **① 目录三态比对**（`lib/model-catalog.js`，只读）：本地 pi-ai 目录（离线，随 DSH 升级）
+  + `models.dev`（8033 模型）+ OpenRouter（444）→ 归一化键后按
+  「精确 → 剥一层部署后缀 → 前缀相似度 ≥ 0.85」匹配；结论按证据等级投票
+  （L1 原厂 > L2 云托管 > L3 转售），同级平票记 `conflict`，无收录记 `missing`，
+  档位别名（`auto`/`fast-model`/`default-model`…）不参与比对。在线目录只落盘缓存，
+  面板打开**零网络**；`refreshModelCatalog` 是唯一联网动作。
+- **② 能力基线**（`settings.modelCapabilities`，`lib/model-patch.js`）：只沉淀**确认态**，
+  借判/冲突/别名/无收录一律不写 —— 宁可不写，也不把猜测写成事实。
+  有效视觉集合 = 人工白名单 ∪ 基线里的 `image` 项。
+- **③ 补齐配置字段**（`completeModelFields`）：只填**缺失**字段（`contextWindow` /
+  `maxTokens` / `reasoningEfforts` / `input`），不增不删模型；先给预演（改哪些、改成什么），
+  用户点「确认写入」才落盘。
+- 面板（模型 Tab）：「刷新能力目录」/「补齐配置字段（N）」/「沉淀确认项（N）」三个按钮，
+  每行一个只读徽章（等级/票数/命中方式/来源 hover 可见）。
+- 顺带修：`applyModelsPatch` 端点被上一次提交漏掉，面板「应用补丁」一直报
+  `Unknown endpoint`；`reasoningEfforts` 按 pi-ai 的**对象映射**（`{level: wireValue}`）写入。
+
+测试：`test/model-catalog.test.mjs`(32) + `test/model-catalog-rpc.test.mjs`(22) +
+`test/model-capabilities.test.mjs`(25) + `test/model-pull-record.test.mjs`。
+真机：旧快照下 28 个模型缺字段；写入后 `workbuddy:cn:deepseek-v4.1-flash` 由回落的
+`262144` 变为 **`1000000`**（maxOut 128000、档位 low/high/max、`input: [text, image]`），
+36 → 36 个模型（只填字段不增不删），第二次预演 0 改动（幂等）。
+写入走 `yaml` Document 叶子级 diff + `withFileLock` + `writeFileAtomic`，注释与格式不动。
+
+### 新增：多模态能力「实测」探针 —— 真发一张图，答对才算看见（L0 最终裁决）
+
+动机（用户原话）：**「除了多模态能力不信任上游」**。目录是别人的二手标注、白名单是人工认定，
+那就只剩实测能算数 —— 这一层是最终裁决，等级 L0。
+
+⚠️ **真机教训（三次打脸，代码注释里钉住了，别退回「200 就算支持」）**：
+- 只发一张图看有没有报错**证明不了任何事**：`workbuddy:cn:hy3`、`glm-5.3`（目录都标「文」）
+  带图请求都返回 200 —— 图片被静默丢弃时模型照样作答；`glm-5.3` 还会**编**一个颜色（「浅灰色」）。
+- 图太小本身会误判：8×8 纯色图问颜色，`glm-5.3` 编颜色；换成 40×40 带数字的图后它答对了。
+- 只认精确色名会漏判：模型常按**色族**作答（navy 答「蓝色」、teal 答「蓝绿色」、
+  maroon 答「红色」、olive 答「绿色」）而**数字全对**。
+
+改法（`lib/model-probe.js`）：
+- **行为化提问**：图里画「背景色 + 白色数字」（3×5 点阵放大 ×5，纯 JS 手编 PNG，零依赖），
+  问「背景是什么颜色？中间的数字是几？」—— **答对才算看见**（盲猜同时命中 ≈ 3%）。
+  样本由模型 id 哈希决定：同一模型可复现（所以能拿录下的回答离线重放分类器），不同模型不同题。
+- **判定**：数字是主信号（10 选 1），色族做辅助；自述看不到图（`看不到`/`无法处理图像`/
+  `不支持`/`请切换到支持多模态的模型`/`没有提供图像`…）→ 文；答错/答一半 → **未定**
+  （模型会编颜色：既不算看见，也不能算纯文本）。
+- **请求级归因**：明确拒绝图片 → 文；模型不存在/无健康账号（`service info not found` 11102）→ 未定；
+  **限流/过载（3003/3004、rate limit、429、502-504）→ 未定且不补纯文本对照**
+  （补了也会被同样限流，会被误判成「纯文本可过、带图失败」—— 真机踩到过）；
+  含糊 400 → 补一次纯文本对照归因。
+- **thinking 预算**：thinking 模型会把预算烧在思考上（`content` 空、`reasoning_content` 满），
+  `max_tokens=600` 时先试一次，空则自动放大到 2400 重试（真机：`deepseek-v4.1-flash`
+  600 空 → 2400 答对）。
+- **纪律**：串行 + 间隔（默认 300ms）+ 单批上限 12（保护账号）；`unknown` 一律不写配置、不进基线；
+  只有 image/text 可沉淀。
+- **等级保护**：`mergeCapabilities` 加等级闸（L0 实测 < L1 原厂 < L2 云托管 < L3 转售），
+  目录结论不得覆盖实测结论 —— 否则用户点一次「沉淀确认项」就会把实测翻过来的结论
+  用目录的错标注覆盖回去。
+- 面板：「实测未定项（N/总数）」+ 每行「实测」按钮；实测结论与目录判定并列显示，
+  **不一致时打红色「与目录矛盾」**（hover 说明该信谁：按纪律以实测为准）。
+
+真机实测（全量 107 个模型，两轮；逐条见 `docs/vision-probe-measured.md`）：
+```
+一轮 107 个（间隔 500ms）→ 图 59 · 文 9 · 未定 39（离线重放修正分类器后：图 67 · 文 11 · 未定 29）
+二轮 30 个（只重测「临时失败 / 数字答错」，间隔 1500ms + 按渠道轮转，避开单个上游限流）
+两轮合并（取最硬证据 图 > 文 > 未定）→ 图 69 · 文 13 · 未定 25
+```
+- **目录标「文」、实测「图」17 个**（目录漏判）：`hy3-x`、`hy4-preview-f`(×2)、`hy4-preview`(×2)、
+  `glm-5.3`(cn/qoder)、`glm-5.2`(cn/qoder)、`glm-5.1`、`minimax-m2.7`(cn/qoder)、
+  `deepseek-v4-pro`(cn/qoder)、`deepseek-v3-2-volc`、`qwen3.7-max`、`hy3`(global)。
+- **目录无收录、实测「图」19 个**：`glm-5.0-turbo`、`kimi-k2.8-preview`(×3)、`deepseek-v4-flash`、
+  `seed-code-pro-0430`、`sagitta`、`aquila`，以及全部渠道档位别名
+  （`auto`/`fast-model`/`balanced-model`/`deep-model`/`default-model`/`primary-model`）。
+- **目录标「图」、实测「文」1 个**（目录错判）：`workbuddy:global:glm-5.3-flash`。
+- **同名模型在不同渠道结论相反**：`glm-5.3` cn 图 / global 文，`glm-5.3-flash` 同，`glm-5.2` 同
+  —— 目录是全局标注，天生区分不出渠道，这正是「按网关实测」不可替代的原因。
+- 未定 25 个几乎全是**与视觉无关**的原因：8 个模型在当前账号下不可用（11102）、
+  traework 的 glm 系持续限流（3004）、`Doubao-Seed-2.0-Code`/`kimi-k3` 90s 超时、
+  少数「数字答错」的按纪律记未定。
+
+测试：`test/model-probe.test.mjs`(25，含解码 PNG 逐像素核对数字真画在图上) +
+`test/client-render.test.mjs`(59，含「与目录矛盾」必须出现)。全量 357 例 / 336 通过 / 0 失败 / 21 跳过。
+附带 `docs/apply-model-fix.mjs`：命令行版「沉淀 + 补齐」（面板按钮的等价物，可预演、可复盘）。
+
 ### 侧边栏入口：把「渠道中心」图标按钮收进卡片（一张卡两个点击区）
 
 现象（用户反馈）：卡片 + 1px 分隔线 + 独立图标按钮是**三个并排盒子**，看着割裂。

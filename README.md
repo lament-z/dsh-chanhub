@@ -6,13 +6,14 @@ The visual design mirrors [dsh-bridge-gateway](https://github.com/lament-z/dsh-b
 
 ## Features
 
-Five tabs, driven by real gateway endpoints (`GET /status`, `GET /v1/models`, `GET /v1/stats/buckets`, `GET /admin/tasks/status`, … — see the table below) plus the gateway `config.json`:
+Six tabs, driven by real gateway endpoints (`GET /status`, `GET /v1/models`, `GET /v1/stats/buckets`, `GET /admin/tasks/status`, … — see the table below) plus the gateway `config.json`:
 
 | Tab | Content |
 |---|---|
 | Accounts | Overview counters, per-realm availability, **lifetime credits earned** (with coverage stated), current usable credits per channel, channel filter, **batch task triggers** (real gateway endpoints), account cards with expiry, per-account fold panels (health / quality / credits / schedule blocks) |
 | Tasks | Task trigger + run status (per-account check-in results), growth-task progress, school-season subtask status |
 | Usage | Single-page card flow: 6 KPIs (tokens / credit burn / usable credits · requests / cache hit / avg latency), activity heatmap, daily stacked bars, account & channel rankings (**switchable metric, defaults to tokens by usage**), model donut; one 720h fetch sliced client-side, `/v1/stats` limitation stated |
+| Models | DSH model config + multimodal capability governance: pull the gateway catalog / overwrite / roll back a backup, **three-way capability comparison** (vendor > cloud host > reseller; borrowed verdicts are never written), **fill missing fields** (`contextWindow` / `maxTokens` / reasoning efforts / vision `input`; missing-only, preview then confirm), the **behavioural vision probe** (send a real image with a colour + digit — it only counts as "sees images" if the model answers correctly), and **capability baseline settlement** (L0 measurement outranks catalog annotations) |
 | Logs | Live log ring buffer with channel chips (chat / task / sys) |
 | Config | All 53 gateway config fields, grouped and validated, plus service control |
 
@@ -119,6 +120,8 @@ The plugin registers the settings namespace `dsh-chanhub`:
 | `authDir` | `""` | Gateway credential directory (for channel derivation) |
 | `restartCommand` | `""` | Restart command; only `docker restart …` / `docker compose … restart …` / `docker-compose restart …` / `./dev.sh restart` are accepted (absolute paths to the binary are allowed). If `docker` is not on PATH, the plugin falls back to known install locations (incl. Docker Desktop's bundled CLI) — see below |
 | `allowServiceControl` | `false` | Must be enabled to run the restart command |
+| `modelPullSnapshot` | `""` | Snapshot of the gateway model catalog from the last pull (JSON; `hasEfforts` marks whether reasoning efforts were captured). Basis for overwrite/fill, also used for rollback comparison |
+| `modelCapabilities` | `""` | The **capability baseline** (JSON, `{at, entries:{id:{image,status,tier,how,at}}}`). Only confirmed verdicts are settled (borrowed/conflict/alias/uncatalogued are never written); evidence tiers L0 measurement > L1 vendor > L2 cloud host > L3 reseller, and a weaker tier can never overwrite a stronger one. The effective vision set = manual whitelist ∪ `image` entries in the baseline |
 
 ### Restart gateway / `docker: command not found`
 
@@ -178,12 +181,18 @@ gateway answers on `127.0.0.1:7866`, so CI stays green without one.
 | `lib/gateway-config.js` | Gateway `config.json` read/write (atomic + fail-fast precheck) |
 | `lib/config-spec.js` | The 53-field config spec (shared by host validation and the UI) |
 | `lib/auths.js` | Read-only credential inventory (the only source for channel derivation) |
-| `client/index.js` | Browser panel: the five-tab UI |
+| `lib/model-catalog.js` | Multimodal capability catalog: offline pi-ai data + models.dev + OpenRouter → normalisation/suffix stripping/fuzzy matching + three-tier voting (pure logic, offline-testable) |
+| `lib/model-patch.js` | Model config patching: whitelist, capability baseline (`mergeCapabilities`, tier-protected), pull snapshot, completion plan (`buildCompletionPatch`) |
+| `lib/model-probe.js` | The behavioural vision probe: self-drawn PNG (background colour + digit), answer-level verdicts, request-level attribution, serial batching |
+| `client/index.js` | Browser panel: the six-tab UI |
+| `client/model-ability.js` | The Models tab: capability badges, probe buttons, "contradicts catalog" warning, completion preview, settlement |
 | `client/derive.js` | Pure derivation logic, testable directly under Node |
 | `client/theme.js` | DSH visual tokens and fold CSS |
 | `client/build.mjs` | esbuild bundle script (same shape as dsh-bridge-gateway) |
 | `cordis.patch.yml` | cordis bundle patch (single row) |
 | `dsh-plugin.naming.json` | Naming declaration (validated by `plugin-write`) |
+| `docs/vision-probe-measured.md` | Measured vision capability for all 107 models (per-model evidence + catalog under/over-claim lists) |
+| `docs/apply-model-fix.mjs` | CLI equivalent of the settle + fill buttons (preview first, `--apply` to write) |
 
 ## License
 
