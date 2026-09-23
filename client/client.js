@@ -2169,7 +2169,8 @@ var ENDPOINTS = {
   getModelCatalog: "getModelCatalog",
   refreshModelCatalog: "refreshModelCatalog",
   commitModelCapabilities: "commitModelCapabilities",
-  completeModelFields: "completeModelFields"
+  completeModelFields: "completeModelFields",
+  probeModelVision: "probeModelVision"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -4129,6 +4130,8 @@ function ModelAbilityTab({ rpcCall, showToast }) {
   const [configuredGaps, setConfiguredGaps] = import_react6.default.useState({});
   const [completion, setCompletion] = import_react6.default.useState(null);
   const [completeBusy, setCompleteBusy] = import_react6.default.useState(false);
+  const [probeResults, setProbeResults] = import_react6.default.useState({});
+  const [probeBusy, setProbeBusy] = import_react6.default.useState(false);
   const notify = (msg) => {
     if (typeof showToast === "function") {
       showToast(msg);
@@ -4235,6 +4238,37 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       setCompleteBusy(false);
     }
   }, [rpcCall, provider, reloadRecord]);
+  const runProbe = import_react6.default.useCallback(async (ids) => {
+    if (!rpcCall) return;
+    setProbeBusy(true);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.probeModelVision, {
+        provider,
+        commit: true,
+        ...Array.isArray(ids) && ids.length > 0 ? { ids } : {}
+      });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? "\u5B9E\u6D4B\u5931\u8D25";
+        setLastErr(msg);
+        notify(`\u5B9E\u6D4B\u5931\u8D25\uFF1A${msg}`);
+        return;
+      }
+      const v = result.value;
+      const byId = { ...probeResults };
+      for (const r of v.results ?? []) byId[r.id] = r;
+      setProbeResults(byId);
+      if (v.report) applyCatalogResult(v.report);
+      const img = (v.results ?? []).filter((r) => r.verdict === "image").length;
+      const txt = (v.results ?? []).filter((r) => r.verdict === "text").length;
+      notify(`\u5B9E\u6D4B ${v.done} \u4E2A\uFF1A\u591A\u6A21\u6001 ${img} \xB7 \u7EAF\u6587\u672C ${txt} \xB7 \u672A\u5B9A ${v.unknown ?? 0}` + ((v.remaining ?? []).length > 0 ? `\uFF1B\u8FD8\u6709 ${v.remaining.length} \u4E2A\u5F85\u5B9E\u6D4B\uFF0C\u518D\u70B9\u4E00\u6B21\u7EE7\u7EED` : "") + ((v.committed?.added ?? []).length > 0 ? `\uFF1B\u5DF2\u6C89\u6DC0 ${v.committed.added.length} \u9879` : ""));
+      await reloadRecord();
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+    } finally {
+      setProbeBusy(false);
+    }
+  }, [rpcCall, provider, probeResults, applyCatalogResult, reloadRecord]);
   const load = import_react6.default.useCallback(async (withOverwrite = false) => {
     if (!rpcCall) return;
     if (withOverwrite) {
@@ -4443,6 +4477,18 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         },
         catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"
       ),
+      catalog && (catalog.summary?.undecided ?? []).length > 0 ? import_react6.default.createElement(
+        "button",
+        {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: probeBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: probeBusy,
+          onClick: () => runProbe(),
+          title: "\u771F\u53D1\u4E00\u5F20\u56FE\u95EE\u8FD9\u6761\u6E20\u9053\u8BA4\u4E0D\u8BA4\u5F97\uFF1A\u56FE\u91CC\u753B\u4E86\u300C\u80CC\u666F\u8272 + \u6570\u5B57\u300D\uFF0C\u53EA\u6709\u7B54\u5BF9\u624D\u7B97\u770B\u89C1 \u2014\u2014 \u5B9E\u6D4B\u53D1\u73B0\u53EA\u53D1\u56FE\u770B\u62A5\u9519\u6839\u672C\u8BC1\u660E\u4E0D\u4E86\u4EC0\u4E48\uFF08\u7EAF\u6587\u672C\u6A21\u578B\u7167\u6837\u56DE 200\uFF0C\u751A\u81F3\u4F1A\u7F16\u4E00\u4E2A\u989C\u8272\uFF09\u3002\u76EE\u5F55\u662F\u522B\u4EBA\u7684\u4E8C\u624B\u6807\u6CE8\uFF0C\u767D\u540D\u5355\u662F\u4EBA\u5DE5\u8BA4\u5B9A\uFF0C\u5B9E\u6D4B\u624D\u662F\u6700\u7EC8\u88C1\u51B3\u3002\u4E32\u884C + 300ms \u95F4\u9694 + \u5355\u6279 12 \u4E2A\uFF08\u4FDD\u62A4\u8D26\u53F7\uFF09\uFF1B\u62FF\u4E0D\u51C6\u7684\u4E00\u5F8B\u8BB0\u300C\u672A\u5B9A\u300D\uFF0C\u4E0D\u5199\u914D\u7F6E\u3002\u786E\u8BA4\u7ED3\u8BBA\u4F1A\u6C89\u6DC0\u8FDB\u80FD\u529B\u57FA\u7EBF\uFF08\u7B49\u7EA7 L0 \u5B9E\u6D4B\uFF09\u3002"
+        },
+        probeBusy ? "\u5B9E\u6D4B\u4E2D\u2026" : `\u5B9E\u6D4B\u672A\u5B9A\u9879\uFF08${Math.min(catalog.summary.undecided.length, 12)}/${catalog.summary.undecided.length}\uFF09`
+      ) : null,
       models && models.length > 0 && Object.keys(configuredGaps).length > 0 ? import_react6.default.createElement(
         "button",
         {
@@ -4694,10 +4740,36 @@ function ModelAbilityTab({ rpcCall, showToast }) {
               import_react6.default.createElement(
                 "td",
                 tdStyle,
-                import_react6.default.createElement(CatalogBadge, {
-                  verdict: catalog?.verdicts?.get(m.id) ?? null,
-                  whitelisted: catalog?.verdicts?.get(m.id)?.whitelist
-                })
+                import_react6.default.createElement(
+                  "div",
+                  { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
+                  import_react6.default.createElement(CatalogBadge, {
+                    verdict: catalog?.verdicts?.get(m.id) ?? null,
+                    whitelisted: catalog?.verdicts?.get(m.id)?.whitelist
+                  }),
+                  // 实测结果（本次会话）：与目录结论并列，冲突时一眼可见
+                  probeResults[m.id] ? import_react6.default.createElement("span", {
+                    style: {
+                      ...s.tag,
+                      color: probeResults[m.id].verdict === "image" ? tone.ok.fg : probeResults[m.id].verdict === "text" ? tone.idle.fg : tone.warn.fg,
+                      background: probeResults[m.id].verdict === "image" ? tone.ok.bg : probeResults[m.id].verdict === "text" ? tone.idle.bg : tone.warn.bg
+                    },
+                    title: `\u5B9E\u6D4B\uFF1A${probeResults[m.id].reason}`
+                  }, `\u5B9E\u6D4B\uFF1A${probeResults[m.id].verdict === "image" ? "\u56FE" : probeResults[m.id].verdict === "text" ? "\u6587" : "\u672A\u5B9A"}`) : null,
+                  // 基线里的 L0 实测结论（持久）
+                  catalog?.capabilities?.[m.id]?.tier === "L0" ? import_react6.default.createElement("span", {
+                    style: { ...s.tag, color: tone.ok.fg, background: tone.ok.bg },
+                    title: `\u5DF2\u6C89\u6DC0\uFF08\u5B9E\u6D4B\uFF09\uFF1A${catalog.capabilities[m.id].how ?? ""}`
+                  }, "\u5DF2\u5B9E\u6D4B") : null,
+                  (catalog?.summary?.undecided ?? []).includes(m.id) && !probeResults[m.id] ? import_react6.default.createElement("button", {
+                    ...s.btnGhost,
+                    style: { ...s.btnGhost, padding: "1px 6px", fontSize: 11, opacity: probeBusy ? 0.5 : 1 },
+                    type: "button",
+                    disabled: probeBusy,
+                    onClick: () => runProbe([m.id]),
+                    title: "\u53EA\u5B9E\u6D4B\u8FD9\u4E00\u4E2A\u6A21\u578B\uFF08\u53D1\u4E00\u5F20\u5E26\u300C\u989C\u8272+\u6570\u5B57\u300D\u7684\u56FE\uFF0C\u7B54\u5BF9\u624D\u7B97\u770B\u89C1\uFF09"
+                  }, "\u5B9E\u6D4B") : null
+                )
               )
             );
           })

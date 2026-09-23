@@ -139,6 +139,9 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
   const [configuredGaps, setConfiguredGaps] = React.useState({});
   const [completion, setCompletion] = React.useState(null);
   const [completeBusy, setCompleteBusy] = React.useState(false);
+  // 实测（探针）：probeResults = 本次会话的实测结果；probeBusy = 正在打探针
+  const [probeResults, setProbeResults] = React.useState({});
+  const [probeBusy, setProbeBusy] = React.useState(false);
 
   const notify = (msg) => {
     if (typeof showToast === 'function') {
@@ -262,6 +265,42 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
       setCompleteBusy(false);
     }
   }, [rpcCall, provider, reloadRecord]);
+
+  // 实测：真发一张 8×8 图问这条渠道收不收。默认只打**未定项**（借判/冲突/无收录），
+  // 单批上限 12、串行 250ms 间隔 —— 保护账号。结论直接沉淀进基线（L0 实测）。
+  const runProbe = React.useCallback(async (ids) => {
+    if (!rpcCall) return;
+    setProbeBusy(true);
+    setLastErr(null);
+    try {
+      const result = await rpcCall(ENDPOINTS.probeModelVision, {
+        provider,
+        commit: true,
+        ...(Array.isArray(ids) && ids.length > 0 ? { ids } : {}),
+      });
+      if (result?.ok !== true) {
+        const msg = result?.error?.message ?? '实测失败';
+        setLastErr(msg);
+        notify(`实测失败：${msg}`);
+        return;
+      }
+      const v = result.value;
+      const byId = { ...probeResults };
+      for (const r of v.results ?? []) byId[r.id] = r;
+      setProbeResults(byId);
+      if (v.report) applyCatalogResult(v.report);
+      const img = (v.results ?? []).filter((r) => r.verdict === 'image').length;
+      const txt = (v.results ?? []).filter((r) => r.verdict === 'text').length;
+      notify(`实测 ${v.done} 个：多模态 ${img} · 纯文本 ${txt} · 未定 ${v.unknown ?? 0}`
+        + ((v.remaining ?? []).length > 0 ? `；还有 ${v.remaining.length} 个待实测，再点一次继续` : '')
+        + ((v.committed?.added ?? []).length > 0 ? `；已沉淀 ${v.committed.added.length} 项` : ''));
+      await reloadRecord();
+    } catch (error) {
+      setLastErr(error?.message ?? String(error));
+    } finally {
+      setProbeBusy(false);
+    }
+  }, [rpcCall, provider, probeResults, applyCatalogResult, reloadRecord]);
 
   const load = React.useCallback(async (withOverwrite = false) => {
     if (!rpcCall) return;
@@ -500,6 +539,26 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
         },
         catalogBusy ? '刷新目录中…' : '刷新能力目录',
       ),
+      catalog && (catalog.summary?.undecided ?? []).length > 0
+        ? React.createElement(
+            'button',
+            {
+              ...s.btnGhost,
+              style: { ...s.btnGhost, opacity: probeBusy ? 0.6 : 1 },
+              type: 'button',
+              disabled: probeBusy,
+              onClick: () => runProbe(),
+              title: '真发一张图问这条渠道认不认得：图里画了「背景色 + 数字」，只有答对才算看见 —— '
+                + '实测发现只发图看报错根本证明不了什么（纯文本模型照样回 200，甚至会编一个颜色）。'
+                + '目录是别人的二手标注，白名单是人工认定，实测才是最终裁决。'
+                + '串行 + 300ms 间隔 + 单批 12 个（保护账号）；拿不准的一律记「未定」，不写配置。'
+                + '确认结论会沉淀进能力基线（等级 L0 实测）。',
+            },
+            probeBusy
+              ? '实测中…'
+              : `实测未定项（${Math.min(catalog.summary.undecided.length, 12)}/${catalog.summary.undecided.length}）`,
+          )
+        : null,
       models && models.length > 0 && Object.keys(configuredGaps).length > 0
         ? React.createElement(
             'button',
@@ -749,10 +808,39 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, typeof m.credits === 'string' && m.credits !== '' ? m.credits : '—'),
                   React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, m.supportsImages === true ? React.createElement(VisionBadge) : React.createElement(TextBadge)),
                   React.createElement('td', tdStyle,
-                    React.createElement(CatalogBadge, {
-                      verdict: catalog?.verdicts?.get(m.id) ?? null,
-                      whitelisted: catalog?.verdicts?.get(m.id)?.whitelist,
-                    })),
+                    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+                      React.createElement(CatalogBadge, {
+                        verdict: catalog?.verdicts?.get(m.id) ?? null,
+                        whitelisted: catalog?.verdicts?.get(m.id)?.whitelist,
+                      }),
+                      // 实测结果（本次会话）：与目录结论并列，冲突时一眼可见
+                      probeResults[m.id]
+                        ? React.createElement('span', {
+                            style: {
+                              ...s.tag,
+                              color: probeResults[m.id].verdict === 'image' ? tone.ok.fg : probeResults[m.id].verdict === 'text' ? tone.idle.fg : tone.warn.fg,
+                              background: probeResults[m.id].verdict === 'image' ? tone.ok.bg : probeResults[m.id].verdict === 'text' ? tone.idle.bg : tone.warn.bg,
+                            },
+                            title: `实测：${probeResults[m.id].reason}`,
+                          }, `实测：${probeResults[m.id].verdict === 'image' ? '图' : probeResults[m.id].verdict === 'text' ? '文' : '未定'}`)
+                        : null,
+                      // 基线里的 L0 实测结论（持久）
+                      catalog?.capabilities?.[m.id]?.tier === 'L0'
+                        ? React.createElement('span', {
+                            style: { ...s.tag, color: tone.ok.fg, background: tone.ok.bg },
+                            title: `已沉淀（实测）：${catalog.capabilities[m.id].how ?? ''}`,
+                          }, '已实测')
+                        : null,
+                      (catalog?.summary?.undecided ?? []).includes(m.id) && !probeResults[m.id]
+                        ? React.createElement('button', {
+                            ...s.btnGhost,
+                            style: { ...s.btnGhost, padding: '1px 6px', fontSize: 11, opacity: probeBusy ? 0.5 : 1 },
+                            type: 'button',
+                            disabled: probeBusy,
+                            onClick: () => runProbe([m.id]),
+                            title: '只实测这一个模型（发一张带「颜色+数字」的图，答对才算看见）',
+                          }, '实测')
+                        : null)),
                 );
               }),
             ),

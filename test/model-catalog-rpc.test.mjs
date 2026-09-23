@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createHandler, ENDPOINTS, SETTINGS_DEFAULTS } from '../lib/index.js';
+import { buildProbeCase } from '../lib/model-probe.js';
 import { CATALOG_CACHE_VERSION, CATALOG_SOURCES } from '../lib/model-catalog.js';
 
 const PROVIDER = 'chanhub2api';
@@ -40,7 +41,7 @@ const OPENROUTER_FIXTURE = {
  * 造 runtime：client 打点计数（用来证明「零网关调用」），缓存落到临时目录，
  * settings 是**会真的落盘**的内存实现（否则「沉淀 → 后续读回」这条链测不出来）。
  */
-async function makeRuntime({ fetchImpl, pluginNs = {}, piModels = [], gatewayModels = [], piAiDirs = ['/nonexistent/pi-ai'] } = {}) {
+async function makeRuntime({ fetchImpl, pluginNs = {}, piModels = [], gatewayModels = [], piAiDirs = ['/nonexistent/pi-ai'], probeReply } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'chanhub-catalog-rpc-'));
   const cacheFile = join(dir, 'model-catalog.json');
   const ns = { ...SETTINGS_DEFAULTS, ...pluginNs };
@@ -48,6 +49,7 @@ async function makeRuntime({ fetchImpl, pluginNs = {}, piModels = [], gatewayMod
   const piNs = piModels === null ? {} : { providers: { [PROVIDER]: { models: piModels } } };
   const calls = [];
   const writes = [];
+  const probeCalls = [];
   const applyOps = (root, ops) => {
     for (const op of ops) {
       if (op.op !== 'set') continue;
@@ -63,6 +65,18 @@ async function makeRuntime({ fetchImpl, pluginNs = {}, piModels = [], gatewayMod
   const runtime = {
     client: {
       models: async () => { calls.push('models'); return { object: 'list', data: gatewayModels }; },
+      // 探针走 /v1/chat/completions；probeReply 让用例脚本化回应
+      request: async (path, options) => {
+        probeCalls.push({ path, body: options?.body });
+        if (typeof probeReply === 'function') return probeReply(options?.body, probeCalls.length - 1);
+        // 默认假网关「看得见图」：按该模型的探针样本答对颜色与数字
+        const c = buildProbeCase(options?.body?.model);
+        return {
+          status: 200,
+          ok: true,
+          body: { choices: [{ message: { content: `${c.expect.colorTokens[0]},${c.expect.digit}` } }] },
+        };
+      },
     },
     settingsService: {
       get: (namespace) => (namespace === 'llm-pi-ai' ? piNs : ns),
@@ -81,7 +95,7 @@ async function makeRuntime({ fetchImpl, pluginNs = {}, piModels = [], gatewayMod
     catalogPiAiDirs: piAiDirs,
     ...(fetchImpl ? { fetchImpl } : {}),
   };
-  return { handle: createHandler(runtime), calls, writes, dir, cacheFile, ns, piNs };
+  return { handle: createHandler(runtime), calls, writes, probeCalls, dir, cacheFile, ns, piNs };
 }
 
 const MODELS = [
@@ -534,6 +548,133 @@ test('completeModelFields：老快照（档位采集上线前）要如实说「�
       id: 'workbuddy:global:deepseek-v4.1-flash',
       fields: ['contextWindow', 'maxTokens'],
     }], '档位补不了就不假装补');
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+// --- 实测（探针）端点 -------------------------------------------------------
+
+test('probeModelVision：实测「图」直接沉淀进基线（L0），unknown 不写', async () => {
+  const rt = await makeRuntime({
+    probeReply: (body) => {
+      if (body.model.endsWith('borrowed-one')) {
+        return { status: 503, body: { error: { message: 'no_healthy_account' } } };
+      }
+      const c = buildProbeCase(body.model);
+      return { status: 200, body: { choices: [{ message: { content: `${c.expect.colorTokens[0]},${c.expect.digit}` } }] } };
+    },
+  });
+  try {
+    const result = await rt.handle(ENDPOINTS.probeModelVision, {
+      provider: PROVIDER,
+      ids: ['workbuddy:global:hy4-preview-f', 'workbuddy:cn:borrowed-one'],
+      commit: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.done, 2);
+    assert.deepEqual(result.value.results.map((r) => r.verdict), ['image', 'unknown']);
+    assert.equal(result.value.unknown, 1);
+    // 只有实测「图」的那条落盘
+    assert.deepEqual(result.value.committed.added, ['workbuddy:global:hy4-preview-f']);
+    const stored = JSON.parse(rt.ns.modelCapabilities);
+    assert.equal(stored.entries['workbuddy:global:hy4-preview-f'].image, true);
+    assert.equal(stored.entries['workbuddy:global:hy4-preview-f'].tier, 'L0');
+    assert.equal(stored.entries['workbuddy:global:hy4-preview-f'].how, '实测');
+    assert.equal(stored.entries['workbuddy:cn:borrowed-one'], undefined, '未定不写');
+    // 探针请求体：带一张图、max_tokens 只 1
+    assert.equal(rt.probeCalls[0].path, '/v1/chat/completions');
+    assert.equal(rt.probeCalls[0].body.messages[0].content.length, 2, '带图 = 文本 + 图片两段');
+    assert.ok(rt.probeCalls[0].body.messages[0].content[1].image_url.url.startsWith('data:image/png;base64,'));
+    assert.ok(rt.probeCalls[0].body.max_tokens >= 512, '预算要够 thinking 模型回答');
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('probeModelVision：不传 ids 时自动打「未定项」（借判/冲突/无收录）', async () => {
+  const rt = await makeRuntime({
+    fetchImpl: async (url) => ({
+      ok: true, status: 200,
+      json: async () => (url.includes('models.dev') ? MODELS_DEV_FIXTURE : OPENROUTER_FIXTURE),
+    }),
+  });
+  try {
+    await seedCatalog(rt);
+    const result = await rt.handle(ENDPOINTS.probeModelVision, {
+      provider: PROVIDER,
+      models: COMMIT_MODELS,
+      commit: true,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    // COMMIT_MODELS 里只有 kimi-k3-1 是借判（auto 是档位别名，已排除）
+    assert.deepEqual(result.value.results.map((r) => r.id), ['workbuddy:cn:kimi-k3-1']);
+    assert.equal(result.value.results[0].verdict, 'image', '默认假网关看得见图');
+    assert.deepEqual(result.value.committed.added, ['workbuddy:cn:kimi-k3-1']);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('probeModelVision：没有未定项时明确回「无事可做」，不打探针', async () => {
+  const rt = await makeRuntime({
+    fetchImpl: async (url) => ({
+      ok: true, status: 200,
+      json: async () => (url.includes('models.dev') ? MODELS_DEV_FIXTURE : OPENROUTER_FIXTURE),
+    }),
+    pluginNs: { modelCapabilities: JSON.stringify({ at: 1, entries: {} }) },
+  });
+  try {
+    await seedCatalog(rt);
+    // 只有确认态的模型 → undecided 为空
+    const result = await rt.handle(ENDPOINTS.probeModelVision, {
+      provider: PROVIDER,
+      models: [{ id: 'workbuddy:global:kimi-k3' }],
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.value.done, 0);
+    assert.ok(result.value.message.includes('没有待实测'));
+    assert.equal(rt.probeCalls.length, 0, '一个探针都不该打');
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('probeModelVision：单批上限生效，剩余项交回面板继续', async () => {
+  const rt = await makeRuntime({});
+  try {
+    const result = await rt.handle(ENDPOINTS.probeModelVision, {
+      provider: PROVIDER,
+      ids: ['a:1', 'a:2', 'a:3'],
+      limit: 2,
+      delayMs: 0,
+      commit: false,
+    });
+    assert.equal(result.value.done, 2);
+    assert.deepEqual(result.value.remaining, ['a:3']);
+    assert.equal(result.value.capped, true);
+    assert.equal(result.value.committed, null, 'commit=false 不写基线');
+    assert.equal(rt.probeCalls.length, 2);
+  } finally {
+    await rm(rt.dir, { recursive: true, force: true });
+  }
+});
+
+test('getModelCatalog：报告带 undecided（面板据此显示「实测未定项」）与基线明细', async () => {
+  const rt = await makeRuntime({
+    fetchImpl: async (url) => ({
+      ok: true, status: 200,
+      json: async () => (url.includes('models.dev') ? MODELS_DEV_FIXTURE : OPENROUTER_FIXTURE),
+    }),
+    pluginNs: {
+      modelCapabilities: JSON.stringify({ at: 9, entries: { 'workbuddy:global:kimi-k3': { image: true, status: 'confirmed', tier: 'L0', how: '实测', at: 9 } } }),
+    },
+  });
+  try {
+    await seedCatalog(rt);
+    const result = await rt.handle(ENDPOINTS.getModelCatalog, { provider: PROVIDER, models: COMMIT_MODELS });
+    assert.deepEqual(result.value.summary.undecided, ['workbuddy:cn:kimi-k3-1']);
+    assert.equal(result.value.capabilities['workbuddy:global:kimi-k3'].tier, 'L0');
   } finally {
     await rm(rt.dir, { recursive: true, force: true });
   }

@@ -585,7 +585,9 @@ function fakeRpc(status) {
                 { id: 'workbuddy:global:kimi-k3', kind: 'catalog-image-not-in-whitelist', status: 'confirmed' },
                 { id: 'workbuddy:cn:kimi-k3-1', kind: 'catalog-image-not-in-whitelist', status: 'borrowed' },
               ],
+              undecided: ['workbuddy:global:kimi-k3', 'workbuddy:cn:kimi-k3-1'],
             },
+            capabilities: {},
             verdicts: CATALOG_VERDICTS,
             baseline: { at: 0, count: 0, baselined: 0, pending: 2 },
             readonly: true,
@@ -617,6 +619,22 @@ function fakeRpc(status) {
               baseline: { at: Date.now(), count: 1, baselined: 1, pending: 1 },
               readonly: true,
             },
+          },
+        };
+      case 'probeModelVision':
+        return {
+          ok: true,
+          value: {
+            provider: 'chanhub2api',
+            results: [
+              { id: 'workbuddy:global:kimi-k3', verdict: 'image', reason: '带图请求被接受', evidence: { imageStatus: 200, imageMessage: '' } },
+              { id: 'workbuddy:cn:kimi-k3-1', verdict: 'text', reason: '上游拒绝图片：不支持图片输入', evidence: { imageStatus: 400, imageMessage: '不支持图片输入' } },
+            ],
+            done: 2,
+            remaining: [],
+            capped: false,
+            unknown: 0,
+            committed: { added: ['workbuddy:global:kimi-k3'], changed: [], count: 1, unknown: 0 },
           },
         };
       case 'completeModelFields': {
@@ -2139,6 +2157,39 @@ test('渲染模型 Tab：补齐配置字段 —— 先预览再写入，未写�
     assert.ok(rpc.calls.some((c) => c.endpoint === 'completeModelFields' && c.payload?.dryRun === false), '确认后真写');
     html = document.getElementById('app').innerHTML;
     assert.ok(!html.includes('补齐预览'), '写完后预览块收起');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染模型 Tab：实测未定项 —— 行内可单测，结论与目录并列显示', { skip }, async () => {
+  const rpc = fakeRpc(realStatusFixture());
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await clickTab(document, '模型');
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    let html = document.getElementById('app').innerHTML;
+
+    const batch = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('实测未定项'));
+    assert.ok(batch, '有未定项时要出「实测未定项」按钮');
+    assert.ok(batch.textContent.includes('2/2'), '按钮上写清本批/总数');
+    const rowButtons = [...document.querySelectorAll('button')].filter((b) => b.textContent === '实测');
+    assert.equal(rowButtons.length, 2, '每个未定项行内也有「实测」按钮');
+
+    // 点行内「实测」→ 只测这一个
+    await React.act(async () => {
+      rowButtons[0].dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const calls = rpc.calls.filter((c) => c.endpoint === 'probeModelVision');
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].payload.ids, ['workbuddy:global:kimi-k3'], '行内只测一个');
+    assert.equal(calls[0].payload.commit, true, '实测结论要沉淀');
+
+    // 结论并列显示：目录判定 + 实测
+    html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('实测：图'), '实测结论要显示出来');
+    assert.ok(html.includes('实测：文'), '纯文本结论也要显示');
   } finally {
     await cleanup();
   }
