@@ -37,13 +37,7 @@ const cache = await MC.readCatalogCache();
 const { verdicts } = MC.classifyAll(gw, cache.index, { whitelist: MP.VISION_MODEL_WHITELIST });
 
 // ③ 实测结论（离线重放修正后的判定；样本由 id 哈希决定，可复现）
-const measured = JSON.parse(fs.readFileSync('/tmp/probe-results-all.json', 'utf8')).results.map((r) => {
-  if (r.evidence?.imageStatus === 200 && r.evidence?.answer) {
-    const re = PR.classifyProbeAnswer({ content: r.evidence.answer, expect: PR.buildProbeCase(r.id).expect });
-    return { ...r, verdict: re.verdict, reason: re.reason };
-  }
-  return r;
-});
+const measured = JSON.parse(fs.readFileSync('/tmp/probe-final.json', 'utf8')).results;
 
 // ④ 合并基线：先目录确认态，再实测（后写者胜 —— 实测 L0 压过目录）
 const at = Date.now();

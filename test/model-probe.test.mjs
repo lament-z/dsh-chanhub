@@ -151,6 +151,9 @@ test('classifyProbeAnswer：自述看不到图 → 文', () => {
     '不支持,0',
     '无法识别，当前模型不支持图片分析。请使用多模态模型或换一种方式描述图片内容。',
     '抱歉，我无法处理图像信息。请切换到支持多模态的模型，或使用文字描述图片内容。',
+    // 二轮实测原话（traework:cn:DeepSeek-V4-Pro / DeepSeek-V4-Flash）
+    '没有提供图像，无法回答。',
+    '无法提供答案，因为没有图片。请提供图片描述。',
   ]) {
     const r = classifyProbeAnswer({ content, expect: { digit: '7', colorTokens: ['紫'] } });
     assert.equal(r.verdict, PROBE_VERDICT.TEXT, content);

@@ -1,17 +1,19 @@
 # 视觉能力实测（探针）—— 全量 107 个模型
 
-> 生成方式：`probeModelVisionBatch`（`lib/model-probe.js`）对网关**逐模型串行实测**，间隔 500–700ms。
+> 生成方式：`probeModelVisionBatch`（`lib/model-probe.js`）对网关**逐模型串行实测**。
 > 每个模型一张 40×40 的图（背景色 + 白色数字，样本由模型 id 哈希决定、可复现），
 > 问「背景是什么颜色？中间的数字是几？」—— **答对才算看见**（盲猜同时命中 ≈ 3%）。
-> 原始数据：`/tmp/probe-results-all.json`。
+> 两轮：第一轮全量 107 个（间隔 500ms），第二轮只重测「临时失败 / 数字答错」的 30 个
+> （间隔 1500ms + 按渠道轮转，避开单个上游限流）。判定取两轮中**最硬**的一条证据：
+> 图 > 文 > 未定。原始数据：`/tmp/probe-results-all.json`、`/tmp/probe-pass2.json`。
 
 ## 结论分布
 
 | 实测结论 | 数量 | 含义 |
 |---|---|---|
-| 图（image） | 67 | 数字答对 + 背景色同族 |
-| 文（text） | 11 | 模型自述看不到图 / 上游拒绝图片 |
-| 未定（unknown） | 29 | 模型不可用、限流、超时、或答案与图不符 —— **不写配置、不进基线** |
+| 图（image） | 69 | 数字答对 + 背景色同族 |
+| 文（text） | 13 | 模型自述看不到图 / 上游拒绝图片 |
+| 未定（unknown） | 25 | 模型不可用、限流、超时、或答案与图不符 —— **不写配置、不进基线** |
 
 ## 要点
 
@@ -35,7 +37,7 @@
   - `workbuddy:global:hy4-preview`
   - `workbuddy:global:hy3`
 
-- **目录无收录（或渠道档位别名）、实测「图」：19 个**
+- **目录无收录（含渠道档位别名）、实测「图」：19 个**
 
   - `workbuddy:cn:glm-5.0-turbo`
   - `workbuddy:cn:kimi-k2.8-preview`
@@ -61,8 +63,10 @@
 
   - `workbuddy:global:glm-5.3-flash`
 
-- 未定绝大多数是**与视觉无关**的原因：`service info not found`(11102)、限流(3004)、
-  网关 60s 超时、502/503；另有少数「数字答对但颜色不符」的，按纪律记未定。
+- 未定绝大多数是**与视觉无关**的原因：`service info not found`(11102)、限流(3003/3004)、
+  网关 60–90s 超时、502/503；少数「数字答错」的按纪律记未定，不替上游下结论。
+- 同一个模型名在**不同渠道**结论可以相反（`glm-5.3` cn 图 / global 文；`glm-5.3-flash` 同）——
+  目录是全局标注，天生区分不出渠道，这正是「按网关实测」不可替代的原因。
 - 纪律：unknown 永不写进 `settings.modelCapabilities`；只有 image/text 可沉淀（等级 L0 实测）。
 
 ## 逐条
@@ -85,6 +89,7 @@
 | `qoder:work:qwen3.8-max` | 图 | confirmed | **图** | ★ | 答对数字与背景色（purple/4）：紫色,4 |
 | `traework:cn:aquila` | 无收录 | missing | **图** |  | 答对数字与背景色（teal/1）：青色,1 |
 | `traework:cn:Doubao-Seed-2.1-Pro` | 图 | borrowed | **图** |  | 答对数字与背景色（orange/0）：橙色,0 |
+| `traework:cn:Doubao-Seed-2.1-Turbo` | 无收录 | undefined | **图** |  | 答对数字与背景色（purple/3）：紫色,3 |
 | `traework:cn:Doubao-Seed-Evolving` | 图 | confirmed | **图** |  | 答对数字与背景色（olive/1）：橄榄绿,1 |
 | `traework:cn:kimi-k2.6` | 图 | confirmed | **图** |  | 答对数字与背景色（orange/8）：橙色,8 |
 | `traework:cn:kimi-k2.7-code` | 图 | confirmed | **图** | ★ | 答对数字与背景色（teal/7）：青色,7 |
@@ -109,6 +114,7 @@
 | `workbuddy:cn:glm-5.3` | 文 | confirmed | **图** | ★ | 答对数字与背景色（purple/1）：紫色，1 |
 | `workbuddy:cn:glm-5.3-flash` | 图 | confirmed | **图** | ★ | 答对数字与背景色（orange/6）：橙色，6 |
 | `workbuddy:cn:glm-5v-turbo` | 图 | confirmed | **图** |  | 答对数字与背景色（purple/2）：紫色,2 |
+| `workbuddy:cn:hy3` | 无收录 | undefined | **图** | ★ | 答对数字、背景色属同色族（navy/7）：蓝色,7 |
 | `workbuddy:cn:hy3-x` | 文 | borrowed | **图** |  | 答对数字与背景色（purple/4）：紫色,4 |
 | `workbuddy:cn:hy4-preview` | 文 | confirmed | **图** |  | 答对数字与背景色（navy/5）：深蓝色,5 |
 | `workbuddy:cn:hy4-preview-f` | 文 | borrowed | **图** | ★ | 答对数字与背景色（purple/7）：紫色,7 |
@@ -136,6 +142,8 @@
 | `workbuddy:global:kimi-k2.6` | 图 | confirmed | **图** |  | 答对数字与背景色（orange/3）：橙色,3 |
 | `workbuddy:global:kimi-k2.8-preview` | 无收录 | missing | **图** |  | 答对数字与背景色（teal/5）：青色,5 |
 | `workbuddy:global:primary-model` | 无收录 | missing | **图** |  | 答对数字与背景色（navy/5）：深蓝色,5 |
+| `traework:cn:DeepSeek-V4-Flash` | 无收录 | undefined | **文** |  | 模型自述看不到图：无法提供答案，因为没有图片。请提供图片描述。 |
+| `traework:cn:DeepSeek-V4-Pro` | 无收录 | undefined | **文** |  | 模型自述看不到图：没有提供图像，无法回答。 |
 | `traework:cn:explore_sub_agent_v2` | 无收录 | missing | **文** |  | 纯文本可过、带图失败（502 solo error code=3004 msg=We're sorry, your requests have exceeded the rate limit. Please wait and try aga |
 | `workbuddy:cn:deepseek-r1-0528-lkeap` | 文 | borrowed | **文** |  | 模型自述看不到图：不支持,0 |
 | `workbuddy:cn:deepseek-v3-0324` | 文 | confirmed | **文** |  | 模型自述看不到图：抱歉，我目前无法查看或分析图片内容。请切换到支持多模态功能的模型，或直接描述图片中的背景颜色和中间数字，我会尽力帮你回答。 |
@@ -157,12 +165,9 @@
 | `workbuddy:global:glm-5.3-flash` | 图 | confirmed | **文** | ★ | 模型自述看不到图：抱歉，我当前无法查看图片。请您切换到支持多模态（图像识别）的模型，或者用文字描述图片内容，我很乐意帮您分析。 |
 | `traework:cn:browser_use_subagent` | 无收录 | missing | **未定** |  | 带图与纯文本都失败（图 502 / 文 502），原因不在视觉 |
 | `traework:cn:computer_use_subagent` | 无收录 | missing | **未定** |  | 带图与纯文本都失败（图 502 / 文 502），原因不在视觉 |
-| `traework:cn:DeepSeek-V4-Flash` | 无收录 | conflict | **未定** |  | 答案与图不符（期望 navy/9）：未知,未知 |
 | `traework:cn:DeepSeek-V4-Flash-Official` | 无收录 | conflict | **未定** | ★ | 答案与图不符（期望 navy/1）：无法确定,无法确定 |
-| `traework:cn:DeepSeek-V4-Pro` | 文 | confirmed | **未定** |  | 答案与图不符（期望 olive/2）：未知,未知 |
 | `traework:cn:DeepSeek-V4-Pro-Official` | 文 | borrowed | **未定** | ★ | 答案与图不符（期望 teal/2）：未知,未知 |
 | `traework:cn:Doubao-Seed-2.0-Code` | 图 | confirmed | **未定** |  | 带图请求失败且无法归因：0 网关请求超时（60000ms）：http://127.0.0.1:7866/v1/chat/completions |
-| `traework:cn:Doubao-Seed-2.1-Turbo` | 图 | confirmed | **未定** |  | 带图请求失败且无法归因：0 网关请求超时（60000ms）：http://127.0.0.1:7866/v1/chat/completions |
 | `traework:cn:file_search_agent` | 无收录 | missing | **未定** |  | 带图与纯文本都失败（图 502 / 文 502），原因不在视觉 |
 | `traework:cn:glm-5` | 文 | confirmed | **未定** |  | 上游临时失败（限流/过载/额度），与视觉无关：solo error code=3004 msg=We're sorry, your requests have exceeded the rate limit. Please wait and |
 | `traework:cn:glm-5-turbo` | 文 | confirmed | **未定** |  | 上游临时失败（限流/过载/额度），与视觉无关：solo error code=3004 msg=We're sorry, your requests have exceeded the rate limit. Please wait and |
@@ -176,7 +181,6 @@
 | `workbuddy:cn:glm-4.6` | 文 | confirmed | **未定** |  | 模型不可用：{"code":11102,"msg":"model [glm-4.6] service info not found","requestId":"af1c10f4c82564c56f92daa9c35def82","displ |
 | `workbuddy:cn:glm-4.6v` | 图 | confirmed | **未定** |  | 上游临时失败（限流/过载/额度），与视觉无关：all accounts are temporarily unavailable, please retry later |
 | `workbuddy:cn:hunyuan-image-alpha-edit` | 无收录 | missing | **未定** |  | 带图与纯文本都失败（图 503 / 文 503），原因不在视觉 |
-| `workbuddy:cn:hy3` | 文 | confirmed | **未定** | ★ | 答案与图不符（期望 navy/7）：深蓝色,1 |
 | `workbuddy:cn:kimi-k2-instruct-taiji` | 无收录 | missing | **未定** |  | 模型不可用：{"code":11102,"msg":"model [kimi-k2-instruct-taiji] service info not found","requestId":"7ce2518c36c787106efc936f4 |
 | `workbuddy:cn:kimi-k2-thinking` | 文 | confirmed | **未定** |  | 模型不可用：{"code":11102,"msg":"model [kimi-k2-thinking] service info not found","requestId":"1755930051c80d62fcc0ab2f52fbcd6 |
 | `workbuddy:cn:minimax-m2.5` | 文 | confirmed | **未定** |  | 模型不可用：{"code":11102,"msg":"model [minimax-m2.5] service info not found","requestId":"9f53245ffd06396ee8f2ae0e751cff9c"," |
