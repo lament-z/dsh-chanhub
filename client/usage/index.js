@@ -23,6 +23,7 @@ import {
   DEFAULT_RANK_METRIC,
   accountShares,
   channelShares,
+  consumerShares,
   creditBurn,
   creditStock,
   dailyByModel,
@@ -154,6 +155,14 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
     () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
     [usage, total, accounts, channelOf, rankMetricValue],
   );
+  // 消费者维度（by_key）：网关 2026-09-24 起提供。旧网关没有该字段 →
+  // consumersAvailable=false，卡片整块不渲染（而不是渲染一个恒空卡片，
+  // 那会被读成「没有消费者在用」）。
+  const consumersAvailable = Array.isArray(usage?.by_key);
+  const consumerRows = React.useMemo(
+    () => consumerShares(usage?.by_key ?? [], total, rankMetricValue),
+    [usage, total, rankMetricValue],
+  );
 
   const subtitle = subtitleText({ freshness, error, lastOkAt });
   const uptime = processUptime(stats);
@@ -199,12 +208,13 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         )
       : null,
 
-    // 容量降级：网关把四维分桶降成两维时必须如实说明（否则读者会把
+    // 容量降级：网关把多维分桶降成三维时必须如实说明（否则读者会把
     // 「按账号/按模型只有一行」误读成「只有一个账号/模型」）
     usage?.degraded
       ? React.createElement('div', { className: 'dshc-ust-card' },
           React.createElement('div', { style: s.warn },
-            '⚠️ 分桶键已超出容量上限，网关已降级为「槽 × 域」两维 —— 按账号 / 按模型两个维度将不再细分。'),
+            '⚠️ 分桶键已超出容量上限，网关已降级为「槽 × 域 × 消费者」三维 —— '
+            + '按账号 / 按模型不再细分（**消费者维度保留**：多 key 下「谁在用」最不可替代）。'),
         )
       : null,
 
@@ -235,15 +245,17 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
             onTip: setTip,
           }),
 
-          // ── ④ 账号排行 + ⑤ 渠道用量（两列并排，维度可切，默认按用量） ──
+          // ── ④ 账号排行 + ⑤ 渠道用量 + ⑥ 消费者用量（三列并排） ──
           React.createElement(RankCards, {
             accounts: accountRows,
             channels: channelRows,
+            consumers: consumerRows,
+            consumersAvailable,
             metric: rankMetricValue,
             onMetricChange: setRankMetricValue,
           }),
 
-          // ── ⑥ 模型占比 ──
+          // ── ⑦ 模型占比 ──
           React.createElement(ModelDonut, { rows: usage?.by_model ?? [], onTip: setTip }),
         )
       : null,

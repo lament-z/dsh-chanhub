@@ -36,6 +36,15 @@ export const svg = (props, ...children) =>
   );
 
 export const Icons = {
+  // 「接入方」Tab：一把钥匙。选它而不是复用 eye/lock —— 那个 Tab 的语义是
+  // 「谁拿着钥匙能进来、进来后能看到什么模型」，钥匙比眼睛更直白。
+  key: (props) =>
+    svg(
+      props,
+      React.createElement('circle', { key: 'a', cx: 8, cy: 8, r: 4 }),
+      React.createElement('path', { key: 'b', d: 'M11 11l9 9' }),
+      React.createElement('path', { key: 'c', d: 'M16.5 16.5l2-2' }),
+    ),
   // 渠道中心主图标：三条汇入一个节点的线（渠道汇聚），与 bridge 的
   // tunnel/ops/gear、宿主齿轮 fallback 均不重合。
   hub: (props) =>

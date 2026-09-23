@@ -48,6 +48,15 @@ export const ENDPOINTS = {
   commitModelCapabilities: 'commitModelCapabilities',
   completeModelFields: 'completeModelFields',
   probeModelVision: 'probeModelVision',
+  // 多消费者 API Key（「接入方」Tab）：网关 /admin/keys 的 CRUD + rotate；
+  // previewApiKey 是宿主**本地**计算（网关没有按 key.id 求值的端点，
+  // 而明文只在创建/轮换那一刻出现一次），规则见 lib/model-scope.js。
+  getApiKeys: 'getApiKeys',
+  createApiKey: 'createApiKey',
+  patchApiKey: 'patchApiKey',
+  deleteApiKey: 'deleteApiKey',
+  rotateApiKey: 'rotateApiKey',
+  previewApiKey: 'previewApiKey',
 };
 
 /** RPC 频道（与宿主 apply 里的 CHANNEL 一致）。 */

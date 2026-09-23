@@ -80,6 +80,7 @@ import { CHANNEL, ENDPOINTS } from './endpoints.js';
 import { AddAccountDialog } from './add-account.js';
 import { UsageTab } from './usage/index.js';
 import { ModelAbilityTab } from './model-ability.js';
+import { ApiKeysTab } from './api-keys.js';
 import { QuickEntry } from './quick-entry.js';
 import { createQuickStore, createSidebarPrefs } from './quick-store.js';
 
@@ -118,6 +119,9 @@ const TABS = [
   { id: 'tasks', label: '任务', icon: 'check' },
   { id: 'usage', label: '用量', icon: 'trend' },
   { id: 'models', label: '模型', icon: 'cpu' },
+  // 「接入方」：多消费者 API Key 与各自的模型集合。仅在网关提供 /admin/keys
+  // 时出现（见 App 里的 adminKeysAvailable 过滤）。
+  { id: 'apikeys', label: '接入方', icon: 'key' },
   { id: 'logs', label: '日志', icon: 'list' },
   { id: 'config', label: '配置', icon: 'gear' },
 ];
@@ -2404,16 +2408,18 @@ function ApiKeyPill({ onReveal }) {
 /**
  * Tab 栏（复刻 dsh-bridge-gateway 的 TabBar：纯前端状态，非 DSH slot 机制）。
  *
- * @param props - `{active, onChange, statusText, onAdd}`。
+ * @param props - `{active, onChange, statusText, onAdd, tabs}`。
  *   onAdd 为空 = 网关不支持交互登录，此时不渲染「添加账号」按钮
  *   （不给出必然失败的入口）。
+ *   tabs 缺省为 TABS；App 传入过滤后的列表（旧网关没有 /admin/keys 时
+ *   去掉「接入方」Tab）。
  * @returns React 元素。
  */
-function TabBar({ active, onChange, statusText, onAdd }) {
+function TabBar({ active, onChange, statusText, onAdd, tabs = TABS }) {
   return React.createElement(
     'div',
     { className: 'dshc-tabs' },
-    ...TABS.map(({ id, label, icon }) => {
+    ...tabs.map(({ id, label, icon }) => {
       const isActive = active === id;
       const TabIcon = Icons[icon];
       return React.createElement(
@@ -3012,6 +3018,16 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   // admin 门槛可用性：探测 /admin/* 路由存在（405 判定）。true = 管理端点已开启，
   // 成长码写操作（点亮/领取）与批量任务按钮才出现；false = 如实隐藏并说明。
   const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
+  // 「接入方」Tab 只在网关确实提供 /admin/keys 时出现。
+  //
+  // 与「添加账号」按 loginChannels 渲染同一纪律：**不给必然失败的入口**。旧网关
+  // （未重建容器）没有这条路由，渲染出来只会是一个点开就报错的死 Tab。
+  // probe 还没回来时按不可见处理 —— 面板加载完 Tab 数从 6 变 7，比先给个死 Tab 好。
+  const adminKeysAvailable = data?.probe?.features?.adminKeys === true;
+  const tabs = React.useMemo(
+    () => (adminKeysAvailable ? TABS : TABS.filter((tab) => tab.id !== 'apikeys')),
+    [adminKeysAvailable],
+  );
 
   /** API_KEY 明文获取（顶栏小眼睛用；走已认证 RPC 通道，明文不落盘）。 */
   const onReveal = React.useCallback(async () => {
@@ -3108,6 +3124,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
     React.createElement(TabBar, {
       active: activeTab,
       onChange: setActiveTab,
+      tabs,
       statusText: '',
       onAdd: loginChannels && loginChannels.length > 0 ? () => setAddOpen(true) : undefined,
     }),
@@ -3171,6 +3188,14 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
       : null,
     activeTab === 'models'
       ? React.createElement(ModelAbilityTab, {
+          rpcCall,
+          showToast,
+        })
+      : null,
+    activeTab === 'apikeys'
+      ? React.createElement(ApiKeysTab, {
+          // 自管数据（与用量/模型能力两个 Tab 同构）：进入时拉一次 /admin/keys，
+          // 任何写操作后自行刷新，不给 App 增加状态。
           rpcCall,
           showToast,
         })

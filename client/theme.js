@@ -629,7 +629,10 @@ body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
 /* ── ④ 账号排行 / ⑤ 渠道用量（两列并排） ──
    名字定宽 + 4px 细条 + 右对齐占比 —— 一屏能排 8 行还不显挤。
    条长按**相对最大值**归一：各项接近时用绝对占比会让所有条一样长。 */
-.dshc-ust-rank { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* 三张卡片（账号 / 渠道 / 消费者）用 auto-fit 而不是写死 2 列：
+   写死 2 列时第三张会孤零零折到第二行左侧，看起来像布局坏了。
+   auto-fit + minmax 让它按实际宽度自适应（宽屏 3 列、中屏 2 列、窄屏 1 列）。 */
+.dshc-ust-rank { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
 @media (max-width: 760px) { .dshc-ust-rank { grid-template-columns: 1fr; } }
 .dshc-ust-rank-row { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 4px 0; min-width: 0; }
 .dshc-ust-rank-row + .dshc-ust-rank-row { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }

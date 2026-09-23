@@ -497,18 +497,30 @@ export function mergeTail(series) {
 /* ──────────────────── ④ 账号排行 / ⑤ 渠道用量（两列） ──────────────────── */
 
 /**
- * 账号用量排行 + 渠道用量（两列并排）。
+ * 账号用量排行 + 渠道用量 + 消费者用量（三列并排）。
  *
- * 两列并排的理由：账号与渠道是同一份数据的两条正交切法，读者常要对照看
- * （「哪个号在烧」与「哪个渠道在烧」）。
+ * 并排的理由：这三条是同一批请求的正交切法，读者常要对照看 ——
+ * 「哪个**上游账号**在烧」（资源/限流视角）、「哪个**渠道**在烧」（余额视角）、
+ * 「哪个**下游消费者**在烧」（谁在用视角）。缺了第三条时，多 key 上线后
+ * 「某台下游把额度吃光了」这类问题在面板上完全不可见。
+ *
+ * 消费者卡只在网关提供 `by_key` 时渲染（旧网关没有该维度，渲染一个恒空卡片
+ * 会被误读成「没有消费者在用」）。
  *
  * 维度切换（默认 Tokens = 按用量）：请求数多不等于用得多 —— 一次长上下文
- * 请求顶几百次短请求。三个维度取的是同一份 `by_uid` 的不同字段，不是跨口径。
+ * 请求顶几百次短请求。三个维度取的是同一份数据的字段，不是跨口径。
  *
- * @param props - `{accounts, channels, metric, onMetricChange}`。
+ * @param props - `{accounts, channels, consumers, consumersAvailable, metric, onMetricChange}`。
  * @returns React 元素。
  */
-export function RankCards({ accounts, channels, metric = 'tokens', onMetricChange }) {
+export function RankCards({
+  accounts,
+  channels,
+  consumers = [],
+  consumersAvailable = false,
+  metric = 'tokens',
+  onMetricChange,
+}) {
   const current = rankMetric(metric);
   const options = RANK_METRICS.map((item) => [item.id, item.label]);
   const extra = `按${current.label}`;
@@ -586,6 +598,47 @@ export function RankCards({ accounts, channels, metric = 'tokens', onMetricChang
             ),
           ),
     ),
+    // 第三条切法：**谁在用**（下游消费者）。只在网关提供 by_key 时渲染 ——
+    // 旧网关没有该维度，渲染一个恒空卡片会被误读成「没有消费者在用」。
+    consumersAvailable
+      ? React.createElement('div', { className: 'dshc-ust-card', 'data-card': 'consumers' },
+          React.createElement(CardHead, { title: '消费者用量', extra: `${extra} · 按 API key` }),
+          consumers.length === 0
+            ? React.createElement('div', { style: s.muted }, '该窗口内没有带消费者身份的请求')
+            : React.createElement(React.Fragment, null,
+                ...consumers.slice(0, 8).map((row, index) =>
+                  React.createElement('div', { key: row.key ?? index, className: 'dshc-ust-rank-row' },
+                    React.createElement('span', { className: 'dshc-ust-rank-no' }, String(index + 1)),
+                    React.createElement('span', { className: 'dshc-ust-rank-name' },
+                      React.createElement('span', { title: row.key }, row.name),
+                      // 被拒率是诊断「下游模型名配错」最直接的信号（集合外 403 会记 failed）。
+                      row.failRate > 0
+                        ? React.createElement('span', {
+                            style: { ...s.tag, color: tone.err.fg, background: tone.err.bg },
+                            title: `${formatNumber(row.failed)} 次被拒（多为集合外模型 403）—— 若持续增长，`
+                              + '多半是对端的模型名不在该 key 的集合里。',
+                          }, `拒 ${formatPercent(row.failRate, 0)}`)
+                        : null,
+                    ),
+                    React.createElement('span', { className: 'dshc-ust-rank-bar' },
+                      React.createElement('i', {
+                        style: {
+                          width: `${Math.max(2, Math.round(row.barShare * 100))}%`,
+                          background: seriesColor(row, index),
+                        },
+                      }),
+                    ),
+                    React.createElement('span', {
+                      className: 'dshc-ust-rank-val',
+                      title: `${current.label} ${current.format(row.value)}（${formatPercent(row.share, 1)}）\n`
+                        + `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分`
+                        + (row.failed > 0 ? ` · 被拒 ${formatNumber(row.failed)} 次` : ''),
+                    }, formatPercent(row.share, 0)),
+                  ),
+                ),
+              ),
+        )
+      : null,
   );
 }
 

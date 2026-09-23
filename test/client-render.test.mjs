@@ -411,7 +411,8 @@ function fakeRpc(status) {
             reachable: true,
             baseURL: 'http://127.0.0.1:7866',
             // probe.features.admin/tasks=true → admin 端点在场（成长码写按钮与批量任务可渲染）。
-            probe: { reachable: true, features: { admin: true, tasks: true, stats: false, usageBuckets: true, logs: true, credits: true, growthTasks: true, schoolTasks: true } },
+            // adminKeys=true → 「接入方」Tab 出现（该 Tab 按此特性开关渲染，旧网关不出现）。
+            probe: { reachable: true, features: { admin: true, tasks: true, stats: false, usageBuckets: true, logs: true, credits: true, growthTasks: true, schoolTasks: true, adminModels: true, adminKeys: true } },
             status,
             ...(endpoint === 'refreshStatus' ? { refreshed: true } : {}),
           },
@@ -429,6 +430,27 @@ function fakeRpc(status) {
               schedule: { checkin_hours: [9, 21], checkin_enabled: true, cat_enabled: true },
               admin: { enabled: false },
             },
+          },
+        };
+      case 'getApiKeys':
+        return {
+          ok: true,
+          value: {
+            count: 2,
+            keys: [
+              {
+                id: 'k_aaa', name: 'workbuddy-switch', role: 'consumer', allow: [],
+                models: ['workbuddy:cn:*'], enabled: true,
+                created_at: '2026-09-20T10:00:00+08:00', last_used_at: '2026-09-23T22:00:00+08:00',
+                key_prefix: 'sk-aaa…bbbb',
+              },
+              {
+                id: 'k_bbb', name: '待用空集', role: 'consumer', allow: ['status'],
+                models: [], enabled: false,
+                created_at: '2026-09-21T10:00:00+08:00',
+                key_prefix: 'sk-ccc…dddd',
+              },
+            ],
           },
         };
       case 'getAccounts':
@@ -1560,10 +1582,35 @@ test('渲染用量：degraded 时警告如实显示，渠道/账号维度仍可�
   try {
     const app = await openUsage(document);
     const html = app.innerHTML;
-    assert.match(html, /已降级为「槽 × 域」/, '缺降级警告');
+    // 降级语义 2026-09-24 变了：网关加了消费者（key）维之后，降级目标由
+    // (槽, 域) 两维改为 (槽, 域, 消费者) 三维 —— 容量紧张时优先保住「谁在用」。
+    // 断言必须跟着改：锁旧文案会让这次有意变更看起来像回归。
+    assert.match(html, /已降级为「槽 × 域 × 消费者」/, '缺降级警告');
     assert.match(html, /不再细分/, '缺降级后果说明');
+    assert.match(html, /消费者维度保留/, '必须说明消费者维度被保留 —— 否则读者会以为 by_key 也不细分了');
     // 账号/渠道卡仍渲染（fixture 的 by_uid 有数据）
     assert.ok(app.querySelector('[data-card="accounts"]'), 'degraded 时账号卡应仍渲染');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染接入方：列出 key、区分全量/空集、绝不出现明文', { skip }, async () => {
+  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+  try {
+    await clickTab(document, '接入方');
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const app = document.getElementById('app');
+    const html = app.innerHTML;
+
+    assert.match(html, /workbuddy-switch/, '缺 key 名');
+    assert.match(html, /sk-aaa…bbbb/, '缺打码密钥');
+    // 集合三态必须能区分：规则集显示条数、空集单独标注（空集 = chat 全拒，是危险态）。
+    assert.match(html, /1 条规则/, '规则集应显示条数摘要');
+    assert.match(html, /空集/, '空集必须与「全量」区分开');
+    assert.match(html, /已停用/, '停用态应可见');
+    // 列表接口本来就不返回明文；渲染层也不得泄漏（双保险）。
+    assert.doesNotMatch(html, /sk-[0-9a-f]{40}/, '列表不得出现完整明文');
   } finally {
     await cleanup();
   }

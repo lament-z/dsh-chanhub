@@ -1618,6 +1618,62 @@ export function accountShares(rows, total, accounts = [], channelOf = () => 'wor
 }
 
 /**
+ * 按**消费者**归因：直接折 `by_key`（网关 2026-09-24 起的第 4 个维度）。
+ *
+ * 与 `accountShares` 是两条正交的切法，不可互相替代：
+ *   - `by_uid` 回答「**哪个上游账号被用了**」（资源视角，会不会被限流）；
+ *   - `by_key` 回答「**谁在用**」（消费者视角，哪台下游在烧额度）。
+ * 同一批请求会同时进这两个维度，所以两者的 Tokens 合计应当相等 —— 不等就说明
+ * 有请求没带消费者身份（未鉴权形态）。
+ *
+ * 名字由网关在**读取时** join key 表（所以支持改名）。已删除的 key 没有 label，
+ * 这里退化成显示 id 而不是编造一个名字 —— 历史用量不该因为删了 key 就认不出来。
+ *
+ * @param rows - `usage.by_key`（旧网关没有该字段 → 传 [] / undefined）。
+ * @param total - 同响应的 total。
+ * @param metric - 维度 id（tokens / requests / credit）。
+ * @returns 已装饰并降序的行。
+ */
+export function consumerShares(rows, total, metric = DEFAULT_RANK_METRIC) {
+  const list = Array.isArray(rows) ? rows : [];
+  const field = rankMetric(metric).field;
+  const decorated = list.map((row) => {
+    const key = String(row?.key ?? '');
+    const label = typeof row?.label === 'string' && row.label !== '' ? row.label : '';
+    const name = label !== ''
+      ? label
+      : key === 'master'
+        ? '主 key'
+        : key === ''
+          ? '（未鉴权）'
+          : `${key}（已删除）`;
+    const requests = Number(row?.requests) || 0;
+    const failed = Number(row?.failed) || 0;
+    return {
+      ...row,
+      name,
+      tokens: Number(row?.total_tokens) || 0,
+      credit: Number(row?.credit) || 0,
+      value: Number(row?.[field]) || 0,
+      requests,
+      failed,
+      // 硬拒（集合外 403）也记 failed 且 uid 为空 —— 对消费者视图来说
+      // 「失败率」正是诊断「下游模型名配错」的关键信号，故一并透出。
+      failRate: requests > 0 ? failed / requests : 0,
+    };
+  });
+  const grand = metricGrandTotal(total, decorated, metric);
+  const max = Math.max(...decorated.map((row) => row.value), 1);
+  return decorated
+    .map((row) => ({
+      ...row,
+      share: grand > 0 ? row.value / grand : 0,
+      barShare: row.value / max,
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/**
  * 按渠道归因：把 `by_uid` 折成渠道（WB / Trae / Qoder）。
  *
  * 为什么从账号再折一层：网关的 `by_realm` 只有 cn/global 两域，

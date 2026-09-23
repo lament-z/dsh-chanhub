@@ -630,7 +630,10 @@ body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
 /* \u2500\u2500 \u2463 \u8D26\u53F7\u6392\u884C / \u2464 \u6E20\u9053\u7528\u91CF\uFF08\u4E24\u5217\u5E76\u6392\uFF09 \u2500\u2500
    \u540D\u5B57\u5B9A\u5BBD + 4px \u7EC6\u6761 + \u53F3\u5BF9\u9F50\u5360\u6BD4 \u2014\u2014 \u4E00\u5C4F\u80FD\u6392 8 \u884C\u8FD8\u4E0D\u663E\u6324\u3002
    \u6761\u957F\u6309**\u76F8\u5BF9\u6700\u5927\u503C**\u5F52\u4E00\uFF1A\u5404\u9879\u63A5\u8FD1\u65F6\u7528\u7EDD\u5BF9\u5360\u6BD4\u4F1A\u8BA9\u6240\u6709\u6761\u4E00\u6837\u957F\u3002 */
-.dshc-ust-rank { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* \u4E09\u5F20\u5361\u7247\uFF08\u8D26\u53F7 / \u6E20\u9053 / \u6D88\u8D39\u8005\uFF09\u7528 auto-fit \u800C\u4E0D\u662F\u5199\u6B7B 2 \u5217\uFF1A
+   \u5199\u6B7B 2 \u5217\u65F6\u7B2C\u4E09\u5F20\u4F1A\u5B64\u96F6\u96F6\u6298\u5230\u7B2C\u4E8C\u884C\u5DE6\u4FA7\uFF0C\u770B\u8D77\u6765\u50CF\u5E03\u5C40\u574F\u4E86\u3002
+   auto-fit + minmax \u8BA9\u5B83\u6309\u5B9E\u9645\u5BBD\u5EA6\u81EA\u9002\u5E94\uFF08\u5BBD\u5C4F 3 \u5217\u3001\u4E2D\u5C4F 2 \u5217\u3001\u7A84\u5C4F 1 \u5217\uFF09\u3002 */
+.dshc-ust-rank { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
 @media (max-width: 760px) { .dshc-ust-rank { grid-template-columns: 1fr; } }
 .dshc-ust-rank-row { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 4px 0; min-width: 0; }
 .dshc-ust-rank-row + .dshc-ust-rank-row { border-top: 1px solid var(--dsw-alias-border-l2,#f3f4f6); }
@@ -1749,6 +1752,36 @@ function accountShares(rows, total, accounts = [], channelOf = () => "workbuddy"
     barShare: row.value / max
   })).sort((a, b) => b.value - a.value);
 }
+function consumerShares(rows, total, metric = DEFAULT_RANK_METRIC) {
+  const list = Array.isArray(rows) ? rows : [];
+  const field = rankMetric(metric).field;
+  const decorated = list.map((row) => {
+    const key = String(row?.key ?? "");
+    const label = typeof row?.label === "string" && row.label !== "" ? row.label : "";
+    const name2 = label !== "" ? label : key === "master" ? "\u4E3B key" : key === "" ? "\uFF08\u672A\u9274\u6743\uFF09" : `${key}\uFF08\u5DF2\u5220\u9664\uFF09`;
+    const requests = Number(row?.requests) || 0;
+    const failed = Number(row?.failed) || 0;
+    return {
+      ...row,
+      name: name2,
+      tokens: Number(row?.total_tokens) || 0,
+      credit: Number(row?.credit) || 0,
+      value: Number(row?.[field]) || 0,
+      requests,
+      failed,
+      // 硬拒（集合外 403）也记 failed 且 uid 为空 —— 对消费者视图来说
+      // 「失败率」正是诊断「下游模型名配错」的关键信号，故一并透出。
+      failRate: requests > 0 ? failed / requests : 0
+    };
+  });
+  const grand = metricGrandTotal(total, decorated, metric);
+  const max = Math.max(...decorated.map((row) => row.value), 1);
+  return decorated.map((row) => ({
+    ...row,
+    share: grand > 0 ? row.value / grand : 0,
+    barShare: row.value / max
+  })).sort((a, b) => b.value - a.value);
+}
 function channelShares(rows, total, accounts = [], channelOf = () => "workbuddy", metric = DEFAULT_RANK_METRIC) {
   const accountsRows = accountShares(rows, total, accounts, channelOf, metric);
   const table = /* @__PURE__ */ new Map();
@@ -1890,6 +1923,14 @@ var svg = (props, ...children) => import_react.default.createElement(
   ...children
 );
 var Icons = {
+  // 「接入方」Tab：一把钥匙。选它而不是复用 eye/lock —— 那个 Tab 的语义是
+  // 「谁拿着钥匙能进来、进来后能看到什么模型」，钥匙比眼睛更直白。
+  key: (props) => svg(
+    props,
+    import_react.default.createElement("circle", { key: "a", cx: 8, cy: 8, r: 4 }),
+    import_react.default.createElement("path", { key: "b", d: "M11 11l9 9" }),
+    import_react.default.createElement("path", { key: "c", d: "M16.5 16.5l2-2" })
+  ),
   // 渠道中心主图标：三条汇入一个节点的线（渠道汇聚），与 bridge 的
   // tunnel/ops/gear、宿主齿轮 fallback 均不重合。
   hub: (props) => svg(
@@ -2170,7 +2211,16 @@ var ENDPOINTS = {
   refreshModelCatalog: "refreshModelCatalog",
   commitModelCapabilities: "commitModelCapabilities",
   completeModelFields: "completeModelFields",
-  probeModelVision: "probeModelVision"
+  probeModelVision: "probeModelVision",
+  // 多消费者 API Key（「接入方」Tab）：网关 /admin/keys 的 CRUD + rotate；
+  // previewApiKey 是宿主**本地**计算（网关没有按 key.id 求值的端点，
+  // 而明文只在创建/轮换那一刻出现一次），规则见 lib/model-scope.js。
+  getApiKeys: "getApiKeys",
+  createApiKey: "createApiKey",
+  patchApiKey: "patchApiKey",
+  deleteApiKey: "deleteApiKey",
+  rotateApiKey: "rotateApiKey",
+  previewApiKey: "previewApiKey"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -3067,7 +3117,14 @@ function mergeTail(series) {
   );
   return [...head, { ...merged, color: SEG_COLORS[SEG_COLORS.length - 1], rest: true }];
 }
-function RankCards({ accounts, channels, metric = "tokens", onMetricChange }) {
+function RankCards({
+  accounts,
+  channels,
+  consumers = [],
+  consumersAvailable = false,
+  metric = "tokens",
+  onMetricChange
+}) {
   const current = rankMetric(metric);
   const options = RANK_METRICS.map((item) => [item.id, item.label]);
   const extra = `\u6309${current.label}`;
@@ -3163,7 +3220,50 @@ ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7
           )
         )
       )
-    )
+    ),
+    // 第三条切法：**谁在用**（下游消费者）。只在网关提供 by_key 时渲染 ——
+    // 旧网关没有该维度，渲染一个恒空卡片会被误读成「没有消费者在用」。
+    consumersAvailable ? import_react4.default.createElement(
+      "div",
+      { className: "dshc-ust-card", "data-card": "consumers" },
+      import_react4.default.createElement(CardHead, { title: "\u6D88\u8D39\u8005\u7528\u91CF", extra: `${extra} \xB7 \u6309 API key` }),
+      consumers.length === 0 ? import_react4.default.createElement("div", { style: s.muted }, "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u5E26\u6D88\u8D39\u8005\u8EAB\u4EFD\u7684\u8BF7\u6C42") : import_react4.default.createElement(
+        import_react4.default.Fragment,
+        null,
+        ...consumers.slice(0, 8).map(
+          (row, index) => import_react4.default.createElement(
+            "div",
+            { key: row.key ?? index, className: "dshc-ust-rank-row" },
+            import_react4.default.createElement("span", { className: "dshc-ust-rank-no" }, String(index + 1)),
+            import_react4.default.createElement(
+              "span",
+              { className: "dshc-ust-rank-name" },
+              import_react4.default.createElement("span", { title: row.key }, row.name),
+              // 被拒率是诊断「下游模型名配错」最直接的信号（集合外 403 会记 failed）。
+              row.failRate > 0 ? import_react4.default.createElement("span", {
+                style: { ...s.tag, color: tone.err.fg, background: tone.err.bg },
+                title: `${formatNumber(row.failed)} \u6B21\u88AB\u62D2\uFF08\u591A\u4E3A\u96C6\u5408\u5916\u6A21\u578B 403\uFF09\u2014\u2014 \u82E5\u6301\u7EED\u589E\u957F\uFF0C\u591A\u534A\u662F\u5BF9\u7AEF\u7684\u6A21\u578B\u540D\u4E0D\u5728\u8BE5 key \u7684\u96C6\u5408\u91CC\u3002`
+              }, `\u62D2 ${formatPercent(row.failRate, 0)}`) : null
+            ),
+            import_react4.default.createElement(
+              "span",
+              { className: "dshc-ust-rank-bar" },
+              import_react4.default.createElement("i", {
+                style: {
+                  width: `${Math.max(2, Math.round(row.barShare * 100))}%`,
+                  background: seriesColor(row, index)
+                }
+              })
+            ),
+            import_react4.default.createElement("span", {
+              className: "dshc-ust-rank-val",
+              title: `${current.label} ${current.format(row.value)}\uFF08${formatPercent(row.share, 1)}\uFF09
+${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206` + (row.failed > 0 ? ` \xB7 \u88AB\u62D2 ${formatNumber(row.failed)} \u6B21` : "")
+            }, formatPercent(row.share, 0))
+          )
+        )
+      )
+    ) : null
   );
 }
 function ModelDonut({ rows, onTip }) {
@@ -3746,6 +3846,11 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
     () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
     [usage, total, accounts, channelOf, rankMetricValue]
   );
+  const consumersAvailable = Array.isArray(usage?.by_key);
+  const consumerRows = import_react5.default.useMemo(
+    () => consumerShares(usage?.by_key ?? [], total, rankMetricValue),
+    [usage, total, rankMetricValue]
+  );
   const subtitle = subtitleText({ freshness, error, lastOkAt });
   const uptime = processUptime(stats);
   return import_react5.default.createElement(
@@ -3802,7 +3907,7 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         reason || "\u7F51\u5173\u672A\u63D0\u4F9B\u5206\u6876\u7AEF\u70B9\uFF0C\u9700\u5728\u7F51\u5173\u4FA7\u652F\u6301 GET /v1/stats/buckets\u3002"
       )
     ) : null,
-    // 容量降级：网关把四维分桶降成两维时必须如实说明（否则读者会把
+    // 容量降级：网关把多维分桶降成三维时必须如实说明（否则读者会把
     // 「按账号/按模型只有一行」误读成「只有一个账号/模型」）
     usage?.degraded ? import_react5.default.createElement(
       "div",
@@ -3810,7 +3915,7 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
       import_react5.default.createElement(
         "div",
         { style: s.warn },
-        "\u26A0\uFE0F \u5206\u6876\u952E\u5DF2\u8D85\u51FA\u5BB9\u91CF\u4E0A\u9650\uFF0C\u7F51\u5173\u5DF2\u964D\u7EA7\u4E3A\u300C\u69FD \xD7 \u57DF\u300D\u4E24\u7EF4 \u2014\u2014 \u6309\u8D26\u53F7 / \u6309\u6A21\u578B\u4E24\u4E2A\u7EF4\u5EA6\u5C06\u4E0D\u518D\u7EC6\u5206\u3002"
+        "\u26A0\uFE0F \u5206\u6876\u952E\u5DF2\u8D85\u51FA\u5BB9\u91CF\u4E0A\u9650\uFF0C\u7F51\u5173\u5DF2\u964D\u7EA7\u4E3A\u300C\u69FD \xD7 \u57DF \xD7 \u6D88\u8D39\u8005\u300D\u4E09\u7EF4 \u2014\u2014 \u6309\u8D26\u53F7 / \u6309\u6A21\u578B\u4E0D\u518D\u7EC6\u5206\uFF08**\u6D88\u8D39\u8005\u7EF4\u5EA6\u4FDD\u7559**\uFF1A\u591A key \u4E0B\u300C\u8C01\u5728\u7528\u300D\u6700\u4E0D\u53EF\u66FF\u4EE3\uFF09\u3002"
       )
     ) : null,
     // ── ① KPI 4 卡（窗口口径） ──
@@ -3848,14 +3953,16 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         onMetricChange: setBarMetric,
         onTip: setTip
       }),
-      // ── ④ 账号排行 + ⑤ 渠道用量（两列并排，维度可切，默认按用量） ──
+      // ── ④ 账号排行 + ⑤ 渠道用量 + ⑥ 消费者用量（三列并排） ──
       import_react5.default.createElement(RankCards, {
         accounts: accountRows,
         channels: channelRows,
+        consumers: consumerRows,
+        consumersAvailable,
         metric: rankMetricValue,
         onMetricChange: setRankMetricValue
       }),
-      // ── ⑥ 模型占比 ──
+      // ── ⑦ 模型占比 ──
       import_react5.default.createElement(ModelDonut, { rows: usage?.by_model ?? [], onTip: setTip })
     ) : null,
     available && rows.length === 0 ? import_react5.default.createElement(
@@ -4827,8 +4934,553 @@ var tdStyle = {
   maxWidth: 280
 };
 
-// client/quick-entry.js
+// client/api-keys.js
 var import_react7 = __toESM(require("react"), 1);
+var ROLE_LABEL = { consumer: "\u4EC5\u5BF9\u8BDD", admin: "\u5168\u6743\uFF08\u542B\u7BA1\u7406\u9762\uFF09" };
+var SURFACES = [
+  { id: "status", label: "\u8D26\u53F7\u72B6\u6001 /status" },
+  { id: "stats", label: "\u7528\u91CF\u7EDF\u8BA1 /v1/stats" },
+  { id: "logs", label: "\u8FD0\u884C\u65E5\u5FD7 /v1/logs" },
+  { id: "models_probes", label: "\u5B9E\u6D4B\u4E0A\u9650 /v1/models/probes" },
+  { id: "models_credits", label: "\u500D\u7387\u8BB0\u5F55 /v1/models/credits" },
+  { id: "accounts", label: "\u8D26\u53F7\u660E\u7EC6 /v1/accounts/*" }
+];
+function scopeSummary(models) {
+  if (models === null || models === void 0) return { kind: "all", label: "\u5168\u91CF" };
+  if (!Array.isArray(models) || models.length === 0) return { kind: "none", label: "\u7A7A\u96C6" };
+  if (models.length === 1 && models[0] === "*") return { kind: "all", label: "\u5168\u91CF" };
+  return { kind: "patterns", label: `${models.length} \u6761\u89C4\u5219` };
+}
+function scopeTone(kind) {
+  if (kind === "none") return tone.err;
+  if (kind === "all") return tone.idle;
+  return tone.info;
+}
+function patternsToText(models) {
+  if (!Array.isArray(models)) return "";
+  return models.join("\n");
+}
+function textToPatterns(text) {
+  return String(text ?? "").split("\n").map((line) => line.trim()).filter((line) => line !== "");
+}
+function bucketOf(id) {
+  const parts = String(id ?? "").split(":");
+  return parts.length >= 3 ? `${parts[0]}:${parts[1]}` : parts[0] ?? "";
+}
+function Overlay({ children, onClose }) {
+  return import_react7.default.createElement(
+    "div",
+    {
+      style: {
+        position: "fixed",
+        inset: 0,
+        zIndex: 95,
+        background: "rgba(15,23,42,.32)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16
+      },
+      onClick: onClose
+    },
+    import_react7.default.createElement(
+      "div",
+      {
+        onClick: (event) => event.stopPropagation(),
+        style: { ...s.card, width: "min(720px, 100%)", maxHeight: "86vh", overflow: "auto", marginBottom: 0, boxShadow: "0 12px 40px rgba(0,0,0,.2)" }
+      },
+      children
+    )
+  );
+}
+function SecretDialog({ name: name2, value, onClose }) {
+  const [copied, setCopied] = import_react7.default.useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return import_react7.default.createElement(
+    Overlay,
+    { onClose },
+    import_react7.default.createElement("div", { style: type.text.heading }, `\u5BC6\u94A5\uFF1A${name2}`),
+    import_react7.default.createElement(
+      "div",
+      { style: { ...s.warn, marginTop: 10 } },
+      "\u8FD9\u6BB5\u660E\u6587**\u53EA\u663E\u793A\u8FD9\u4E00\u6B21**\u3002\u5173\u95ED\u540E\u7F51\u5173\u4E0D\u518D\u8FD4\u56DE\u5B83 \u2014\u2014 \u8BF7\u7ACB\u523B\u590D\u5236\u5230\u4E0B\u6E38\u914D\u7F6E\u91CC\uFF1B\u82E5\u6CA1\u6284\u4E0B\u6765\uFF0C\u53EA\u80FD\u56DE\u5217\u8868\u70B9\u300C\u8F6E\u6362\u300D\u91CD\u65B0\u751F\u6210\u4E00\u628A\u3002"
+    ),
+    import_react7.default.createElement(
+      "div",
+      {
+        style: {
+          ...s.code,
+          marginTop: 12,
+          padding: "10px 12px",
+          borderRadius: 8,
+          background: "var(--dsw-alias-bg-layer-2,#f9f9fb)",
+          border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+          fontSize: 14,
+          userSelect: "all"
+        }
+      },
+      value
+    ),
+    import_react7.default.createElement(
+      "div",
+      { style: { display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" } },
+      import_react7.default.createElement(
+        "button",
+        { type: "button", style: s.btnGhost, onClick: copy },
+        copied ? "\u5DF2\u590D\u5236 \u2713" : "\u590D\u5236"
+      ),
+      import_react7.default.createElement("button", { type: "button", style: s.btnPri, onClick: onClose }, "\u6211\u5DF2\u4FDD\u5B58\uFF0C\u5173\u95ED")
+    )
+  );
+}
+function ScopeEditor({ catalog, patterns, onChange }) {
+  const [filter, setFilter] = import_react7.default.useState("");
+  const selected = new Set(patterns);
+  const buckets = import_react7.default.useMemo(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const item of catalog) {
+      const key = bucketOf(item.id);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(item);
+    }
+    return [...map.entries()];
+  }, [catalog]);
+  const toggle = (id) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange([...next]);
+  };
+  const addRule = (rule) => {
+    if (selected.has(rule)) return;
+    onChange([...patterns, rule]);
+  };
+  const keyword = filter.trim().toLowerCase();
+  const matches = keyword === "" ? [] : catalog.filter((item) => item.id.toLowerCase().includes(keyword)).slice(0, 40);
+  let listSection;
+  if (catalog.length === 0) {
+    listSection = import_react7.default.createElement("div", { style: { ...s.muted, marginTop: 6 } }, "\u76EE\u5F55\u52A0\u8F7D\u4E2D\u6216\u4E0D\u53EF\u5F97");
+  } else if (keyword === "") {
+    listSection = import_react7.default.createElement(
+      "div",
+      { style: { ...s.muted, marginTop: 6 } },
+      `\u5171 ${catalog.length} \u4E2A\u6A21\u578B\uFF08\u8F93\u5165\u5173\u952E\u5B57\u641C\u7D22\uFF1B\u4E5F\u53EF\u7528\u4E0A\u9762\u7684\u6E20\u9053\u524D\u7F00\u4E00\u952E\u8986\u76D6\uFF09`
+    );
+  } else {
+    listSection = import_react7.default.createElement(
+      "div",
+      {
+        style: {
+          marginTop: 6,
+          maxHeight: 220,
+          overflow: "auto",
+          border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+          borderRadius: 8,
+          padding: "6px 10px"
+        }
+      },
+      ...matches.length === 0 ? [import_react7.default.createElement("div", { key: "none", style: s.muted }, "\u65E0\u5339\u914D")] : matches.map((item) => import_react7.default.createElement(
+        "label",
+        { key: item.id, style: { display: "flex", gap: 8, alignItems: "center", padding: "3px 0", cursor: "pointer" } },
+        import_react7.default.createElement("input", {
+          type: "checkbox",
+          checked: selected.has(item.id),
+          onChange: () => toggle(item.id)
+        }),
+        import_react7.default.createElement("span", { style: { ...type.text.code, flex: 1 } }, item.id),
+        import_react7.default.createElement("span", { style: { ...type.text.caption } }, item.name ?? "")
+      ))
+    );
+  }
+  return import_react7.default.createElement(
+    "div",
+    null,
+    import_react7.default.createElement(
+      "div",
+      { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
+      import_react7.default.createElement("span", { style: { ...type.text.secondary } }, "\u5FEB\u6377\uFF1A"),
+      import_react7.default.createElement("button", {
+        type: "button",
+        style: s.btnGhost,
+        onClick: () => onChange(["*"])
+      }, "\u5168\u91CF\uFF08*\uFF09"),
+      import_react7.default.createElement("button", {
+        type: "button",
+        style: s.btnGhost,
+        onClick: () => onChange([])
+      }, "\u7A7A\u96C6\uFF08\u5168\u90E8\u62D2\u7EDD\uFF09"),
+      import_react7.default.createElement(
+        "span",
+        { style: { ...type.text.caption } },
+        "\u89C4\u5219\u53EA\u652F\u6301\u524D\u7F00\u901A\u914D\uFF0C* \u5FC5\u987B\u5728\u672B\u5C3E"
+      )
+    ),
+    // 按渠道一键加前缀 —— 这是最高频的操作，放在勾选列表之前。
+    catalog.length > 0 ? import_react7.default.createElement(
+      "div",
+      { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 } },
+      ...buckets.map(([bucket, items]) => import_react7.default.createElement("button", {
+        key: bucket,
+        type: "button",
+        style: { ...s.btnLink, padding: "2px 8px", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", borderRadius: 999 },
+        onClick: () => addRule(`${bucket}:*`),
+        title: `\u52A0\u5165\u89C4\u5219 ${bucket}:*\uFF08\u8BE5\u6E20\u9053\u5168\u90E8 ${items.length} \u4E2A\u6A21\u578B\uFF09`
+      }, `+ ${bucket}:*`))
+    ) : null,
+    import_react7.default.createElement("div", { style: { ...s.label, marginTop: 12 } }, "\u89C4\u5219\uFF08\u4E00\u884C\u4E00\u6761\uFF09"),
+    import_react7.default.createElement("textarea", {
+      value: patternsToText(patterns),
+      onChange: (event) => onChange(textToPatterns(event.target.value)),
+      spellCheck: false,
+      rows: Math.min(8, Math.max(2, patterns.length)),
+      style: { ...s.input, height: "auto", padding: "8px 10px", marginTop: 4, lineHeight: 1.7, resize: "vertical" },
+      placeholder: "workbuddy:cn:*\ntraework:cn:qwen3.8-max"
+    }),
+    import_react7.default.createElement("div", { style: { ...s.label, marginTop: 12 } }, "\u52FE\u9009\u5177\u4F53\u6A21\u578B\uFF08\u53EF\u9009\uFF09"),
+    import_react7.default.createElement("input", {
+      value: filter,
+      onChange: (event) => setFilter(event.target.value),
+      placeholder: "\u641C\u6A21\u578B id\u2026",
+      style: { ...s.input, marginTop: 4 }
+    }),
+    listSection
+  );
+}
+function KeyEditor({ rpcCall, initial, onCancel, onSaved }) {
+  const isEdit = initial?.id !== void 0;
+  const [name2, setName] = import_react7.default.useState(initial?.name ?? "");
+  const [role, setRole] = import_react7.default.useState(initial?.role ?? "consumer");
+  const [allow, setAllow] = import_react7.default.useState(Array.isArray(initial?.allow) ? initial.allow : []);
+  const [patterns, setPatterns] = import_react7.default.useState(() => {
+    if (initial === void 0 || initial === null) return ["workbuddy:cn:*"];
+    if (initial.models === null || initial.models === void 0) return ["*"];
+    return Array.isArray(initial.models) ? [...initial.models] : ["*"];
+  });
+  const [catalog, setCatalog] = import_react7.default.useState([]);
+  const [busy, setBusy] = import_react7.default.useState(false);
+  const [error, setError] = import_react7.default.useState("");
+  import_react7.default.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const result = await rpcCall(ENDPOINTS.getModels, {});
+        if (!alive) return;
+        const body = result?.ok ? result.value : void 0;
+        const data = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+        setCatalog(data.filter((item) => typeof item?.id === "string").map((item) => ({ id: item.id, name: item.name })));
+      } catch {
+        if (alive) setCatalog([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [rpcCall]);
+  const save = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const payload = { name: name2, models: patterns, role };
+      if (role === "admin") payload.allow = [];
+      else payload.allow = allow;
+      const result = isEdit ? await rpcCall(ENDPOINTS.patchApiKey, { id: initial.id, ...payload }) : await rpcCall(ENDPOINTS.createApiKey, payload);
+      if (!result?.ok) {
+        setError(result?.error?.message ?? "\u4FDD\u5B58\u5931\u8D25");
+        return;
+      }
+      onSaved(result.value?.key ?? null, isEdit);
+    } catch (err) {
+      setError(String(err?.message ?? err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return import_react7.default.createElement(
+    Overlay,
+    { onClose: busy ? () => {
+    } : onCancel },
+    import_react7.default.createElement("div", { style: type.text.heading }, isEdit ? `\u7F16\u8F91\u63A5\u5165\u65B9\uFF1A${initial.name}` : "\u65B0\u5EFA\u63A5\u5165\u65B9"),
+    import_react7.default.createElement("div", { style: { ...s.label, marginTop: 12 } }, "\u540D\u79F0"),
+    import_react7.default.createElement("input", {
+      value: name2,
+      onChange: (event) => setName(event.target.value),
+      placeholder: "\u4F8B\u5982 workbuddy-switch / \u6211\u7684\u53E6\u4E00\u53F0 DSH",
+      style: { ...s.input, marginTop: 4 }
+    }),
+    import_react7.default.createElement("div", { style: { ...s.label, marginTop: 12 } }, "\u6743\u9650"),
+    import_react7.default.createElement(
+      "select",
+      {
+        value: role,
+        onChange: (event) => setRole(event.target.value),
+        style: { ...s.input, marginTop: 4 }
+      },
+      ...Object.entries(ROLE_LABEL).map(([value, label]) => import_react7.default.createElement("option", { key: value, value }, label))
+    ),
+    role === "consumer" ? import_react7.default.createElement(
+      import_react7.default.Fragment,
+      null,
+      import_react7.default.createElement("div", { style: { ...s.label, marginTop: 12 } }, "\u989D\u5916\u653E\u884C\u7684\u89C2\u6D4B\u7AEF\u70B9"),
+      import_react7.default.createElement(
+        "div",
+        { style: { ...s.muted, marginTop: 2 } },
+        "\u4E0D\u52FE = \u8BE5 key \u53EA\u80FD\u5BF9\u8BDD\u4E0E\u62C9\u6A21\u578B\u3002\u8D26\u53F7\u6C60 / \u7528\u91CF / \u65E5\u5FD7\u9ED8\u8BA4\u4E0D\u7ED9\u4E0B\u6E38\u3002"
+      ),
+      import_react7.default.createElement(
+        "div",
+        { style: { display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 6 } },
+        ...SURFACES.map((item) => import_react7.default.createElement(
+          "label",
+          { key: item.id, style: { display: "flex", gap: 6, alignItems: "center", cursor: "pointer", fontSize: 12 } },
+          import_react7.default.createElement("input", {
+            type: "checkbox",
+            checked: allow.includes(item.id),
+            onChange: () => setAllow((prev) => prev.includes(item.id) ? prev.filter((x) => x !== item.id) : [...prev, item.id])
+          }),
+          item.label
+        ))
+      )
+    ) : import_react7.default.createElement(
+      "div",
+      { style: { ...s.warn, marginTop: 12 } },
+      "\u300C\u5168\u6743\u300D= \u8BE5 key \u53EF\u8BBF\u95EE /admin/*\uFF08\u6539\u7F51\u5173\u914D\u7F6E\u3001\u5173\u8D26\u53F7\uFF09\u3002\u53EA\u7ED9\u786E\u5B9E\u9700\u8981\u7684\u7528\u9014\u3002"
+    ),
+    import_react7.default.createElement("div", { style: { ...s.label, marginTop: 14 } }, "\u6A21\u578B\u96C6\u5408"),
+    import_react7.default.createElement(ScopeEditor, { catalog, patterns, onChange: setPatterns }),
+    error !== "" ? import_react7.default.createElement("div", { style: { ...s.err, marginTop: 12 } }, error) : null,
+    import_react7.default.createElement(
+      "div",
+      { style: { display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" } },
+      import_react7.default.createElement("button", { type: "button", style: s.btnGhost, onClick: onCancel, disabled: busy }, "\u53D6\u6D88"),
+      import_react7.default.createElement(
+        "button",
+        { type: "button", style: s.btnPri, onClick: save, disabled: busy },
+        busy ? "\u4FDD\u5B58\u4E2D\u2026" : isEdit ? "\u4FDD\u5B58" : "\u521B\u5EFA"
+      )
+    )
+  );
+}
+function ApiKeysTab({ rpcCall, showToast }) {
+  const [state, setState] = import_react7.default.useState({ loading: true, error: "", keys: [] });
+  const [editor, setEditor] = import_react7.default.useState(null);
+  const [secret, setSecret] = import_react7.default.useState(null);
+  const [busyId, setBusyId] = import_react7.default.useState("");
+  const [previews, setPreviews] = import_react7.default.useState({});
+  const load = import_react7.default.useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true, error: "" }));
+    try {
+      const result = await rpcCall(ENDPOINTS.getApiKeys, {});
+      if (!result?.ok) {
+        setState({ loading: false, error: result?.error?.message ?? "\u8BFB\u53D6\u5931\u8D25", keys: [] });
+        return;
+      }
+      setState({ loading: false, error: "", keys: Array.isArray(result.value?.keys) ? result.value.keys : [] });
+    } catch (error) {
+      setState({ loading: false, error: String(error?.message ?? error), keys: [] });
+    }
+  }, [rpcCall]);
+  import_react7.default.useEffect(() => {
+    load();
+  }, [load]);
+  const act = async (id, endpoint, payload, okMessage) => {
+    setBusyId(id);
+    try {
+      const result = await rpcCall(endpoint, payload);
+      if (!result?.ok) {
+        showToast?.(`\u5931\u8D25\uFF1A${result?.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
+        return void 0;
+      }
+      if (okMessage) showToast?.(okMessage);
+      await load();
+      return result.value;
+    } catch (error) {
+      showToast?.(`\u5931\u8D25\uFF1A${String(error?.message ?? error)}`);
+      return void 0;
+    } finally {
+      setBusyId("");
+    }
+  };
+  const preview = async (item) => {
+    setPreviews((prev) => ({ ...prev, [item.id]: { loading: true } }));
+    try {
+      const result = await rpcCall(ENDPOINTS.previewApiKey, {
+        models: item.models === null || item.models === void 0 ? void 0 : item.models
+      });
+      setPreviews((prev) => ({
+        ...prev,
+        [item.id]: result?.ok ? { loading: false, data: result.value } : { loading: false, error: result?.error?.message ?? "\u9884\u89C8\u5931\u8D25" }
+      }));
+    } catch (error) {
+      setPreviews((prev) => ({ ...prev, [item.id]: { loading: false, error: String(error?.message ?? error) } }));
+    }
+  };
+  const remove = async (item) => {
+    const ok = typeof window === "undefined" ? true : window.confirm(`\u5220\u9664\u63A5\u5165\u65B9\u300C${item.name}\u300D\uFF1F
+
+\u8BE5 key \u7ACB\u5373\u5931\u6548\uFF08\u7528\u5B83\u914D\u7F6E\u7684\u4E0B\u6E38\u4F1A\u5F00\u59CB\u62A5 401\uFF09\u3002
+\u5386\u53F2\u7528\u91CF\u4F1A\u4FDD\u7559\uFF0C\u4F46\u4E0D\u518D\u663E\u793A\u540D\u5B57\u3002`);
+    if (!ok) return;
+    await act(item.id, ENDPOINTS.deleteApiKey, { id: item.id }, "\u5DF2\u5220\u9664");
+  };
+  const rotate = async (item) => {
+    const ok = typeof window === "undefined" ? true : window.confirm(`\u8F6E\u6362\u300C${item.name}\u300D\u7684\u5BC6\u94A5\uFF1F
+
+\u65E7\u5BC6\u94A5\u7ACB\u5373\u5931\u6548 \u2014\u2014 \u7528\u5B83\u914D\u7F6E\u7684\u4E0B\u6E38\u5FC5\u987B\u540C\u6B65\u6362\u65B0\uFF0C\u5426\u5219\u4F1A\u4E00\u76F4 401\u3002`);
+    if (!ok) return;
+    const value = await act(item.id, ENDPOINTS.rotateApiKey, { id: item.id });
+    if (value?.key) setSecret(value.key);
+  };
+  const actions = import_react7.default.createElement(
+    import_react7.default.Fragment,
+    null,
+    import_react7.default.createElement("button", {
+      type: "button",
+      style: s.btnPri,
+      onClick: () => setEditor({ mode: "create" }),
+      disabled: state.loading
+    }, "\uFF0B \u65B0\u5EFA\u63A5\u5165\u65B9"),
+    import_react7.default.createElement("button", { type: "button", style: s.btnGhost, onClick: load }, "\u5237\u65B0")
+  );
+  return import_react7.default.createElement(
+    "div",
+    null,
+    import_react7.default.createElement(
+      "div",
+      { style: s.card },
+      import_react7.default.createElement(CardHead, {
+        title: "\u63A5\u5165\u65B9\uFF08API Key\uFF09",
+        extra: `${state.keys.length} \u4E2A`,
+        actions
+      }),
+      import_react7.default.createElement(
+        "div",
+        { style: { ...s.muted, marginTop: 8 } },
+        "\u6BCF\u4E2A\u4E0B\u6E38\u7528\u81EA\u5DF1\u7684\u4E00\u628A key\uFF0C\u5404\u81EA\u53EA\u770B\u5230\u81EA\u5DF1\u96C6\u5408\u5185\u7684\u6A21\u578B\uFF1B\u96C6\u5408\u5916\u7684\u6A21\u578B\u5728\u5BF9\u8BDD\u63A5\u53E3\u4E0A\u4F1A\u88AB\u76F4\u63A5\u62D2\u7EDD\uFF08403\uFF09\uFF0C\u4E14\u4E0D\u6D88\u8017\u8D26\u53F7\u989D\u5EA6\u3002",
+        "\u9762\u677F\u62FF\u7684\u662F**\u5168\u91CF\u76EE\u5F55**\uFF08/admin/models\uFF09\uFF0C\u4E0D\u53D7\u4EFB\u4F55 key \u7684\u96C6\u5408\u5F71\u54CD\u3002"
+      ),
+      state.error !== "" ? import_react7.default.createElement("div", { style: { ...s.err, marginTop: 10 } }, state.error) : null
+    ),
+    state.loading && state.keys.length === 0 ? import_react7.default.createElement("div", { style: { ...s.card, ...s.muted } }, "\u52A0\u8F7D\u4E2D\u2026") : null,
+    state.keys.length === 0 && !state.loading && state.error === "" ? import_react7.default.createElement(
+      "div",
+      { style: { ...s.card, ...s.muted } },
+      "\u8FD8\u6CA1\u6709\u63A5\u5165\u65B9\u3002\u5F53\u524D\u6240\u6709\u4E0B\u6E38\u5171\u7528\u7F51\u5173\u914D\u7F6E\u91CC\u90A3\u628A\u4E3B key\uFF08\u6052\u5168\u91CF\uFF09\u3002",
+      "\u65B0\u5EFA\u4E00\u628A\u4E4B\u540E\uFF0C\u5C31\u80FD\u6309\u4E0B\u6E38\u628A\u6A21\u578B\u76EE\u5F55\u6536\u7A84\u3002"
+    ) : null,
+    ...state.keys.map((item) => {
+      const summary = scopeSummary(item.models);
+      const st = scopeTone(summary.kind);
+      const previewState = previews[item.id];
+      return import_react7.default.createElement(
+        "div",
+        { key: item.id, style: s.card },
+        import_react7.default.createElement(
+          "div",
+          { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+          import_react7.default.createElement("span", { style: { ...type.text.heading, flex: 1 } }, item.name),
+          item.enabled === false ? import_react7.default.createElement("span", { style: { ...s.tag, color: tone.idle.fg, background: tone.idle.bg } }, "\u5DF2\u505C\u7528") : null,
+          import_react7.default.createElement("span", { style: { ...s.tag, color: st.fg, background: st.bg } }, summary.label),
+          import_react7.default.createElement("span", {
+            style: { ...s.tag, color: item.role === "admin" ? tone.warn.fg : tone.idle.fg, background: item.role === "admin" ? tone.warn.bg : tone.idle.bg }
+          }, ROLE_LABEL[item.role] ?? item.role)
+        ),
+        import_react7.default.createElement(
+          "div",
+          { style: { ...s.code, marginTop: 8 } },
+          item.key_prefix,
+          import_react7.default.createElement(
+            "span",
+            { style: { ...type.text.caption, marginLeft: 8 } },
+            "\uFF08\u53EA\u663E\u793A\u524D\u540E\u51E0\u4F4D\uFF1B\u5B8C\u6574\u5BC6\u94A5\u4EC5\u5728\u521B\u5EFA/\u8F6E\u6362\u65F6\u51FA\u73B0\u8FC7\u4E00\u6B21\uFF09"
+          )
+        ),
+        import_react7.default.createElement(
+          "div",
+          { style: { ...s.muted, marginTop: 6 } },
+          `\u6700\u8FD1\u4F7F\u7528\uFF1A${item.last_used_at ? relativeTime(item.last_used_at) : "\u4ECE\u672A\u4F7F\u7528"}`,
+          item.created_at ? `\u3000\u521B\u5EFA\u4E8E ${relativeTime(item.created_at)}` : "",
+          Array.isArray(item.allow) && item.allow.length > 0 ? `\u3000\u989D\u5916\u653E\u884C\uFF1A${item.allow.join("\u3001")}` : ""
+        ),
+        // 规则明细：全量/空集不需要展开，规则集才列出来。
+        summary.kind === "patterns" ? import_react7.default.createElement(
+          "div",
+          { style: { ...s.code, marginTop: 6, ...type.text.caption } },
+          item.models.join("\u3000")
+        ) : null,
+        previewState ? import_react7.default.createElement(
+          "div",
+          { style: { ...previewState.error ? s.err : s.tip, marginTop: 8 } },
+          previewState.loading ? "\u63A8\u7B97\u4E2D\u2026" : previewState.error ? `\u9884\u89C8\u5931\u8D25\uFF1A${previewState.error}` : `\u6309\u89C4\u5219\u63A8\u7B97\uFF1A\u5168\u91CF\u76EE\u5F55 ${previewState.data.total} \u4E2A\uFF0C\u8BE5 key \u53EF\u89C1 ${previewState.data.visible} \u4E2A\uFF08${previewState.data.scope?.label ?? ""}\uFF09\u3002\u8FD9\u662F\u6309\u4E0E\u7F51\u5173\u9010\u6761\u5BF9\u9F50\u7684\u89C4\u5219\u672C\u5730\u7B97\u7684\uFF0C\u4E0D\u662F\u5B9E\u6D4B\u503C\u3002`
+        ) : null,
+        import_react7.default.createElement(
+          "div",
+          { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+          import_react7.default.createElement("button", {
+            type: "button",
+            style: s.btnGhost,
+            disabled: busyId === item.id,
+            onClick: () => preview(item)
+          }, "\u9884\u89C8\u53EF\u89C1\u6A21\u578B"),
+          import_react7.default.createElement("button", {
+            type: "button",
+            style: s.btnGhost,
+            disabled: busyId === item.id,
+            onClick: () => setEditor({ mode: "edit", key: item })
+          }, "\u7F16\u8F91"),
+          import_react7.default.createElement("button", {
+            type: "button",
+            style: s.btnGhost,
+            disabled: busyId === item.id,
+            onClick: () => act(
+              item.id,
+              ENDPOINTS.patchApiKey,
+              { id: item.id, enabled: item.enabled === false },
+              item.enabled === false ? "\u5DF2\u542F\u7528" : "\u5DF2\u505C\u7528"
+            )
+          }, item.enabled === false ? "\u542F\u7528" : "\u505C\u7528"),
+          import_react7.default.createElement("button", {
+            type: "button",
+            style: s.btnGhost,
+            disabled: busyId === item.id,
+            onClick: () => rotate(item)
+          }, "\u8F6E\u6362\u5BC6\u94A5"),
+          import_react7.default.createElement("button", {
+            type: "button",
+            style: { ...s.btnGhost, color: tone.err.fg },
+            disabled: busyId === item.id,
+            onClick: () => remove(item)
+          }, "\u5220\u9664")
+        )
+      );
+    }),
+    editor ? import_react7.default.createElement(KeyEditor, {
+      rpcCall,
+      initial: editor.mode === "edit" ? editor.key : void 0,
+      onCancel: () => setEditor(null),
+      onSaved: async (created, isEdit) => {
+        setEditor(null);
+        await load();
+        if (!isEdit && created) setSecret(created);
+        else showToast?.("\u5DF2\u4FDD\u5B58");
+      }
+    }) : null,
+    secret ? import_react7.default.createElement(SecretDialog, {
+      name: secret.name,
+      value: secret.key,
+      onClose: () => setSecret(null)
+    }) : null
+  );
+}
+
+// client/quick-entry.js
+var import_react8 = __toESM(require("react"), 1);
 var import_react_dom = require("react-dom");
 var ENTRY_CSS = `
 @keyframes dshc-entry-in { from{opacity:0} to{opacity:1} }
@@ -4877,10 +5529,10 @@ function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "v
   const clamped = Math.max(0, Math.min(1, Number(ratio) || 0));
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "svg",
     { width: size, height: size, viewBox: `0 0 ${size} ${size}`, "aria-hidden": "true" },
-    import_react7.default.createElement("circle", {
+    import_react8.default.createElement("circle", {
       cx: size / 2,
       cy: size / 2,
       r: radius,
@@ -4888,7 +5540,7 @@ function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "v
       stroke: track,
       strokeWidth: stroke
     }),
-    import_react7.default.createElement("circle", {
+    import_react8.default.createElement("circle", {
       cx: size / 2,
       cy: size / 2,
       r: radius,
@@ -4904,8 +5556,8 @@ function Ring({ ratio = 0, size = 34, stroke = 4, color = tone.ok.fg, track = "v
 }
 function useMountProgress(duration = 520) {
   const canAnimate = typeof requestAnimationFrame === "function" && !(typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const [progress, setProgress] = import_react7.default.useState(canAnimate ? 0 : 1);
-  import_react7.default.useEffect(() => {
+  const [progress, setProgress] = import_react8.default.useState(canAnimate ? 0 : 1);
+  import_react8.default.useEffect(() => {
     if (!canAnimate) return void 0;
     const start = Date.now();
     let frame = 0;
@@ -4934,24 +5586,24 @@ function useMountProgress(duration = 520) {
 function Sparkline({ values, color = tone.info.fg, width = 96, height = 22 }) {
   const { points, area, flat } = sparkPath(values, { width, height });
   if (points === "") {
-    return import_react7.default.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, "\u65E0\u89C2\u6D4B");
+    return import_react8.default.createElement("div", { style: { ...s.muted, fontSize: 10.5 } }, "\u65E0\u89C2\u6D4B");
   }
   const id = `dshc-spark-${Math.abs(hashString(points)).toString(36)}`;
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "svg",
     { width, height, viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true" },
-    import_react7.default.createElement(
+    import_react8.default.createElement(
       "defs",
       null,
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "linearGradient",
         { id, x1: 0, y1: 0, x2: 0, y2: 1 },
-        import_react7.default.createElement("stop", { offset: "0%", stopColor: color, stopOpacity: flat ? 0.08 : 0.28 }),
-        import_react7.default.createElement("stop", { offset: "100%", stopColor: color, stopOpacity: 0 })
+        import_react8.default.createElement("stop", { offset: "0%", stopColor: color, stopOpacity: flat ? 0.08 : 0.28 }),
+        import_react8.default.createElement("stop", { offset: "100%", stopColor: color, stopOpacity: 0 })
       )
     ),
-    flat ? null : import_react7.default.createElement("polygon", { points: area, fill: `url(#${id})`, stroke: "none" }),
-    import_react7.default.createElement("polyline", {
+    flat ? null : import_react8.default.createElement("polygon", { points: area, fill: `url(#${id})`, stroke: "none" }),
+    import_react8.default.createElement("polyline", {
       points,
       fill: "none",
       stroke: color,
@@ -4965,30 +5617,30 @@ function Sparkline({ values, color = tone.info.fg, width = 96, height = 22 }) {
 function ChannelBar({ channels, total }) {
   const rows = (channels ?? []).filter((row) => row.count > 0);
   const sum = rows.reduce((acc, row) => acc + row.count, 0) || total || 1;
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "div",
     { style: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 } },
-    import_react7.default.createElement(
+    import_react8.default.createElement(
       "div",
       {
         style: { display: "flex", height: 6, borderRadius: 999, overflow: "hidden", background: "var(--dsw-alias-bg-layer-2,#f3f4f6)" }
       },
       ...rows.map(
-        (row) => import_react7.default.createElement("span", {
+        (row) => import_react8.default.createElement("span", {
           key: row.id,
           title: `${row.label} \xB7 ${row.count} \u4E2A\u8D26\u53F7`,
           style: { width: `${row.count / sum * 100}%`, background: row.color ?? "var(--dsw-alias-button-info-fill,#4176f7)" }
         })
       )
     ),
-    import_react7.default.createElement(
+    import_react8.default.createElement(
       "div",
       { style: { display: "flex", flexWrap: "wrap", gap: 8, minWidth: 0 } },
       ...rows.map(
-        (row) => import_react7.default.createElement(
+        (row) => import_react8.default.createElement(
           "span",
           { key: row.id, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } },
-          import_react7.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: row.color } }),
+          import_react8.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: row.color } }),
           `${row.label} ${row.count}`
         )
       )
@@ -4996,7 +5648,7 @@ function ChannelBar({ channels, total }) {
   );
 }
 function Chip({ text, fg, bg, title }) {
-  return import_react7.default.createElement("span", {
+  return import_react8.default.createElement("span", {
     title,
     style: {
       fontSize: 10.5,
@@ -5013,7 +5665,7 @@ function Chip({ text, fg, bg, title }) {
   }, text);
 }
 function Tile({ label, value, hint, accent, children }) {
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "div",
     {
       style: {
@@ -5028,12 +5680,12 @@ function Tile({ label, value, hint, accent, children }) {
         border: "1px solid var(--dsw-alias-border-l2,#eef1f5)"
       }
     },
-    import_react7.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, label),
-    import_react7.default.createElement(
+    import_react8.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, label),
+    import_react8.default.createElement(
       "span",
       { style: { display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 } },
-      import_react7.default.createElement("span", { style: { fontSize: 17, fontWeight: 650, letterSpacing: "-0.01em", color: accent ?? "var(--dsw-alias-label-primary,currentColor)" } }, value),
-      hint ? import_react7.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, hint) : null
+      import_react8.default.createElement("span", { style: { fontSize: 17, fontWeight: 650, letterSpacing: "-0.01em", color: accent ?? "var(--dsw-alias-label-primary,currentColor)" } }, value),
+      hint ? import_react8.default.createElement("span", { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, hint) : null
     ),
     children
   );
@@ -5041,42 +5693,42 @@ function Tile({ label, value, hint, accent, children }) {
 function AccountQuickRow({ vm, series, usageTotal }) {
   const statusTone = tone[vm.state?.tone] ?? tone.idle;
   const dayCount = Number(usageTotal?.requests) || (Array.isArray(series) ? series.reduce((a, b) => a + b, 0) : 0);
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "div",
     {
       className: "dshc-quick-row",
       style: { display: "flex", gap: 9, padding: "8px 10px", borderRadius: 10, minWidth: 0, alignItems: "stretch" }
     },
     // 渠道色条：一眼分辨是哪个渠道的号
-    import_react7.default.createElement("span", { style: { width: 3, borderRadius: 999, background: vm.color, flex: "0 0 3px" } }),
-    import_react7.default.createElement(
+    import_react8.default.createElement("span", { style: { width: 3, borderRadius: 999, background: vm.color, flex: "0 0 3px" } }),
+    import_react8.default.createElement(
       "div",
       { style: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0, flex: 1 } },
       // 行 1：名称 + 活跃/short 状态
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } },
-        import_react7.default.createElement("span", {
+        import_react8.default.createElement("span", {
           style: { fontSize: 12.5, fontWeight: 550, color: "var(--dsw-alias-label-primary,currentColor)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 },
           title: `${vm.name} \xB7 ${vm.uid}`
         }, vm.name),
-        vm.activity ? import_react7.default.createElement(
+        vm.activity ? import_react8.default.createElement(
           "span",
           { style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, color: (tone[vm.activity.tone] ?? tone.info).fg, whiteSpace: "nowrap" } },
-          import_react7.default.createElement("span", { className: vm.activity.key === "busy" ? "dshc-quick-dot" : void 0, style: { width: 5, height: 5, borderRadius: 999, background: "currentColor", display: "inline-block" } }),
+          import_react8.default.createElement("span", { className: vm.activity.key === "busy" ? "dshc-quick-dot" : void 0, style: { width: 5, height: 5, borderRadius: 999, background: "currentColor", display: "inline-block" } }),
           vm.activity.label
         ) : null
       ),
       // 行 2：余额条（相对池内最高）+ 数值
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } },
-        import_react7.default.createElement(
+        import_react8.default.createElement(
           "span",
           {
             style: { flex: "1 1 auto", minWidth: 30, height: 4, borderRadius: 999, background: "var(--dsw-alias-bg-layer-2,#f1f5f9)", overflow: "hidden" }
           },
-          import_react7.default.createElement("span", {
+          import_react8.default.createElement("span", {
             style: {
               display: "block",
               height: "100%",
@@ -5087,41 +5739,41 @@ function AccountQuickRow({ vm, series, usageTotal }) {
             }
           })
         ),
-        import_react7.default.createElement("span", {
+        import_react8.default.createElement("span", {
           title: `${vm.creditsExact} \u79EF\u5206`,
           style: { fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: "var(--dsw-alias-label-primary,currentColor)", whiteSpace: "nowrap" }
         }, vm.creditsText)
       ),
       // 行 3：状态 + 渠道 + 24h 用量 + 到期 + 在途
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         { style: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", minWidth: 0 } },
-        import_react7.default.createElement(Chip, { text: vm.state?.label ?? "\u2014", fg: statusTone.fg, bg: statusTone.bg, title: vm.state?.detail || void 0 }),
+        import_react8.default.createElement(Chip, { text: vm.state?.label ?? "\u2014", fg: statusTone.fg, bg: statusTone.bg, title: vm.state?.detail || void 0 }),
         // 渠道胶囊与渠道中心共用一个组件（同一渠道两处必然同色）
-        import_react7.default.createElement(ChannelChip, { channel: vm.channel, label: vm.channelLabel }),
-        vm.inFlight > 0 ? import_react7.default.createElement(Chip, {
+        import_react8.default.createElement(ChannelChip, { channel: vm.channel, label: vm.channelLabel }),
+        vm.inFlight > 0 ? import_react8.default.createElement(Chip, {
           text: `\u5728\u9014 ${vm.inFlight}${vm.target ? `/${vm.target}` : ""}`,
           fg: vm.inFlightFull ? tone.warn.fg : tone.info.fg,
           bg: vm.inFlightFull ? tone.warn.bg : tone.info.bg,
           title: vm.target ? `\u5355\u53F7\u5728\u9014\u4E0A\u9650 ${vm.target}` : "\u672A\u8BBE\u4E0A\u9650\uFF080 = \u4E0D\u9650\uFF09"
         }) : null,
-        vm.expiry ? import_react7.default.createElement(Chip, {
+        vm.expiry ? import_react8.default.createElement(Chip, {
           text: vm.expiry.expired ? "\u51ED\u8BC1\u5DF2\u8FC7\u671F" : `\u5230\u671F ${daysText(vm.expiry.days)}`,
           fg: vm.expiry.days <= 7 ? tone.warn.fg : void 0,
           bg: vm.expiry.days <= 7 ? tone.warn.bg : void 0,
           title: `\u6765\u6E90\uFF1A${vm.expiry.kind === "credential" ? "\u767B\u5F55\u51ED\u8BC1" : "\u79EF\u5206\u5957\u9910"}`
         }) : null,
-        vm.expiring > 0 ? import_react7.default.createElement(Chip, { text: `${formatCompact(vm.expiring)} \u5C06\u8FC7\u671F`, fg: tone.warn.fg, bg: tone.warn.bg, title: "\u8BE5\u7A97\u53E3\u5185\u5373\u5C06\u8FC7\u671F\u7684\u79EF\u5206\uFF08\u4F18\u5148\u6D88\u8017\uFF09" }) : null,
-        series && series.some((value) => value > 0) ? import_react7.default.createElement(
+        vm.expiring > 0 ? import_react8.default.createElement(Chip, { text: `${formatCompact(vm.expiring)} \u5C06\u8FC7\u671F`, fg: tone.warn.fg, bg: tone.warn.bg, title: "\u8BE5\u7A97\u53E3\u5185\u5373\u5C06\u8FC7\u671F\u7684\u79EF\u5206\uFF08\u4F18\u5148\u6D88\u8017\uFF09" }) : null,
+        series && series.some((value) => value > 0) ? import_react8.default.createElement(
           "span",
           { style: { marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5 } },
-          import_react7.default.createElement(Sparkline, { values: series, color: vm.color, width: 74, height: 18 }),
-          import_react7.default.createElement(
+          import_react8.default.createElement(Sparkline, { values: series, color: vm.color, width: 74, height: 18 }),
+          import_react8.default.createElement(
             "span",
             { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", whiteSpace: "nowrap" } },
             `${formatNumber(dayCount)} \u6B21/24h`
           )
-        ) : dayCount > 0 ? import_react7.default.createElement(
+        ) : dayCount > 0 ? import_react8.default.createElement(
           "span",
           { style: { marginLeft: "auto", fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", whiteSpace: "nowrap" } },
           `${formatNumber(dayCount)} \u6B21/24h`
@@ -5141,17 +5793,17 @@ function hashString(text) {
   return hash;
 }
 function EntryIcon({ size = 16, color = "currentColor" }) {
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "svg",
     { width: size, height: size, viewBox: "0 0 20 20", fill: "none", "aria-hidden": "true" },
-    import_react7.default.createElement("path", {
+    import_react8.default.createElement("path", {
       d: "M4 12.5a6.5 6.5 0 1 1 12 0",
       stroke: color,
       strokeWidth: 1.6,
       strokeLinecap: "round"
     }),
-    import_react7.default.createElement("circle", { cx: 10, cy: 13.4, r: 2.1, fill: color }),
-    import_react7.default.createElement("path", { d: "M3 16.6h14", stroke: color, strokeWidth: 1.4, strokeLinecap: "round", opacity: 0.45 })
+    import_react8.default.createElement("circle", { cx: 10, cy: 13.4, r: 2.1, fill: color }),
+    import_react8.default.createElement("path", { d: "M3 16.6h14", stroke: color, strokeWidth: 1.4, strokeLinecap: "round", opacity: 0.45 })
   );
 }
 function FreshnessPill({ phase, error, fetchedAt, now }) {
@@ -5162,14 +5814,14 @@ function FreshnessPill({ phase, error, fetchedAt, now }) {
     error: { text: error?.message ? "\u7F51\u5173\u4E0D\u53EF\u8FBE" : "\u8BFB\u53D6\u5931\u8D25", fg: tone.err.fg, bg: tone.err.bg }
   };
   const item = map[phase] ?? map.loading;
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "span",
     { style: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, color: item.fg } },
-    import_react7.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: item.fg, display: "inline-block" } }),
+    import_react8.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: item.fg, display: "inline-block" } }),
     item.text
   );
 }
-var EntryBoundary = class extends import_react7.default.Component {
+var EntryBoundary = class extends import_react8.default.Component {
   constructor(props) {
     super(props);
     this.state = { error: void 0, open: false };
@@ -5188,7 +5840,7 @@ var EntryBoundary = class extends import_react7.default.Component {
     const { error, open } = this.state;
     if (!error) return this.props.children;
     const text = String(error?.stack ?? error?.message ?? error);
-    const chip = import_react7.default.createElement("button", {
+    const chip = import_react8.default.createElement("button", {
       type: "button",
       onClick: this.toggle,
       title: text,
@@ -5210,7 +5862,7 @@ var EntryBoundary = class extends import_react7.default.Component {
       }
     }, "\u26A0 \u6E20\u9053\u5165\u53E3\u5F02\u5E38");
     const detail = open ? (0, import_react_dom.createPortal)(
-      import_react7.default.createElement("div", {
+      import_react8.default.createElement("div", {
         role: "dialog",
         "aria-label": "\u6E20\u9053\u5165\u53E3\u9519\u8BEF",
         style: {
@@ -5236,45 +5888,45 @@ var EntryBoundary = class extends import_react7.default.Component {
       }, text.slice(0, 2e3)),
       document.body
     ) : null;
-    return import_react7.default.createElement(import_react7.default.Fragment, null, chip, detail);
+    return import_react8.default.createElement(import_react8.default.Fragment, null, chip, detail);
   }
 };
 function QuickEntry(props) {
-  return import_react7.default.createElement(EntryBoundary, null, import_react7.default.createElement(QuickEntryInner, props));
+  return import_react8.default.createElement(EntryBoundary, null, import_react8.default.createElement(QuickEntryInner, props));
 }
 function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, clock }) {
-  const now = import_react7.default.useMemo(() => {
+  const now = import_react8.default.useMemo(() => {
     if (typeof clock === "function") return clock;
     if (typeof clock === "number") return () => clock;
     return Date.now;
   }, [clock]);
-  const [snapshot, setSnapshot] = import_react7.default.useState(() => store?.getSnapshot?.());
-  const [enabled, setEnabled] = import_react7.default.useState(() => prefs ? prefs.value : true);
-  const [open, setOpen] = import_react7.default.useState(false);
-  const [centerOpen, setCenterOpen] = import_react7.default.useState(false);
-  const [anchor, setAnchor] = import_react7.default.useState();
-  const buttonRef = import_react7.default.useRef(null);
-  const rootRef = import_react7.default.useRef(null);
-  const openCenter = import_react7.default.useCallback(() => {
+  const [snapshot, setSnapshot] = import_react8.default.useState(() => store?.getSnapshot?.());
+  const [enabled, setEnabled] = import_react8.default.useState(() => prefs ? prefs.value : true);
+  const [open, setOpen] = import_react8.default.useState(false);
+  const [centerOpen, setCenterOpen] = import_react8.default.useState(false);
+  const [anchor, setAnchor] = import_react8.default.useState();
+  const buttonRef = import_react8.default.useRef(null);
+  const rootRef = import_react8.default.useRef(null);
+  const openCenter = import_react8.default.useCallback(() => {
     setOpen(false);
     setCenterOpen(true);
   }, []);
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     if (!store) return void 0;
     const off = store.subscribe(setSnapshot);
     store.start?.();
     return off;
   }, [store]);
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     if (!prefs) return void 0;
     const sync = () => setEnabled(prefs.value);
     sync();
     return prefs.subscribe?.(sync);
   }, [prefs]);
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     if (!enabled && open) setOpen(false);
   }, [enabled, open]);
-  import_react7.default.useLayoutEffect(() => {
+  import_react8.default.useLayoutEffect(() => {
     if (!open) return void 0;
     const place = () => {
       const rect = buttonRef.current?.getBoundingClientRect();
@@ -5302,7 +5954,7 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       window.removeEventListener("scroll", place, true);
     };
   }, [open]);
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     if (!open) return void 0;
     const onPointerDown = (event) => {
       if (rootRef.current?.contains(event.target)) return;
@@ -5321,19 +5973,19 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     if (!open) return;
     void store?.loadUsage?.({});
     void store?.loadAux?.({});
   }, [open, store]);
-  const prevWide = import_react7.default.useRef(wide);
-  import_react7.default.useEffect(() => {
+  const prevWide = import_react8.default.useRef(wide);
+  import_react8.default.useEffect(() => {
     if (prevWide.current !== wide) {
       prevWide.current = wide;
       setOpen(false);
     }
   }, [wide]);
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     if (wide !== true) return void 0;
     const button2 = buttonRef.current;
     if (!button2) return void 0;
@@ -5351,7 +6003,7 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       row.style.flexWrap = before;
     };
   }, [wide]);
-  const summary = import_react7.default.useMemo(
+  const summary = import_react8.default.useMemo(
     () => quickSummaryVM({ status: snapshot?.status, usage: snapshot?.usage, now: now() }),
     [snapshot, now]
   );
@@ -5372,7 +6024,7 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
     return Math.max(0, Math.min(1, enter * span - index * SEG_STAGGER));
   };
   const card = wide === true;
-  const button = import_react7.default.createElement(
+  const button = import_react8.default.createElement(
     "button",
     {
       ref: buttonRef,
@@ -5407,12 +6059,12 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
         gap: 7
       }
     },
-    import_react7.default.createElement(
+    import_react8.default.createElement(
       "span",
       { style: { position: "relative", display: "inline-flex", flex: "0 0 auto" } },
-      import_react7.default.createElement(EntryIcon, { size: wide ? 17 : 18, color: badgeColor }),
+      import_react8.default.createElement(EntryIcon, { size: wide ? 17 : 18, color: badgeColor }),
       // 角标：rail 态唯一的异常信号
-      alert || phase === "stale" ? import_react7.default.createElement("span", {
+      alert || phase === "stale" ? import_react8.default.createElement("span", {
         style: {
           position: "absolute",
           right: -1,
@@ -5425,16 +6077,16 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
         }
       }) : null
     ),
-    wide ? import_react7.default.createElement(
+    wide ? import_react8.default.createElement(
       "span",
       { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1, justifyContent: "space-between" } },
-      import_react7.default.createElement("span", { style: { fontSize: 13, fontWeight: 550, color: "var(--dsw-alias-label-primary,currentColor)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
-      import_react7.default.createElement(
+      import_react8.default.createElement("span", { style: { fontSize: 13, fontWeight: 550, color: "var(--dsw-alias-label-primary,currentColor)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
+      import_react8.default.createElement(
         "span",
         { style: { display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0, flex: "0 0 auto" } },
         // 健康环：把「5/5」从纯文字变成一眼可扫的占比（16px / 3px 描边；语义在 title + aria-label）
         // 入场：从 0 扫到目标占比 + 淡入；扫出期间关掉 CSS 过渡（否则两套动画叠加会发飘）。
-        hasAccounts && phase !== "error" ? import_react7.default.createElement("span", {
+        hasAccounts && phase !== "error" ? import_react8.default.createElement("span", {
           role: "img",
           "aria-label": `\u8D26\u53F7 ${summary.healthy}/${summary.total} \u5065\u5EB7`,
           title: `\u8D26\u53F7 ${summary.healthy}/${summary.total} \u5065\u5EB7${summary.cooling > 0 ? ` \xB7 \u51B7\u5374 ${summary.cooling}` : ""}${summary.disabled > 0 ? ` \xB7 \u7981\u7528 ${summary.disabled}` : ""}`,
@@ -5443,14 +6095,14 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
             flex: "0 0 auto",
             opacity: enter >= 1 ? 1 : 0.25 + 0.75 * enter
           }
-        }, import_react7.default.createElement(Ring, {
+        }, import_react8.default.createElement(Ring, {
           ratio: summary.healthRatio * enter,
           size: 16,
           stroke: 3,
           color: badgeColor,
           transition: enter >= 1 ? void 0 : "none"
         })) : null,
-        import_react7.default.createElement(
+        import_react8.default.createElement(
           "span",
           { style: { fontSize: 11.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" } },
           phase === "error" ? "\u4E0D\u53EF\u8FBE" : hasAccounts ? `${summary.healthy}/${summary.total} \xB7 ${formatCompact(shownCredits)}` : "\u65E0\u8D26\u53F7"
@@ -5458,7 +6110,7 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       )
     ) : null
   );
-  const centerButton = card && centerPanel ? import_react7.default.createElement("button", {
+  const centerButton = card && centerPanel ? import_react8.default.createElement("button", {
     type: "button",
     "aria-haspopup": "dialog",
     "aria-expanded": centerOpen,
@@ -5482,20 +6134,20 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       justifyContent: "center",
       color: "var(--dsw-alias-label-secondary,#6b7280)"
     }
-  }, import_react7.default.createElement(Icons.hub, { width: 17, height: 17, "aria-hidden": "true" })) : null;
-  const divider = centerButton ? import_react7.default.createElement("span", {
+  }, import_react8.default.createElement(Icons.hub, { width: 17, height: 17, "aria-hidden": "true" })) : null;
+  const divider = centerButton ? import_react8.default.createElement("span", {
     "aria-hidden": "true",
     style: { flex: "0 0 auto", alignSelf: "center", width: 1, height: 18, background: "var(--dsw-alias-border-l2,#e5e7eb)" }
   }) : null;
   const decorations = [];
   if (card) {
-    decorations.push(import_react7.default.createElement("span", {
+    decorations.push(import_react8.default.createElement("span", {
       key: "strip",
       "aria-hidden": "true",
       style: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: badgeColor }
     }));
     if (hasAccounts && phase !== "error" && barRows.length > 0) {
-      decorations.push(import_react7.default.createElement(
+      decorations.push(import_react8.default.createElement(
         "span",
         {
           key: "bar",
@@ -5513,7 +6165,7 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
           }
         },
         ...barRows.map(
-          (row, index) => import_react7.default.createElement("span", {
+          (row, index) => import_react8.default.createElement("span", {
             key: row.id,
             style: {
               width: `${row.count / barTotal * 100 * segProgress(index)}%`,
@@ -5525,7 +6177,7 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
       ));
     }
   }
-  const entryRow = import_react7.default.createElement("div", {
+  const entryRow = import_react8.default.createElement("div", {
     "data-dshc-entry": "row",
     ...card ? { className: "dshc-entry-card" } : {},
     "data-open": open ? "true" : "false",
@@ -5547,9 +6199,9 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
         background: open ? "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 12%, transparent), transparent 70%), var(--dsw-alias-bg-layer-2,#f9fafb)" : "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%), var(--dsw-alias-bg-layer-1,#fff)"
       } : {}
     }
-  }, import_react7.default.createElement("style", null, ENTRY_CSS), ...decorations, button, divider, centerButton);
+  }, import_react8.default.createElement("style", null, ENTRY_CSS), ...decorations, button, divider, centerButton);
   const popover = open && anchor ? (0, import_react_dom.createPortal)(
-    import_react7.default.createElement(Popover, {
+    import_react8.default.createElement(Popover, {
       snapshot,
       summary,
       anchor,
@@ -5565,14 +6217,14 @@ function QuickEntryInner({ wide, store, prefs, centerPanel, centerPanelProps, cl
     document.body
   ) : null;
   const centerModal = centerOpen && centerPanel ? (0, import_react_dom.createPortal)(
-    import_react7.default.createElement(
+    import_react8.default.createElement(
       CenterModal,
       { onClose: () => setCenterOpen(false) },
-      import_react7.default.createElement(centerPanel, centerPanelProps ?? {})
+      import_react8.default.createElement(centerPanel, centerPanelProps ?? {})
     ),
     document.body
   ) : null;
-  return import_react7.default.createElement(import_react7.default.Fragment, null, entryRow, popover, centerModal);
+  return import_react8.default.createElement(import_react8.default.Fragment, null, entryRow, popover, centerModal);
 }
 function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, openCenter }) {
   const phase = snapshot?.phase ?? "loading";
@@ -5580,12 +6232,12 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
   const refreshing = snapshot?.refreshing === true;
   const usage = snapshot?.usage;
   const sheet = typeof window !== "undefined" && window.innerWidth < 480;
-  const seriesByUid = import_react7.default.useMemo(() => {
+  const seriesByUid = import_react8.default.useMemo(() => {
     const buckets = usage?.buckets;
     if (!Array.isArray(buckets) || buckets.length === 0) return /* @__PURE__ */ new Map();
     return usageSeriesByKey(buckets, "uid").series;
   }, [usage]);
-  const usageByUid = import_react7.default.useMemo(() => {
+  const usageByUid = import_react8.default.useMemo(() => {
     const rows = Array.isArray(usage?.by_uid) ? usage.by_uid : [];
     return new Map(rows.map((row) => [row.key, row]));
   }, [usage]);
@@ -5600,11 +6252,11 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
       now: now()
     })
   ).sort((a, b) => b.credits - a.credits || a.name.localeCompare(b.name));
-  const daySpark = import_react7.default.useMemo(() => {
+  const daySpark = import_react8.default.useMemo(() => {
     if (!Array.isArray(usage?.buckets)) return [];
     return usageBySlot(usage.buckets).map((row) => row.requests);
   }, [usage]);
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "div",
     {
       ref: rootRef,
@@ -5632,9 +6284,9 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
         overflow: "hidden"
       }
     },
-    import_react7.default.createElement("style", null, QUICK_CSS),
+    import_react8.default.createElement("style", null, QUICK_CSS),
     // ── 头部：品牌色渐变条 + 标题 + 新鲜度 + 关闭
-    import_react7.default.createElement(
+    import_react8.default.createElement(
       "div",
       {
         style: {
@@ -5647,16 +6299,16 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
           borderBottom: "1px solid var(--dsw-alias-border-l2,#eef1f5)"
         }
       },
-      import_react7.default.createElement("span", { style: { color: tone.info.fg, display: "inline-flex" } }, import_react7.default.createElement(EntryIcon, { size: 15, color: "currentColor" })),
-      import_react7.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
+      import_react8.default.createElement("span", { style: { color: tone.info.fg, display: "inline-flex" } }, import_react8.default.createElement(EntryIcon, { size: 15, color: "currentColor" })),
+      import_react8.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u8D26\u53F7"),
       // 头部只留「标题 + 新鲜度」：网关自述名（/status 的 version）与进程 uptime 不放这里 ——
       // 它们紧贴标题、灰字、无前缀，会被读成一条账号摘要（用户反馈）。要看这两项去
       // 「渠道中心」的用量页（进程累计那块）。
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "span",
         { style: { marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 } },
-        import_react7.default.createElement(FreshnessPill, { phase, error, fetchedAt: snapshot?.fetchedAt, now: now() }),
-        import_react7.default.createElement("button", {
+        import_react8.default.createElement(FreshnessPill, { phase, error, fetchedAt: snapshot?.fetchedAt, now: now() }),
+        import_react8.default.createElement("button", {
           type: "button",
           "aria-label": "\u5173\u95ED",
           onClick: onClose,
@@ -5665,33 +6317,33 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
       )
     ),
     // ── 错误态：不显示 0、不假装有数据
-    phase === "error" ? import_react7.default.createElement(
+    phase === "error" ? import_react8.default.createElement(
       "div",
       { style: { padding: "14px 12px", display: "flex", flexDirection: "column", gap: 8 } },
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         { style: { fontSize: 12.5, color: tone.err.fg, display: "flex", alignItems: "center", gap: 6 } },
-        import_react7.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: "currentColor" } }),
+        import_react8.default.createElement("span", { style: { width: 6, height: 6, borderRadius: 999, background: "currentColor" } }),
         error?.message ?? "\u7F51\u5173\u4E0D\u53EF\u8FBE"
       ),
-      import_react7.default.createElement("div", { style: { ...s.muted, fontSize: 11.5 } }, snapshot?.baseURL ? `\u5730\u5740 ${snapshot.baseURL}` : "\u672A\u914D\u7F6E\u7F51\u5173\u5730\u5740"),
-      import_react7.default.createElement(
+      import_react8.default.createElement("div", { style: { ...s.muted, fontSize: 11.5 } }, snapshot?.baseURL ? `\u5730\u5740 ${snapshot.baseURL}` : "\u672A\u914D\u7F6E\u7F51\u5173\u5730\u5740"),
+      import_react8.default.createElement(
         "div",
         { style: { display: "flex", gap: 8, marginTop: 2 } },
-        import_react7.default.createElement("button", { type: "button", onClick: () => onRefresh?.(), style: { ...s.btnGhost, height: 28, fontSize: 12 } }, "\u91CD\u8BD5"),
-        openCenter ? import_react7.default.createElement("button", { type: "button", onClick: () => {
+        import_react8.default.createElement("button", { type: "button", onClick: () => onRefresh?.(), style: { ...s.btnGhost, height: 28, fontSize: 12 } }, "\u91CD\u8BD5"),
+        openCenter ? import_react8.default.createElement("button", { type: "button", onClick: () => {
           onClose?.();
           openCenter?.();
         }, style: { ...s.btnPri, height: 28, fontSize: 12 } }, "\u6253\u5F00\u6E20\u9053\u4E2D\u5FC3") : null
       )
-    ) : import_react7.default.createElement(
-      import_react7.default.Fragment,
+    ) : import_react8.default.createElement(
+      import_react8.default.Fragment,
       null,
       // ── 汇总：三块统计
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         { style: { display: "flex", gap: 8, padding: "10px 12px 4px" } },
-        import_react7.default.createElement(
+        import_react8.default.createElement(
           Tile,
           {
             label: "\u53EF\u7528\u79EF\u5206",
@@ -5699,55 +6351,55 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
             accent: tone.info.fg,
             hint: summary.creditsFreshness?.stale ? "\u504F\u65E7" : void 0
           },
-          import_react7.default.createElement(
+          import_react8.default.createElement(
             "div",
             { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 } },
-            import_react7.default.createElement(Ring, { ratio: summary.healthRatio, color: summary.healthy === summary.total ? tone.ok.fg : tone.warn.fg }),
-            import_react7.default.createElement(
+            import_react8.default.createElement(Ring, { ratio: summary.healthRatio, color: summary.healthy === summary.total ? tone.ok.fg : tone.warn.fg }),
+            import_react8.default.createElement(
               "span",
               { style: { fontSize: 10.5, color: "var(--dsw-alias-label-tertiary,#8b93a1)", lineHeight: 1.35 } },
               `\u8D26\u53F7 ${summary.healthy}/${summary.total}`,
-              summary.cooling > 0 ? import_react7.default.createElement("br", null) : null,
+              summary.cooling > 0 ? import_react8.default.createElement("br", null) : null,
               summary.cooling > 0 ? `\u51B7\u5374 ${summary.cooling}` : ""
             )
           )
         ),
-        import_react7.default.createElement(
+        import_react8.default.createElement(
           Tile,
           { label: "\u8FD1 24h", value: summary.usage24h ? formatNumber(summary.usage24h.requests) : "\u2014", hint: "\u6B21" },
-          import_react7.default.createElement(
+          import_react8.default.createElement(
             "div",
             { style: { marginTop: 2, display: "flex", alignItems: "center", gap: 6, minWidth: 0 } },
-            import_react7.default.createElement(Sparkline, { values: daySpark, color: tone.info.fg, width: 92, height: 20 })
+            import_react8.default.createElement(Sparkline, { values: daySpark, color: tone.info.fg, width: 92, height: 20 })
           )
         )
       ),
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         { style: { padding: "6px 12px 10px" } },
-        import_react7.default.createElement(ChannelBar, {
+        import_react8.default.createElement(ChannelBar, {
           channels: summary.channels.map((row) => ({ ...row, color: channelColor(row.id) })),
           total: summary.total
         }),
-        summary.usage24h ? import_react7.default.createElement(
+        summary.usage24h ? import_react8.default.createElement(
           "div",
           { style: { ...s.muted, fontSize: 10.5, marginTop: 6 } },
           `${formatTokens(summary.usage24h.tokens)} tokens \xB7 \u6210\u529F ${formatNumber(summary.usage24h.success)} / \u5931\u8D25 ${formatNumber(summary.usage24h.failed)}${summary.inFlight > 0 ? ` \xB7 \u5728\u9014 ${summary.inFlight}` : ""}${typeof summary.sticky === "number" ? ` \xB7 \u7C98\u6027 ${summary.sticky}` : ""}`
         ) : null
       ),
       // ── 账号列表（滚动区）
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         {
           className: "dshc-quick-scroll",
           style: { display: "flex", flexDirection: "column", gap: 2, padding: "4px 6px 8px", overflowY: "auto", minHeight: 0, flex: 1 }
         },
-        vms.length === 0 ? import_react7.default.createElement(
+        vms.length === 0 ? import_react8.default.createElement(
           "div",
           { style: { ...s.muted, padding: "10px 8px", fontSize: 11.5 } },
           "\u7F51\u5173\u8FD8\u6CA1\u6709\u8D26\u53F7 \u2014\u2014 \u5230\u300C\u6E20\u9053\u4E2D\u5FC3\u300D\u6DFB\u52A0\u540E\u8FD9\u91CC\u4F1A\u81EA\u52A8\u51FA\u73B0\u3002"
         ) : vms.map(
-          (vm) => import_react7.default.createElement(AccountQuickRow, {
+          (vm) => import_react8.default.createElement(AccountQuickRow, {
             key: vm.uid,
             vm,
             series: seriesByUid.get(vm.uid),
@@ -5756,7 +6408,7 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
         )
       ),
       // ── 底栏：新鲜度 + 动作
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         {
           style: {
@@ -5768,22 +6420,22 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
             background: "var(--dsw-alias-bg-layer-2,#fafbfc)"
           }
         },
-        import_react7.default.createElement(
+        import_react8.default.createElement(
           "span",
           { style: { ...s.muted, fontSize: 10.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
           snapshot?.refreshError ? `\u5237\u65B0\u5931\u8D25\uFF1A${snapshot.refreshError.message ?? "\u672A\u77E5\u539F\u56E0"}` : summary.creditsFreshness?.oldestISO ? `\u79EF\u5206 ${relativeTime(summary.creditsFreshness.oldestISO, now())}${summary.creditsFreshness.stale ? "\uFF08\u504F\u65E7\uFF09" : ""}` : " "
         ),
-        import_react7.default.createElement(
+        import_react8.default.createElement(
           "span",
           { style: { marginLeft: "auto", display: "inline-flex", gap: 6 } },
-          import_react7.default.createElement("button", {
+          import_react8.default.createElement("button", {
             type: "button",
             disabled: refreshing,
             onClick: onRefresh,
             title: "\u5411\u4E0A\u6E38\u91CD\u53D6\u5404\u8D26\u53F7\u4F59\u989D\uFF08\u4F1A\u771F\u6253\u4E00\u6B21\u4E0A\u6E38\uFF09",
             style: { ...s.btnGhost, height: 28, fontSize: 12, opacity: refreshing ? 0.6 : 1 }
           }, refreshing ? "\u5237\u65B0\u4E2D\u2026" : "\u5237\u65B0"),
-          openCenter ? import_react7.default.createElement("button", {
+          openCenter ? import_react8.default.createElement("button", {
             type: "button",
             title: "\u6253\u5F00\u300C\u6E20\u9053\u4E2D\u5FC3\u300D\u9762\u677F\uFF08\u542B\u8D26\u53F7\u6C60\u3001\u4EFB\u52A1\u3001\u65E5\u5FD7\u3001\u7528\u91CF\uFF09",
             onClick: () => {
@@ -5798,9 +6450,9 @@ function Popover({ snapshot, summary, anchor, now, rootRef, onClose, onRefresh, 
   );
 }
 function CenterModal({ onClose, children }) {
-  const closeRef = import_react7.default.useRef(null);
+  const closeRef = import_react8.default.useRef(null);
   const sheet = typeof window !== "undefined" && window.innerWidth < 640;
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
         event.stopPropagation();
@@ -5816,14 +6468,14 @@ function CenterModal({ onClose, children }) {
       if (body) body.style.overflow = before;
     };
   }, [onClose]);
-  import_react7.default.useEffect(() => {
+  import_react8.default.useEffect(() => {
     const previous = document.activeElement;
     closeRef.current?.focus?.();
     return () => {
       previous?.focus?.();
     };
   }, []);
-  return import_react7.default.createElement(
+  return import_react8.default.createElement(
     "div",
     {
       className: "dshc-center-backdrop",
@@ -5842,7 +6494,7 @@ function CenterModal({ onClose, children }) {
         background: "rgba(15,23,42,.45)"
       }
     },
-    import_react7.default.createElement(
+    import_react8.default.createElement(
       "div",
       {
         className: "dshc-center-dialog",
@@ -5865,7 +6517,7 @@ function CenterModal({ onClose, children }) {
         }
       },
       // 头部：图标 + 标题 + 关闭（与 popover 头部同一套令牌，不写死颜色）
-      import_react7.default.createElement(
+      import_react8.default.createElement(
         "div",
         {
           style: {
@@ -5878,13 +6530,13 @@ function CenterModal({ onClose, children }) {
             background: "linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-button-info-fill,#4176f7) 8%, transparent), transparent 70%)"
           }
         },
-        import_react7.default.createElement(
+        import_react8.default.createElement(
           "span",
           { style: { color: tone.info.fg, display: "inline-flex" } },
-          import_react7.default.createElement(Icons.hub, { width: 17, height: 17, "aria-hidden": "true" })
+          import_react8.default.createElement(Icons.hub, { width: 17, height: 17, "aria-hidden": "true" })
         ),
-        import_react7.default.createElement("span", { style: { fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u4E2D\u5FC3"),
-        import_react7.default.createElement("button", {
+        import_react8.default.createElement("span", { style: { fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap" } }, "\u6E20\u9053\u4E2D\u5FC3"),
+        import_react8.default.createElement("button", {
           ref: closeRef,
           type: "button",
           "aria-label": "\u5173\u95ED\u6E20\u9053\u4E2D\u5FC3",
@@ -5906,7 +6558,7 @@ function CenterModal({ onClose, children }) {
         }, "\u2715")
       ),
       // 主体：渠道中心面板本体（滚动区，移动端整屏）
-      import_react7.default.createElement("div", {
+      import_react8.default.createElement("div", {
         className: "dshc-center-body",
         style: { flex: 1, minHeight: 0, overflow: "auto", padding: sheet ? "12px 12px 20px" : "12px 14px 16px" }
       }, children)
@@ -6277,6 +6929,9 @@ var TABS = [
   { id: "tasks", label: "\u4EFB\u52A1", icon: "check" },
   { id: "usage", label: "\u7528\u91CF", icon: "trend" },
   { id: "models", label: "\u6A21\u578B", icon: "cpu" },
+  // 「接入方」：多消费者 API Key 与各自的模型集合。仅在网关提供 /admin/keys
+  // 时出现（见 App 里的 adminKeysAvailable 过滤）。
+  { id: "apikeys", label: "\u63A5\u5165\u65B9", icon: "key" },
   { id: "logs", label: "\u65E5\u5FD7", icon: "list" },
   { id: "config", label: "\u914D\u7F6E", icon: "gear" }
 ];
@@ -8395,11 +9050,11 @@ function ApiKeyPill({ onReveal }) {
     React.createElement("span", { className: "dshc-keypill-ico", title: "\u590D\u5236" }, React.createElement(Icons.copy, null))
   );
 }
-function TabBar({ active, onChange, statusText, onAdd }) {
+function TabBar({ active, onChange, statusText, onAdd, tabs = TABS }) {
   return React.createElement(
     "div",
     { className: "dshc-tabs" },
-    ...TABS.map(({ id, label, icon }) => {
+    ...tabs.map(({ id, label, icon }) => {
       const isActive = active === id;
       const TabIcon = Icons[icon];
       return React.createElement(
@@ -8876,6 +9531,11 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   const maxInFlight = maxInFlightOf(configInfo?.config);
   const limitOf = React.useCallback((account) => realmLimitOf(configInfo?.config, account?.realm), [configInfo?.config]);
   const adminAvailable = data?.probe?.features?.admin === true || data?.probe?.features?.tasks === true;
+  const adminKeysAvailable = data?.probe?.features?.adminKeys === true;
+  const tabs = React.useMemo(
+    () => adminKeysAvailable ? TABS : TABS.filter((tab) => tab.id !== "apikeys"),
+    [adminKeysAvailable]
+  );
   const onReveal = React.useCallback(async () => {
     try {
       const result = await rpcCall(ENDPOINTS.revealApiKey, {});
@@ -8972,6 +9632,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
     React.createElement(TabBar, {
       active: activeTab,
       onChange: setActiveTab,
+      tabs,
       statusText: "",
       onAdd: loginChannels && loginChannels.length > 0 ? () => setAddOpen(true) : void 0
     }),
@@ -9027,6 +9688,12 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
       onRefreshAll: refresh
     }) : null,
     activeTab === "models" ? React.createElement(ModelAbilityTab, {
+      rpcCall,
+      showToast
+    }) : null,
+    activeTab === "apikeys" ? React.createElement(ApiKeysTab, {
+      // 自管数据（与用量/模型能力两个 Tab 同构）：进入时拉一次 /admin/keys，
+      // 任何写操作后自行刷新，不给 App 增加状态。
       rpcCall,
       showToast
     }) : null,
