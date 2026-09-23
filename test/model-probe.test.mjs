@@ -157,6 +157,26 @@ test('classifyProbeAnswer：自述看不到图 → 文', () => {
   }
 });
 
+test('classifyProbeAnswer：数字对 + 色族对 → 图（真机：navy 答「蓝色」、maroon 答「红色」）', () => {
+  // 真机原话：minimax-m3 期望 navy/3 答「蓝色,3」；deepseek-flash 期望 olive/7 答「绿色,7」；
+  // deepseek-v4-pro 期望 teal/1 答「蓝绿色,1」；summary 期望 maroon/6 答「红色,6」
+  const cases = [
+    [{ digit: '3', colorTokens: ['深蓝', 'navy'], colorFamily: ['蓝', 'blue', 'navy'] }, '蓝色,3'],
+    [{ digit: '7', colorTokens: ['橄榄', 'olive'], colorFamily: ['绿', 'green', 'olive'] }, '绿色,7'],
+    [{ digit: '1', colorTokens: ['青', 'teal'], colorFamily: ['青', '蓝绿', 'teal'] }, '蓝绿色,1'],
+    [{ digit: '6', colorTokens: ['酒红', 'maroon'], colorFamily: ['红', 'red', 'maroon'] }, '红色,6'],
+  ];
+  for (const [expect, content] of cases) {
+    const r = classifyProbeAnswer({ content, expect });
+    assert.equal(r.verdict, PROBE_VERDICT.IMAGE, content);
+    assert.ok(r.reason.includes('同色族'), r.reason);
+  }
+  // 数字对、色族也不符 → 未定（例如答「黑色,7」）
+  assert.equal(classifyProbeAnswer({
+    content: '黑色,7', expect: { digit: '7', colorTokens: ['紫'], colorFamily: ['紫', 'purple'] },
+  }).verdict, PROBE_VERDICT.UNKNOWN);
+});
+
 test('classifyProbeAnswer：答错/答一半 → 未定（真机里模型会编颜色，不能算看见也不能算纯文本）', () => {
   const expect = { digit: '7', colorTokens: ['紫', 'purple'] };
   assert.equal(classifyProbeAnswer({ content: '浅灰色', expect }).verdict, PROBE_VERDICT.UNKNOWN);

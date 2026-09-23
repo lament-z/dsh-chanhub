@@ -627,8 +627,9 @@ function fakeRpc(status) {
           value: {
             provider: 'chanhub2api',
             results: [
-              { id: 'workbuddy:global:kimi-k3', verdict: 'image', reason: '带图请求被接受', evidence: { imageStatus: 200, imageMessage: '' } },
-              { id: 'workbuddy:cn:kimi-k3-1', verdict: 'text', reason: '上游拒绝图片：不支持图片输入', evidence: { imageStatus: 400, imageMessage: '不支持图片输入' } },
+              { id: 'workbuddy:global:kimi-k3', verdict: 'image', reason: '答对背景色与数字（purple/7）', evidence: { imageStatus: 200, imageMessage: '' } },
+              { id: 'workbuddy:cn:glm-5.3', verdict: 'image', reason: '答对背景色与数字（orange/6）', evidence: { imageStatus: 200, imageMessage: '' } },
+              { id: 'workbuddy:cn:kimi-k3-1', verdict: 'text', reason: '模型自述看不到图：不支持图片输入', evidence: { imageStatus: 200, imageMessage: '' } },
             ],
             done: 2,
             remaining: [],
@@ -2190,6 +2191,9 @@ test('渲染模型 Tab：实测未定项 —— 行内可单测，结论与目�
     html = document.getElementById('app').innerHTML;
     assert.ok(html.includes('实测：图'), '实测结论要显示出来');
     assert.ok(html.includes('实测：文'), '纯文本结论也要显示');
+    // 目录与实测不一致必须显式标矛盾（真机里目录对 CN 的「文」标注经常是错的）
+    assert.ok(html.includes('与目录矛盾'), '目录说「文」而实测「图」时要标矛盾');
+    assert.ok(html.includes('实测：图') && html.includes('实测：文'));
   } finally {
     await cleanup();
   }

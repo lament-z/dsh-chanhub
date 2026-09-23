@@ -4064,6 +4064,33 @@ function catalogColors(v) {
   if (v.verdict === "image") return tone.ok;
   return tone.idle;
 }
+function ProbeMark({ result, capability, verdict, canProbe, busy, onProbe }) {
+  const measured = result?.verdict ?? (capability?.tier === "L0" ? capability.image === true ? "image" : "text" : null);
+  const label = { image: "\u56FE", text: "\u6587", unknown: "\u672A\u5B9A" };
+  const color = measured === "image" ? tone.ok : measured === "text" ? tone.idle : tone.warn;
+  const catalogVerdict = verdict?.verdict;
+  const conflict = measured !== null && measured !== "unknown" && (catalogVerdict === "image" || catalogVerdict === "text") && measured !== catalogVerdict;
+  return import_react6.default.createElement(
+    "span",
+    { style: { display: "inline-flex", alignItems: "center", gap: 6 } },
+    measured ? import_react6.default.createElement("span", {
+      style: { ...s.tag, color: color.fg, background: color.bg },
+      title: result ? `\u5B9E\u6D4B\uFF1A${result.reason}` : `\u5DF2\u6C89\u6DC0\uFF08${capability.tier}\uFF09\uFF1A${capability.how ?? ""} \u2014\u2014 \u6765\u81EA\u80FD\u529B\u57FA\u7EBF\uFF0C\u4E0D\u662F\u672C\u6B21\u4F1A\u8BDD\u5B9E\u6D4B`
+    }, `${result ? "\u5B9E\u6D4B" : "\u5DF2\u6C89\u6DC0"}\uFF1A${label[measured] ?? measured}`) : null,
+    conflict ? import_react6.default.createElement("span", {
+      style: { ...s.tag, color: tone.err.fg, background: tone.err.bg },
+      title: `\u5B9E\u6D4B\u4E0E\u76EE\u5F55\u4E0D\u4E00\u81F4\uFF1A\u76EE\u5F55\u8BF4\u300C${label[catalogVerdict]}\u300D\uFF08${verdict.status}\uFF09\uFF0C\u5B9E\u6D4B\u8BF4\u300C${label[measured]}\u300D\u3002\u6309\u7EAA\u5F8B\u4EE5\u5B9E\u6D4B\u4E3A\u51C6 \u2014\u2014 \u70B9\u300C\u6C89\u6DC0\u786E\u8BA4\u9879\u300D\u628A\u5B9E\u6D4B\u7ED3\u8BBA\u5199\u8FDB\u57FA\u7EBF\u3002`
+    }, "\u4E0E\u76EE\u5F55\u77DB\u76FE") : null,
+    canProbe ? import_react6.default.createElement("button", {
+      ...s.btnGhost,
+      style: { ...s.btnGhost, padding: "1px 6px", fontSize: 11, opacity: busy ? 0.5 : 1 },
+      type: "button",
+      disabled: busy,
+      onClick: onProbe,
+      title: "\u53EA\u5B9E\u6D4B\u8FD9\u4E00\u4E2A\u6A21\u578B\uFF08\u53D1\u4E00\u5F20\u5E26\u300C\u989C\u8272+\u6570\u5B57\u300D\u7684\u56FE\uFF0C\u7B54\u5BF9\u624D\u7B97\u770B\u89C1\uFF09"
+    }, "\u5B9E\u6D4B") : null
+  );
+}
 function CatalogBadge({ verdict, whitelisted }) {
   if (!verdict) {
     return import_react6.default.createElement("span", { style: { ...s.tag, color: tone.idle.fg, background: tone.idle.bg } }, "\u672A\u6BD4\u5BF9");
@@ -4747,28 +4774,14 @@ function ModelAbilityTab({ rpcCall, showToast }) {
                     verdict: catalog?.verdicts?.get(m.id) ?? null,
                     whitelisted: catalog?.verdicts?.get(m.id)?.whitelist
                   }),
-                  // 实测结果（本次会话）：与目录结论并列，冲突时一眼可见
-                  probeResults[m.id] ? import_react6.default.createElement("span", {
-                    style: {
-                      ...s.tag,
-                      color: probeResults[m.id].verdict === "image" ? tone.ok.fg : probeResults[m.id].verdict === "text" ? tone.idle.fg : tone.warn.fg,
-                      background: probeResults[m.id].verdict === "image" ? tone.ok.bg : probeResults[m.id].verdict === "text" ? tone.idle.bg : tone.warn.bg
-                    },
-                    title: `\u5B9E\u6D4B\uFF1A${probeResults[m.id].reason}`
-                  }, `\u5B9E\u6D4B\uFF1A${probeResults[m.id].verdict === "image" ? "\u56FE" : probeResults[m.id].verdict === "text" ? "\u6587" : "\u672A\u5B9A"}`) : null,
-                  // 基线里的 L0 实测结论（持久）
-                  catalog?.capabilities?.[m.id]?.tier === "L0" ? import_react6.default.createElement("span", {
-                    style: { ...s.tag, color: tone.ok.fg, background: tone.ok.bg },
-                    title: `\u5DF2\u6C89\u6DC0\uFF08\u5B9E\u6D4B\uFF09\uFF1A${catalog.capabilities[m.id].how ?? ""}`
-                  }, "\u5DF2\u5B9E\u6D4B") : null,
-                  (catalog?.summary?.undecided ?? []).includes(m.id) && !probeResults[m.id] ? import_react6.default.createElement("button", {
-                    ...s.btnGhost,
-                    style: { ...s.btnGhost, padding: "1px 6px", fontSize: 11, opacity: probeBusy ? 0.5 : 1 },
-                    type: "button",
-                    disabled: probeBusy,
-                    onClick: () => runProbe([m.id]),
-                    title: "\u53EA\u5B9E\u6D4B\u8FD9\u4E00\u4E2A\u6A21\u578B\uFF08\u53D1\u4E00\u5F20\u5E26\u300C\u989C\u8272+\u6570\u5B57\u300D\u7684\u56FE\uFF0C\u7B54\u5BF9\u624D\u7B97\u770B\u89C1\uFF09"
-                  }, "\u5B9E\u6D4B") : null
+                  import_react6.default.createElement(ProbeMark, {
+                    result: probeResults[m.id] ?? null,
+                    capability: catalog?.capabilities?.[m.id] ?? null,
+                    verdict: catalog?.verdicts?.get(m.id) ?? null,
+                    canProbe: (catalog?.summary?.undecided ?? []).includes(m.id) && !probeResults[m.id],
+                    busy: probeBusy,
+                    onProbe: () => runProbe([m.id])
+                  })
                 )
               )
             );

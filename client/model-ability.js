@@ -65,6 +65,50 @@ function catalogColors(v) {
   return tone.idle;
 }
 
+/**
+ * 实测标记：把「实测结论」与「目录判定」摆在一起，**不一致时显式标矛盾**。
+ *
+ * 为什么必须标出来：真机实测发现目录对 CN 渠道的「纯文本」标注经常是错的
+ * （hy3-x / hy4-preview-f / glm-5.3 等目录标「文」、实测能读图）。矛盾不标出来，
+ * 用户只会看到两个并排的徽章，不知道该信谁 —— 按本项目纪律：**实测优先**。
+ */
+function ProbeMark({ result, capability, verdict, canProbe, busy, onProbe }) {
+  const measured = result?.verdict
+    ?? (capability?.tier === 'L0' ? (capability.image === true ? 'image' : 'text') : null);
+  const label = { image: '图', text: '文', unknown: '未定' };
+  const color = measured === 'image' ? tone.ok : measured === 'text' ? tone.idle : tone.warn;
+  const catalogVerdict = verdict?.verdict;
+  const conflict = measured !== null && measured !== 'unknown'
+    && (catalogVerdict === 'image' || catalogVerdict === 'text')
+    && measured !== catalogVerdict;
+  return React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6 } },
+    measured
+      ? React.createElement('span', {
+          style: { ...s.tag, color: color.fg, background: color.bg },
+          title: result
+            ? `实测：${result.reason}`
+            : `已沉淀（${capability.tier}）：${capability.how ?? ''} —— 来自能力基线，不是本次会话实测`,
+        }, `${result ? '实测' : '已沉淀'}：${label[measured] ?? measured}`)
+      : null,
+    conflict
+      ? React.createElement('span', {
+          style: { ...s.tag, color: tone.err.fg, background: tone.err.bg },
+          title: `实测与目录不一致：目录说「${label[catalogVerdict]}」（${verdict.status}），实测说「${label[measured]}」。`
+            + '按纪律以实测为准 —— 点「沉淀确认项」把实测结论写进基线。',
+        }, '与目录矛盾')
+      : null,
+    canProbe
+      ? React.createElement('button', {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, padding: '1px 6px', fontSize: 11, opacity: busy ? 0.5 : 1 },
+          type: 'button',
+          disabled: busy,
+          onClick: onProbe,
+          title: '只实测这一个模型（发一张带「颜色+数字」的图，答对才算看见）',
+        }, '实测')
+      : null);
+}
+
 /** 目录判定徽章（只读标注，不写配置）。hover 里带证据：等级/票数/命中方式/来源。 */
 function CatalogBadge({ verdict, whitelisted }) {
   if (!verdict) {
@@ -813,34 +857,14 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                         verdict: catalog?.verdicts?.get(m.id) ?? null,
                         whitelisted: catalog?.verdicts?.get(m.id)?.whitelist,
                       }),
-                      // 实测结果（本次会话）：与目录结论并列，冲突时一眼可见
-                      probeResults[m.id]
-                        ? React.createElement('span', {
-                            style: {
-                              ...s.tag,
-                              color: probeResults[m.id].verdict === 'image' ? tone.ok.fg : probeResults[m.id].verdict === 'text' ? tone.idle.fg : tone.warn.fg,
-                              background: probeResults[m.id].verdict === 'image' ? tone.ok.bg : probeResults[m.id].verdict === 'text' ? tone.idle.bg : tone.warn.bg,
-                            },
-                            title: `实测：${probeResults[m.id].reason}`,
-                          }, `实测：${probeResults[m.id].verdict === 'image' ? '图' : probeResults[m.id].verdict === 'text' ? '文' : '未定'}`)
-                        : null,
-                      // 基线里的 L0 实测结论（持久）
-                      catalog?.capabilities?.[m.id]?.tier === 'L0'
-                        ? React.createElement('span', {
-                            style: { ...s.tag, color: tone.ok.fg, background: tone.ok.bg },
-                            title: `已沉淀（实测）：${catalog.capabilities[m.id].how ?? ''}`,
-                          }, '已实测')
-                        : null,
-                      (catalog?.summary?.undecided ?? []).includes(m.id) && !probeResults[m.id]
-                        ? React.createElement('button', {
-                            ...s.btnGhost,
-                            style: { ...s.btnGhost, padding: '1px 6px', fontSize: 11, opacity: probeBusy ? 0.5 : 1 },
-                            type: 'button',
-                            disabled: probeBusy,
-                            onClick: () => runProbe([m.id]),
-                            title: '只实测这一个模型（发一张带「颜色+数字」的图，答对才算看见）',
-                          }, '实测')
-                        : null)),
+                      React.createElement(ProbeMark, {
+                        result: probeResults[m.id] ?? null,
+                        capability: catalog?.capabilities?.[m.id] ?? null,
+                        verdict: catalog?.verdicts?.get(m.id) ?? null,
+                        canProbe: (catalog?.summary?.undecided ?? []).includes(m.id) && !probeResults[m.id],
+                        busy: probeBusy,
+                        onProbe: () => runProbe([m.id]),
+                      }))),
                 );
               }),
             ),
