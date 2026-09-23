@@ -84,6 +84,43 @@ const CONFLICT = { id: 'x:y', status: 'conflict', verdict: 'unknown' };
 const MISSING = { id: 'x:z', status: 'missing', verdict: 'unknown' };
 const ALIAS = { id: 'workbuddy:cn:auto', status: 'alias', verdict: 'unknown' };
 
+test('mergeCapabilities：等级保护 —— 目录（L1）不得覆盖实测（L0）', () => {
+  // 真机场景：目录说 workbuddy:cn:glm-5.3 是「文」，实测答对了图里的颜色与数字 → L0 图。
+  // 用户点「沉淀确认项」时会把目录结论也并进来，没有等级保护就会把实测结果覆盖回「文」。
+  const measured = mergeCapabilities(null, [
+    { id: 'workbuddy:cn:glm-5.3', status: 'confirmed', verdict: 'image', tier: 'L0', how: '实测' },
+  ], { at: 1 });
+  const merged = mergeCapabilities(measured, [
+    { id: 'workbuddy:cn:glm-5.3', status: 'confirmed', verdict: 'text', tier: 'L1', how: '精确' },
+  ], { at: 2 });
+  assert.equal(merged.entries['workbuddy:cn:glm-5.3'].image, true, 'L0 实测必须保住');
+  assert.equal(merged.entries['workbuddy:cn:glm-5.3'].tier, 'L0');
+  assert.equal(merged.downgraded.length, 1);
+  assert.deepEqual(merged.downgraded[0], {
+    id: 'workbuddy:cn:glm-5.3', kept: 'image', ignored: 'text', keptTier: 'L0', ignoredTier: 'L1',
+  });
+  assert.equal(merged.changed.length, 0, '被挡下的不算「翻转」');
+  // 反向：实测（L0）可以覆盖目录（L1）
+  const flipped = mergeCapabilities(merged, [
+    { id: 'workbuddy:cn:glm-5.3', status: 'confirmed', verdict: 'text', tier: 'L0', how: '实测' },
+  ], { at: 3 });
+  assert.equal(flipped.entries['workbuddy:cn:glm-5.3'].image, false);
+  assert.equal(flipped.changed.length, 1);
+  // 同级可以覆盖（L1 换 L1：目录刷新后结论变了，就该更新）
+  const l1 = mergeCapabilities(null, [
+    { id: 'workbuddy:cn:glm-5.3', status: 'confirmed', verdict: 'text', tier: 'L1' },
+  ], { at: 4 });
+  const same = mergeCapabilities(l1, [
+    { id: 'workbuddy:cn:glm-5.3', status: 'confirmed', verdict: 'image', tier: 'L1' },
+  ], { at: 5 });
+  assert.equal(same.entries['workbuddy:cn:glm-5.3'].image, true, '同级按最新结论走');
+  // 实测之后再被实测覆盖也允许（都是 L0）
+  const remeasured = mergeCapabilities(flipped, [
+    { id: 'workbuddy:cn:glm-5.3', status: 'confirmed', verdict: 'image', tier: 'L0', how: '实测' },
+  ], { at: 6 });
+  assert.equal(remeasured.entries['workbuddy:cn:glm-5.3'].image, true, '复测可以改判');
+});
+
 test('mergeCapabilities：只沉淀确认态，其余计入 skipped', () => {
   const merged = mergeCapabilities(null, [CONFIRMED_IMAGE, CONFIRMED_TEXT, BORROWED, CONFLICT, MISSING, ALIAS], { at: 7 });
   assert.deepEqual(merged.added, ['workbuddy:global:kimi-k3', 'workbuddy:cn:glm-5.3']);

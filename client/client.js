@@ -4347,7 +4347,7 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       }
       const v = result.value;
       if (v.report) applyCatalogResult(v.report);
-      notify(`\u5DF2\u6C89\u6DC0 ${(v.added ?? []).length} \u9879` + ((v.changed ?? []).length > 0 ? `\u3001\u6539\u5199 ${v.changed.length} \u9879` : "") + `\uFF08\u57FA\u7EBF\u5171 ${v.count ?? 0} \u9879\uFF1B\u8DF3\u8FC7\u672A\u786E\u8BA4 ${v.skipped ?? 0} \u9879\uFF09`);
+      notify(`\u5DF2\u6C89\u6DC0 ${(v.added ?? []).length} \u9879` + ((v.changed ?? []).length > 0 ? `\u3001\u6539\u5199 ${v.changed.length} \u9879` : "") + ((v.downgraded ?? []).length > 0 ? `\u3001\u4FDD\u4F4F ${v.downgraded.length} \u9879\u5B9E\u6D4B\u7ED3\u8BBA` : "") + `\uFF08\u57FA\u7EBF\u5171 ${v.count ?? 0} \u9879\uFF1B\u8DF3\u8FC7\u672A\u786E\u8BA4 ${v.skipped ?? 0} \u9879\uFF09`);
       await reloadRecord();
     } catch (error) {
       notify(`\u6C89\u6DC0\u5F02\u5E38\uFF1A${error?.message ?? error}`);

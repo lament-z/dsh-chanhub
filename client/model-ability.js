@@ -403,6 +403,7 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
       if (v.report) applyCatalogResult(v.report);
       notify(`已沉淀 ${(v.added ?? []).length} 项`
         + ((v.changed ?? []).length > 0 ? `、改写 ${v.changed.length} 项` : '')
+        + ((v.downgraded ?? []).length > 0 ? `、保住 ${v.downgraded.length} 项实测结论` : '')
         + `（基线共 ${v.count ?? 0} 项；跳过未确认 ${v.skipped ?? 0} 项）`);
       // 基线变了 → 勾选框可用范围跟着变，重读一次回显（零网关请求）
       await reloadRecord();
