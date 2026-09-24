@@ -1556,6 +1556,15 @@ export const RANK_METRICS = [
 /** 默认维度：**按用量（Tokens）** —— 「谁在用」的第一答案就是量，不是次数。 */
 export const DEFAULT_RANK_METRIC = 'tokens';
 
+/**
+ * 「已删除的 key」汇总行的哨兵 key。
+ *
+ * 它是**前端合成的行**，网关不会返回同名 key（网关的 key id 一律 `k_` 前缀，
+ * 主 key 是 `master`）。判身份一律用 `row.deleted`，这个常量只用于 React key
+ * 与排查 —— 别拿它当判据，否则改一次常量就要全仓跟着改。
+ */
+const DELETED_CONSUMER_KEY = '__deleted__';
+
 /** 取维度定义（未知 id 回落默认维度，不抛错）。 */
 export function rankMetric(id) {
   return RANK_METRICS.find((item) => item.id === id) ?? RANK_METRICS[0];
@@ -1629,29 +1638,36 @@ export function accountShares(rows, total, accounts = [], channelOf = () => 'wor
  * 名字由网关在**读取时** join key 表（所以支持改名）。已删除的 key 没有 label，
  * 这里退化成显示 id 而不是编造一个名字 —— 历史用量不该因为删了 key 就认不出来。
  *
+ * 但**逐把渲染会挤掉真实消费者**（实测 720h 下 7 把废弃 key 占掉 8 行里的 6 行），
+ * 所以已删除的 key 在这里折成**一行**汇总（`deleted: true`，含 `deletedCount`
+ * 与 `deletedIds`），并固定排在末位。理由与口径见函数体内注释。
+ *
  * @param rows - `usage.by_key`（旧网关没有该字段 → 传 [] / undefined）。
- * @param total - 同响应的 total。
- * @param metric - 维度 id（tokens / requests / credit）。
- * @returns 已装饰并降序的行。
+ * @param metric - 维度 id（tokens / requests / credit）。**不接 total**：见下。
+ * @returns 已装饰的行：真实消费者按维度降序，末位（若有）是「已删除」汇总行。
  */
-export function consumerShares(rows, total, metric = DEFAULT_RANK_METRIC) {
+export function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
   const list = Array.isArray(rows) ? rows : [];
   const field = rankMetric(metric).field;
   const decorated = list.map((row) => {
     const key = String(row?.key ?? '');
     const label = typeof row?.label === 'string' && row.label !== '' ? row.label : '';
+    // 「已删除」的判据只有一条：网关没给 label，且既不是主 key 也不是未鉴权。
+    // 网关在**读取时** join key 表，所以「查不到名字」= 这把 key 已不在表里。
+    const deleted = label === '' && key !== '' && key !== 'master';
     const name = label !== ''
       ? label
       : key === 'master'
         ? '主 key'
-        : key === ''
-          ? '（未鉴权）'
-          : `${key}（已删除）`;
+        : deleted
+          ? `${key}（已删除）`
+          : '（未鉴权）';
     const requests = Number(row?.requests) || 0;
     const failed = Number(row?.failed) || 0;
     return {
       ...row,
       name,
+      deleted,
       tokens: Number(row?.total_tokens) || 0,
       credit: Number(row?.credit) || 0,
       value: Number(row?.[field]) || 0,
@@ -1662,15 +1678,60 @@ export function consumerShares(rows, total, metric = DEFAULT_RANK_METRIC) {
       failRate: requests > 0 ? failed / requests : 0,
     };
   });
-  const grand = metricGrandTotal(total, decorated, metric);
+  // 分母口径（**别改回 total**）：消费者维的宇宙只是 total 的一个**子集**。
+  // by_key 只覆盖「带消费者归属」的请求（多消费者 key 上线之后）；更早的历史桶
+  // keyID 为空，被网关的 accumulate 直接跳过，只进 by_uid/by_model。
+  // 拿响应里的 total 当分母会让每一行的占比被系统性低估 —— 实测 720h 下
+  // master 显示 18.7%、各行占比之和也只有 18.7%（不是 100%），24h 下才接近正确。
+  // 故这里改用本维度各行之和：份额之和恒为 100%，且跨窗口稳定。
+  //
+  // 与「账号用量」「渠道用量」两张卡的区别：那两张的宇宙≈total，用 total 是对的
+  // （metricGrandTotal 的首选分支），不要一起改。
+  const grand = decorated.reduce((sum, row) => sum + row.value, 0);
   const max = Math.max(...decorated.map((row) => row.value), 1);
-  return decorated
-    .map((row) => ({
-      ...row,
-      share: grand > 0 ? row.value / grand : 0,
-      barShare: row.value / max,
-    }))
+  const withShares = (row) => ({
+    ...row,
+    share: grand > 0 ? row.value / grand : 0,
+    barShare: row.value / max,
+  });
+
+  // ── 已删除的 key 折叠成**一行**（2026-09-24） ──
+  //
+  // 为什么不逐把渲染、也不直接不显示：
+  //   · 逐把渲染会**挤掉真实消费者**。实测 720h 窗口 7 把废弃 key（每把 1~3 次
+  //     被拒的探针请求、0 token）+ 2 个真实消费者 = 9 行，卡片只画 8 行 ——
+  //     于是 8 行里有 6 行是「k_xxx（已删除）0%」，真正在用的 key 反而容易被挤没。
+  //   · 直接不显示会**破坏份额口径**：grand 是本维各行之和，删掉的行仍占分母
+  //     （实测这 7 把里有 2 把带 token），可见行的占比就不再合 100%，而且
+  //     「有一批历史用量认不出是谁」这件事被悄悄抹掉了。
+  //   · 折叠成一行则两条都保住：加法逐字段合并 → 分母一字不差；行数从 N 变 1；
+  //     具体 id 仍在 `deletedIds` 里，卡片用 tooltip 兜住，信息没丢。
+  //
+  // 位置：**不进排行**。它不是可比较的消费者，而是「认不出名字的历史」，
+  // 故固定排在末位（调用方据此把它渲染成末行、不占序号、不占 8 行预算）。
+  const gone = decorated.filter((row) => row.deleted);
+  const merged = gone.length === 0 ? null : {
+    key: DELETED_CONSUMER_KEY,
+    label: '',
+    deleted: true,
+    deletedCount: gone.length,
+    deletedIds: gone.map((row) => row.key),
+    name: `已删除的 ${gone.length} 个 key`,
+    requests: gone.reduce((sum, row) => sum + row.requests, 0),
+    failed: gone.reduce((sum, row) => sum + row.failed, 0),
+    tokens: gone.reduce((sum, row) => sum + row.tokens, 0),
+    credit: gone.reduce((sum, row) => sum + row.credit, 0),
+    value: gone.reduce((sum, row) => sum + row.value, 0),
+  };
+  if (merged) {
+    merged.failRate = merged.requests > 0 ? merged.failed / merged.requests : 0;
+  }
+
+  const ranked = decorated
+    .filter((row) => !row.deleted)
+    .map(withShares)
     .sort((a, b) => b.value - a.value);
+  return merged ? [...ranked, withShares(merged)] : ranked;
 }
 
 /**

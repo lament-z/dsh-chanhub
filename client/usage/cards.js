@@ -507,6 +507,11 @@ export function mergeTail(series) {
  * 消费者卡只在网关提供 `by_key` 时渲染（旧网关没有该维度，渲染一个恒空卡片
  * 会被误读成「没有消费者在用」）。
  *
+ * 已删除的 key 由 `consumerShares` 折成一行（`deleted: true`）并排在末位，
+ * 本组件只负责把它画成「弱化的汇总行」：不占序号、不占 8 行预算、灰条、
+ * 不挂「拒 X%」chip（会挤掉名字列）、id 与被拒次数走 tooltip。
+ * 折叠而不是隐藏的理由见 `consumerShares` 的注释。
+ *
  * 维度切换（默认 Tokens = 按用量）：请求数多不等于用得多 —— 一次长上下文
  * 请求顶几百次短请求。三个维度取的是同一份数据的字段，不是跨口径。
  *
@@ -524,6 +529,25 @@ export function RankCards({
   const current = rankMetric(metric);
   const options = RANK_METRICS.map((item) => [item.id, item.label]);
   const extra = `按${current.label}`;
+
+  // 已删除的 key 在 derive 层已折成**一行**（`deleted: true`，见 consumerShares）。
+  // 它**不进排行**：不是一个可比较的消费者，而是「认不出名字的历史」。
+  // 故它不占 8 行预算、不占序号，固定渲染在末位 —— 否则 7 把废弃 key 会把
+  // 真实消费者的位置挤光（这正是本次改动的起因：实测 8 行里 6 行是废弃 key）。
+  const consumerRanked = consumers.filter((row) => !row.deleted);
+  const consumerGone = consumers.find((row) => row.deleted) ?? null;
+  // 汇总行的 tooltip 是**唯一的** id 出口（行内放不下 7 个 14 字符的 id）。
+  const goneTitle = consumerGone
+    ? `已删除的 ${consumerGone.deletedCount} 个 key（名字已随删除丢失，历史用量保留）\n`
+      + `${consumerGone.deletedIds.join('、')}\n`
+      + `${current.label} ${current.format(consumerGone.value)}（${formatPercent(consumerGone.share, 1)}）\n`
+      + `${formatNumber(consumerGone.requests)} 请求 · ${formatTokens(consumerGone.tokens)}`
+      + ` · ${formatCredit(consumerGone.credit)} 积分`
+      // 被拒次数只在这里出现（行内不放 chip，否则会把名字挤成「已删…」）
+      + (consumerGone.failed > 0
+        ? ` · 被拒 ${formatNumber(consumerGone.failed)} 次（多为集合外模型 403）`
+        : '')
+    : '';
 
   return React.createElement('div', { className: 'dshc-ust-rank' },
     React.createElement('div', { className: 'dshc-ust-card', 'data-card': 'accounts' },
@@ -606,7 +630,7 @@ export function RankCards({
           consumers.length === 0
             ? React.createElement('div', { style: s.muted }, '该窗口内没有带消费者身份的请求')
             : React.createElement(React.Fragment, null,
-                ...consumers.slice(0, 8).map((row, index) =>
+                ...consumerRanked.slice(0, 8).map((row, index) =>
                   React.createElement('div', { key: row.key ?? index, className: 'dshc-ust-rank-row' },
                     React.createElement('span', { className: 'dshc-ust-rank-no' }, String(index + 1)),
                     React.createElement('span', { className: 'dshc-ust-rank-name' },
@@ -636,6 +660,38 @@ export function RankCards({
                     }, formatPercent(row.share, 0)),
                   ),
                 ),
+                // 末行：已删除的 key 汇总（占位序号列 + 灰条 + 弱化，一眼可辨「这不是一个消费者」）。
+                consumerGone
+                  ? React.createElement('div', {
+                      key: consumerGone.key,
+                      className: 'dshc-ust-rank-row',
+                      'data-row': 'deleted-consumers',
+                      style: { opacity: 0.6 },
+                    },
+                      React.createElement('span', { className: 'dshc-ust-rank-no' }, ''),
+                      // 这里**不放**「拒 X%」chip：名字列只有 104px（窄屏 84px），
+                      // chip 会把它挤到 36px —— 实测真机上只剩「已删…」，
+                      // 汇总行最该看清的「几个 key」反而看不见。被拒次数留在
+                      // tooltip 里（信息不丢，只是不抢这一行的版面）。
+                      React.createElement('span', { className: 'dshc-ust-rank-name' },
+                        React.createElement('span', { title: goneTitle }, consumerGone.name),
+                      ),
+                      React.createElement('span', { className: 'dshc-ust-rank-bar' },
+                        React.createElement('i', {
+                          style: {
+                            width: `${Math.max(2, Math.round(consumerGone.barShare * 100))}%`,
+                            // 中性灰：汇总行没有身份色可给（名字都没了），上调色板色
+                            // 会让人以为它是一路可追踪的消费者。
+                            background: 'var(--dsw-alias-label-tertiary,#8b93a1)',
+                          },
+                        }),
+                      ),
+                      React.createElement('span', {
+                        className: 'dshc-ust-rank-val',
+                        title: goneTitle,
+                      }, formatPercent(consumerGone.share, 0)),
+                    )
+                  : null,
               ),
         )
       : null,

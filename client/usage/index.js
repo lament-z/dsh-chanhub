@@ -159,9 +159,11 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   // consumersAvailable=false，卡片整块不渲染（而不是渲染一个恒空卡片，
   // 那会被读成「没有消费者在用」）。
   const consumersAvailable = Array.isArray(usage?.by_key);
+  // 注意不传 total：消费者维的分母必须取 by_key 各行之和（理由见 derive.js
+  // consumerShares 的注释 —— by_key 的宇宙只是 total 的子集，用 total 会低估占比）。
   const consumerRows = React.useMemo(
-    () => consumerShares(usage?.by_key ?? [], total, rankMetricValue),
-    [usage, total, rankMetricValue],
+    () => consumerShares(usage?.by_key ?? [], rankMetricValue),
+    [usage, rankMetricValue],
   );
 
   const subtitle = subtitleText({ freshness, error, lastOkAt });

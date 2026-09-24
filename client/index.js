@@ -2406,6 +2406,133 @@ function ApiKeyPill({ onReveal }) {
 }
 
 /**
+ * 「保持唤醒」顶栏 chip。
+ *
+ * 语义边界（重要，别写歪）：这个开关表达的是**用户意图** ——「这台机器应该对外
+ * 服务」，不是「服务在线」。对外是否真的可达不是本机可观测的事实：它取决于路由器
+ * 转发、ISP、公网 IP，以及本机醒着（最后一条正是本开关要解决的，拿它当触发会自锁：
+ * 机器睡了→探测必失败→判定离线→不按住→继续睡）。所以 UI 只声称本机能证明的那件事：
+ * **caffeinate 是否真的在按住**。
+ *
+ * 三态（第三态是必须的，少了它用户会以为按住了、其实没有）：
+ *   desired=on  + active   → 已按住
+ *   desired=on  + !active  → 已开启但未生效（异常）
+ *   desired=off            → 允许休眠
+ *
+ * @param props - `{rpcCall, showToast}`。
+ * @returns React 元素。
+ */
+function KeepAwakeChip({ rpcCall, showToast }) {
+  const [state, setState] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    try {
+      const res = await rpcCall(ENDPOINTS.getKeepAwake, {});
+      setState(res?.ok === false ? null : res?.value ?? null);
+    } catch {
+      setState(null);
+    }
+  }, [rpcCall]);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  const on = state?.desired === 'on';
+  const active = state?.active === true;
+
+  // 只在「已开启」时轮询：关态不会自己变，没必要周期性花一个 ps 子进程。
+  // 轮询的唯一目的是发现「caffeinate 掉了」这个异常态。
+  React.useEffect(() => {
+    if (!on) return undefined;
+    const timer = setInterval(() => void load(), 20000);
+    return () => clearInterval(timer);
+  }, [on, load]);
+
+  const toggle = React.useCallback(async () => {
+    const wantOn = !on;
+    if (!wantOn && typeof window !== 'undefined') {
+      const okGo = window.confirm(
+        '关闭「保持唤醒」后，本机空闲约 9 分钟会进入休眠，\n' +
+          '网关地址 将不可达（官方客户端会连不上）。\n\n确认关闭？',
+      );
+      if (!okGo) return;
+    }
+    setBusy(true);
+    try {
+      const res = await rpcCall(ENDPOINTS.setKeepAwake, { on: wantOn });
+      if (res?.ok === false) {
+        showToast?.(`切换保持唤醒失败：${res?.error?.message ?? '未知原因'}`);
+        return;
+      }
+      const next = res?.value ?? null;
+      setState(next);
+      if (next?.desired === 'on') {
+        showToast?.(
+          next.active
+            ? '已开启保持唤醒：本机不会进入休眠，对外服务可持续在线'
+            : '已记下开启意图，但 caffeinate 未生效（本机仍会休眠）—— 请检查系统环境',
+        );
+      } else {
+        showToast?.('已关闭保持唤醒：本机可正常休眠，对外服务将在空闲后中断');
+      }
+    } catch (error) {
+      showToast?.(`切换保持唤醒失败：${error?.message ?? error}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [on, rpcCall, showToast]);
+
+  const color = on ? (active ? tone.ok.fg : tone.warn.fg) : tone.idle.fg;
+  const text = !state
+    ? '保持唤醒'
+    : !on
+      ? '允许休眠'
+      : active
+        ? '保持唤醒'
+        : '保持唤醒 · 未生效';
+
+  const held = (() => {
+    if (!on || !active || !state?.holdingMs) return '';
+    const min = Math.floor(state.holdingMs / 60000);
+    if (min < 60) return `已持续 ${min} 分`;
+    return `已持续 ${Math.floor(min / 60)} 小时 ${min % 60} 分`;
+  })();
+
+  const title = (() => {
+    if (!state) return '保持唤醒：状态读取中…';
+    if (!on) return '当前允许休眠。点击开启：本机不再进入休眠，对外服务可持续在线。';
+    if (!active) return '已开启但 caffeinate 未生效 —— 本机仍会休眠。点击重试。';
+    return `本机正在被按住，不会进入休眠${held ? `（${held}）` : ''}。点击关闭（会二次确认）。`;
+  })();
+
+  return React.createElement(
+    'button',
+    {
+      type: 'button',
+      onClick: toggle,
+      disabled: busy,
+      title,
+      style: {
+        ...s.btnGhost,
+        height: 26,
+        padding: '0 10px',
+        flexShrink: 0,
+        gap: 5,
+        color,
+        background: on ? (active ? tone.ok.bg : tone.warn.bg) : 'transparent',
+        border: `1px solid ${on ? color : 'var(--dsw-alias-border-l2,#e5e7eb)'}`,
+        opacity: busy ? 0.65 : 1,
+      },
+    },
+    React.createElement(Icons.bolt, { style: { width: 13, height: 13 } }),
+    React.createElement('span', { style: { fontSize: 12, whiteSpace: 'nowrap' } }, text),
+    held ? React.createElement('span', { style: { fontSize: 11, opacity: 0.75 } }, held) : null,
+  );
+}
+
+/**
  * Tab 栏（复刻 dsh-bridge-gateway 的 TabBar：纯前端状态，非 DSH slot 机制）。
  *
  * @param props - `{active, onChange, statusText, onAdd, tabs}`。
@@ -3080,6 +3207,9 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
         ),
       ),
       React.createElement(ApiKeyPill, { onReveal }),
+      // 保持唤醒开关：放在 API Key 药丸之后、刷新按钮之前 —— 与「已连接」状态同属
+      // 顶栏的状态区，一眼可见。ApiKeyPill 带 marginLeft:auto，故它之后都靠右。
+      React.createElement(KeepAwakeChip, { rpcCall, showToast }),
       React.createElement(
         'button',
         {

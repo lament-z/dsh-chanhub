@@ -1720,6 +1720,7 @@ var RANK_METRICS = [
   { id: "credit", field: "credit", label: "\u79EF\u5206", format: formatCredit }
 ];
 var DEFAULT_RANK_METRIC = "tokens";
+var DELETED_CONSUMER_KEY = "__deleted__";
 function rankMetric(id) {
   return RANK_METRICS.find((item) => item.id === id) ?? RANK_METRICS[0];
 }
@@ -1752,18 +1753,20 @@ function accountShares(rows, total, accounts = [], channelOf = () => "workbuddy"
     barShare: row.value / max
   })).sort((a, b) => b.value - a.value);
 }
-function consumerShares(rows, total, metric = DEFAULT_RANK_METRIC) {
+function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
   const list = Array.isArray(rows) ? rows : [];
   const field = rankMetric(metric).field;
   const decorated = list.map((row) => {
     const key = String(row?.key ?? "");
     const label = typeof row?.label === "string" && row.label !== "" ? row.label : "";
-    const name2 = label !== "" ? label : key === "master" ? "\u4E3B key" : key === "" ? "\uFF08\u672A\u9274\u6743\uFF09" : `${key}\uFF08\u5DF2\u5220\u9664\uFF09`;
+    const deleted = label === "" && key !== "" && key !== "master";
+    const name2 = label !== "" ? label : key === "master" ? "\u4E3B key" : deleted ? `${key}\uFF08\u5DF2\u5220\u9664\uFF09` : "\uFF08\u672A\u9274\u6743\uFF09";
     const requests = Number(row?.requests) || 0;
     const failed = Number(row?.failed) || 0;
     return {
       ...row,
       name: name2,
+      deleted,
       tokens: Number(row?.total_tokens) || 0,
       credit: Number(row?.credit) || 0,
       value: Number(row?.[field]) || 0,
@@ -1774,13 +1777,32 @@ function consumerShares(rows, total, metric = DEFAULT_RANK_METRIC) {
       failRate: requests > 0 ? failed / requests : 0
     };
   });
-  const grand = metricGrandTotal(total, decorated, metric);
+  const grand = decorated.reduce((sum, row) => sum + row.value, 0);
   const max = Math.max(...decorated.map((row) => row.value), 1);
-  return decorated.map((row) => ({
+  const withShares = (row) => ({
     ...row,
     share: grand > 0 ? row.value / grand : 0,
     barShare: row.value / max
-  })).sort((a, b) => b.value - a.value);
+  });
+  const gone = decorated.filter((row) => row.deleted);
+  const merged = gone.length === 0 ? null : {
+    key: DELETED_CONSUMER_KEY,
+    label: "",
+    deleted: true,
+    deletedCount: gone.length,
+    deletedIds: gone.map((row) => row.key),
+    name: `\u5DF2\u5220\u9664\u7684 ${gone.length} \u4E2A key`,
+    requests: gone.reduce((sum, row) => sum + row.requests, 0),
+    failed: gone.reduce((sum, row) => sum + row.failed, 0),
+    tokens: gone.reduce((sum, row) => sum + row.tokens, 0),
+    credit: gone.reduce((sum, row) => sum + row.credit, 0),
+    value: gone.reduce((sum, row) => sum + row.value, 0)
+  };
+  if (merged) {
+    merged.failRate = merged.requests > 0 ? merged.failed / merged.requests : 0;
+  }
+  const ranked = decorated.filter((row) => !row.deleted).map(withShares).sort((a, b) => b.value - a.value);
+  return merged ? [...ranked, withShares(merged)] : ranked;
 }
 function channelShares(rows, total, accounts = [], channelOf = () => "workbuddy", metric = DEFAULT_RANK_METRIC) {
   const accountsRows = accountShares(rows, total, accounts, channelOf, metric);
@@ -2220,7 +2242,11 @@ var ENDPOINTS = {
   patchApiKey: "patchApiKey",
   deleteApiKey: "deleteApiKey",
   rotateApiKey: "rotateApiKey",
-  previewApiKey: "previewApiKey"
+  previewApiKey: "previewApiKey",
+  // 「保持唤醒」顶栏 chip：宿主机不进入休眠（对外服务的必要前提）。
+  // 纯宿主动作（spawn/kill caffeinate），不经过 chanhub 网关。
+  getKeepAwake: "getKeepAwake",
+  setKeepAwake: "setKeepAwake"
 };
 var CHANNEL = "/dsh-chanhub";
 
@@ -3128,6 +3154,12 @@ function RankCards({
   const current = rankMetric(metric);
   const options = RANK_METRICS.map((item) => [item.id, item.label]);
   const extra = `\u6309${current.label}`;
+  const consumerRanked = consumers.filter((row) => !row.deleted);
+  const consumerGone = consumers.find((row) => row.deleted) ?? null;
+  const goneTitle = consumerGone ? `\u5DF2\u5220\u9664\u7684 ${consumerGone.deletedCount} \u4E2A key\uFF08\u540D\u5B57\u5DF2\u968F\u5220\u9664\u4E22\u5931\uFF0C\u5386\u53F2\u7528\u91CF\u4FDD\u7559\uFF09
+${consumerGone.deletedIds.join("\u3001")}
+${current.label} ${current.format(consumerGone.value)}\uFF08${formatPercent(consumerGone.share, 1)}\uFF09
+${formatNumber(consumerGone.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(consumerGone.tokens)} \xB7 ${formatCredit(consumerGone.credit)} \u79EF\u5206` + (consumerGone.failed > 0 ? ` \xB7 \u88AB\u62D2 ${formatNumber(consumerGone.failed)} \u6B21\uFF08\u591A\u4E3A\u96C6\u5408\u5916\u6A21\u578B 403\uFF09` : "") : "";
   return import_react4.default.createElement(
     "div",
     { className: "dshc-ust-rank" },
@@ -3230,7 +3262,7 @@ ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7
       consumers.length === 0 ? import_react4.default.createElement("div", { style: s.muted }, "\u8BE5\u7A97\u53E3\u5185\u6CA1\u6709\u5E26\u6D88\u8D39\u8005\u8EAB\u4EFD\u7684\u8BF7\u6C42") : import_react4.default.createElement(
         import_react4.default.Fragment,
         null,
-        ...consumers.slice(0, 8).map(
+        ...consumerRanked.slice(0, 8).map(
           (row, index) => import_react4.default.createElement(
             "div",
             { key: row.key ?? index, className: "dshc-ust-rank-row" },
@@ -3261,7 +3293,43 @@ ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7
 ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206` + (row.failed > 0 ? ` \xB7 \u88AB\u62D2 ${formatNumber(row.failed)} \u6B21` : "")
             }, formatPercent(row.share, 0))
           )
-        )
+        ),
+        // 末行：已删除的 key 汇总（占位序号列 + 灰条 + 弱化，一眼可辨「这不是一个消费者」）。
+        consumerGone ? import_react4.default.createElement(
+          "div",
+          {
+            key: consumerGone.key,
+            className: "dshc-ust-rank-row",
+            "data-row": "deleted-consumers",
+            style: { opacity: 0.6 }
+          },
+          import_react4.default.createElement("span", { className: "dshc-ust-rank-no" }, ""),
+          // 这里**不放**「拒 X%」chip：名字列只有 104px（窄屏 84px），
+          // chip 会把它挤到 36px —— 实测真机上只剩「已删…」，
+          // 汇总行最该看清的「几个 key」反而看不见。被拒次数留在
+          // tooltip 里（信息不丢，只是不抢这一行的版面）。
+          import_react4.default.createElement(
+            "span",
+            { className: "dshc-ust-rank-name" },
+            import_react4.default.createElement("span", { title: goneTitle }, consumerGone.name)
+          ),
+          import_react4.default.createElement(
+            "span",
+            { className: "dshc-ust-rank-bar" },
+            import_react4.default.createElement("i", {
+              style: {
+                width: `${Math.max(2, Math.round(consumerGone.barShare * 100))}%`,
+                // 中性灰：汇总行没有身份色可给（名字都没了），上调色板色
+                // 会让人以为它是一路可追踪的消费者。
+                background: "var(--dsw-alias-label-tertiary,#8b93a1)"
+              }
+            })
+          ),
+          import_react4.default.createElement("span", {
+            className: "dshc-ust-rank-val",
+            title: goneTitle
+          }, formatPercent(consumerGone.share, 0))
+        ) : null
       )
     ) : null
   );
@@ -3848,8 +3916,8 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   );
   const consumersAvailable = Array.isArray(usage?.by_key);
   const consumerRows = import_react5.default.useMemo(
-    () => consumerShares(usage?.by_key ?? [], total, rankMetricValue),
-    [usage, total, rankMetricValue]
+    () => consumerShares(usage?.by_key ?? [], rankMetricValue),
+    [usage, rankMetricValue]
   );
   const subtitle = subtitleText({ freshness, error, lastOkAt });
   const uptime = processUptime(stats);
@@ -9050,6 +9118,95 @@ function ApiKeyPill({ onReveal }) {
     React.createElement("span", { className: "dshc-keypill-ico", title: "\u590D\u5236" }, React.createElement(Icons.copy, null))
   );
 }
+function KeepAwakeChip({ rpcCall, showToast }) {
+  const [state, setState] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const load = React.useCallback(async () => {
+    try {
+      const res = await rpcCall(ENDPOINTS.getKeepAwake, {});
+      setState(res?.ok === false ? null : res?.value ?? null);
+    } catch {
+      setState(null);
+    }
+  }, [rpcCall]);
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+  const on = state?.desired === "on";
+  const active = state?.active === true;
+  React.useEffect(() => {
+    if (!on) return void 0;
+    const timer = setInterval(() => void load(), 2e4);
+    return () => clearInterval(timer);
+  }, [on, load]);
+  const toggle = React.useCallback(async () => {
+    const wantOn = !on;
+    if (!wantOn && typeof window !== "undefined") {
+      const okGo = window.confirm(
+        "\u5173\u95ED\u300C\u4FDD\u6301\u5524\u9192\u300D\u540E\uFF0C\u672C\u673A\u7A7A\u95F2\u7EA6 9 \u5206\u949F\u4F1A\u8FDB\u5165\u4F11\u7720\uFF0C\n网关地址 \u5C06\u4E0D\u53EF\u8FBE\uFF08\u5B98\u65B9\u5BA2\u6237\u7AEF\u4F1A\u8FDE\u4E0D\u4E0A\uFF09\u3002\n\n\u786E\u8BA4\u5173\u95ED\uFF1F"
+      );
+      if (!okGo) return;
+    }
+    setBusy(true);
+    try {
+      const res = await rpcCall(ENDPOINTS.setKeepAwake, { on: wantOn });
+      if (res?.ok === false) {
+        showToast?.(`\u5207\u6362\u4FDD\u6301\u5524\u9192\u5931\u8D25\uFF1A${res?.error?.message ?? "\u672A\u77E5\u539F\u56E0"}`);
+        return;
+      }
+      const next = res?.value ?? null;
+      setState(next);
+      if (next?.desired === "on") {
+        showToast?.(
+          next.active ? "\u5DF2\u5F00\u542F\u4FDD\u6301\u5524\u9192\uFF1A\u672C\u673A\u4E0D\u4F1A\u8FDB\u5165\u4F11\u7720\uFF0C\u5BF9\u5916\u670D\u52A1\u53EF\u6301\u7EED\u5728\u7EBF" : "\u5DF2\u8BB0\u4E0B\u5F00\u542F\u610F\u56FE\uFF0C\u4F46 caffeinate \u672A\u751F\u6548\uFF08\u672C\u673A\u4ECD\u4F1A\u4F11\u7720\uFF09\u2014\u2014 \u8BF7\u68C0\u67E5\u7CFB\u7EDF\u73AF\u5883"
+        );
+      } else {
+        showToast?.("\u5DF2\u5173\u95ED\u4FDD\u6301\u5524\u9192\uFF1A\u672C\u673A\u53EF\u6B63\u5E38\u4F11\u7720\uFF0C\u5BF9\u5916\u670D\u52A1\u5C06\u5728\u7A7A\u95F2\u540E\u4E2D\u65AD");
+      }
+    } catch (error) {
+      showToast?.(`\u5207\u6362\u4FDD\u6301\u5524\u9192\u5931\u8D25\uFF1A${error?.message ?? error}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [on, rpcCall, showToast]);
+  const color = on ? active ? tone.ok.fg : tone.warn.fg : tone.idle.fg;
+  const text = !state ? "\u4FDD\u6301\u5524\u9192" : !on ? "\u5141\u8BB8\u4F11\u7720" : active ? "\u4FDD\u6301\u5524\u9192" : "\u4FDD\u6301\u5524\u9192 \xB7 \u672A\u751F\u6548";
+  const held = (() => {
+    if (!on || !active || !state?.holdingMs) return "";
+    const min = Math.floor(state.holdingMs / 6e4);
+    if (min < 60) return `\u5DF2\u6301\u7EED ${min} \u5206`;
+    return `\u5DF2\u6301\u7EED ${Math.floor(min / 60)} \u5C0F\u65F6 ${min % 60} \u5206`;
+  })();
+  const title = (() => {
+    if (!state) return "\u4FDD\u6301\u5524\u9192\uFF1A\u72B6\u6001\u8BFB\u53D6\u4E2D\u2026";
+    if (!on) return "\u5F53\u524D\u5141\u8BB8\u4F11\u7720\u3002\u70B9\u51FB\u5F00\u542F\uFF1A\u672C\u673A\u4E0D\u518D\u8FDB\u5165\u4F11\u7720\uFF0C\u5BF9\u5916\u670D\u52A1\u53EF\u6301\u7EED\u5728\u7EBF\u3002";
+    if (!active) return "\u5DF2\u5F00\u542F\u4F46 caffeinate \u672A\u751F\u6548 \u2014\u2014 \u672C\u673A\u4ECD\u4F1A\u4F11\u7720\u3002\u70B9\u51FB\u91CD\u8BD5\u3002";
+    return `\u672C\u673A\u6B63\u5728\u88AB\u6309\u4F4F\uFF0C\u4E0D\u4F1A\u8FDB\u5165\u4F11\u7720${held ? `\uFF08${held}\uFF09` : ""}\u3002\u70B9\u51FB\u5173\u95ED\uFF08\u4F1A\u4E8C\u6B21\u786E\u8BA4\uFF09\u3002`;
+  })();
+  return React.createElement(
+    "button",
+    {
+      type: "button",
+      onClick: toggle,
+      disabled: busy,
+      title,
+      style: {
+        ...s.btnGhost,
+        height: 26,
+        padding: "0 10px",
+        flexShrink: 0,
+        gap: 5,
+        color,
+        background: on ? active ? tone.ok.bg : tone.warn.bg : "transparent",
+        border: `1px solid ${on ? color : "var(--dsw-alias-border-l2,#e5e7eb)"}`,
+        opacity: busy ? 0.65 : 1
+      }
+    },
+    React.createElement(Icons.bolt, { style: { width: 13, height: 13 } }),
+    React.createElement("span", { style: { fontSize: 12, whiteSpace: "nowrap" } }, text),
+    held ? React.createElement("span", { style: { fontSize: 11, opacity: 0.75 } }, held) : null
+  );
+}
 function TabBar({ active, onChange, statusText, onAdd, tabs = TABS }) {
   return React.createElement(
     "div",
@@ -9582,6 +9739,9 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
         )
       ),
       React.createElement(ApiKeyPill, { onReveal }),
+      // 保持唤醒开关：放在 API Key 药丸之后、刷新按钮之前 —— 与「已连接」状态同属
+      // 顶栏的状态区，一眼可见。ApiKeyPill 带 marginLeft:auto，故它之后都靠右。
+      React.createElement(KeepAwakeChip, { rpcCall, showToast }),
       React.createElement(
         "button",
         {

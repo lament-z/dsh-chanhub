@@ -14,6 +14,7 @@ import {
   channelPalette,
   accountShares,
   channelShares,
+  consumerShares,
   creditBurn,
   creditStock,
   creditsFreshness,
@@ -516,4 +517,59 @@ test('U27 channelPalette：三件套同源、soft/edge 由 identity 色派生、
   assert.equal(channelPalette('nope').solid, '#94a3b8');
   assert.equal(channelPalette(undefined).solid, '#94a3b8');
   assert.equal(channelPalette('').soft, 'color-mix(in srgb, #94a3b8 12%, transparent)');
+});
+
+// U28 —— 消费者维「已删除的 key」折叠（2026-09-24）。
+//
+// 为什么必须钉死：这次改动的两个错误方向都是**静默**的 —— 逐把渲染只是把真实
+// 消费者挤出 8 行预算（看起来像「没人用」），而直接过滤掉会改掉份额分母
+// （看起来像「这些量不存在」）。两者都不会报错，只能靠断言拦。
+test('U28 consumerShares：已删除的 key 折成一行且末位，分母与总量一字不差', () => {
+  const rows = [
+    { key: 'master', label: '主 key', requests: 1639, failed: 16, total_tokens: 357418199, credit: 71.93 },
+    { key: 'k_live', label: 'workbuddyswitch', requests: 17, failed: 7, total_tokens: 393683, credit: 0 },
+    { key: 'k_gone1', label: '', requests: 3, failed: 2, total_tokens: 649, credit: 0 },
+    { key: 'k_gone2', label: '', requests: 1, failed: 1, total_tokens: 185, credit: 0 },
+    { key: 'k_gone3', label: '', requests: 1, failed: 1, total_tokens: 0, credit: 0 },
+  ];
+  const out = consumerShares(rows, 'tokens');
+
+  // 5 行 → 3 行（2 个真实消费者 + 1 行汇总）
+  assert.equal(out.length, 3, '已删除的 3 把必须折成 1 行');
+  assert.deepEqual(out.map((r) => r.key), ['master', 'k_live', '__deleted__'], '汇总行必须固定末位、不进排行');
+
+  const gone = out[2];
+  assert.equal(gone.deleted, true, '汇总行必须带 deleted 标记（卡片据此判身份）');
+  assert.equal(gone.deletedCount, 3);
+  assert.deepEqual(gone.deletedIds, ['k_gone1', 'k_gone2', 'k_gone3'], 'id 明细必须保留（tooltip 是唯一出口）');
+  assert.equal(gone.name, '已删除的 3 个 key');
+
+  // 逐字段相加：分母/总量不得因折叠而变化（这是「别改成直接隐藏」的硬约束）
+  assert.equal(gone.tokens, 834, 'token 必须逐行相加');
+  assert.equal(gone.requests, 5);
+  assert.equal(gone.failed, 4);
+  assert.equal(gone.failRate, 4 / 5);
+  assert.ok(Math.abs(out.reduce((sum, r) => sum + r.tokens, 0) - 357812716) < 1e-9, '总量必须守恒');
+  assert.ok(Math.abs(out.reduce((sum, r) => sum + r.share, 0) - 1) < 1e-9, '份额之和必须仍是 100%');
+  assert.ok(Math.abs(gone.share - 834 / 357812716) < 1e-12, '汇总行仍占分母（隐藏会破坏占比口径）');
+});
+
+test('U28b consumerShares：无已删除 key 时不多出空行；未鉴权/主 key 不被误判为已删除', () => {
+  const only = consumerShares([
+    { key: 'master', label: '主 key', requests: 10, total_tokens: 100 },
+    { key: 'k_live', label: 'A', requests: 5, total_tokens: 50 },
+  ], 'tokens');
+  assert.equal(only.length, 2, '没有已删除的 key 时不得凭空多一行汇总');
+  assert.ok(only.every((r) => r.deleted === false));
+
+  // 空 key = 未鉴权（网关降级形态），不是「已删除」；label 缺失但 key 是 master 也不是
+  const edge = consumerShares([
+    { key: '', requests: 5, total_tokens: 10 },
+    { key: 'master', requests: 1, total_tokens: 1 },
+  ], 'tokens');
+  assert.deepEqual(edge.map((r) => r.name), ['（未鉴权）', '主 key'], '边界行不得被折进「已删除」');
+  assert.ok(edge.every((r) => r.deleted === false));
+
+  assert.equal(consumerShares([], 'tokens').length, 0);
+  assert.equal(consumerShares(undefined, 'tokens').length, 0, '旧网关无 by_key 时不得抛错');
 });

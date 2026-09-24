@@ -57,6 +57,10 @@ export const ENDPOINTS = {
   deleteApiKey: 'deleteApiKey',
   rotateApiKey: 'rotateApiKey',
   previewApiKey: 'previewApiKey',
+  // 「保持唤醒」顶栏 chip：宿主机不进入休眠（对外服务的必要前提）。
+  // 纯宿主动作（spawn/kill caffeinate），不经过 chanhub 网关。
+  getKeepAwake: 'getKeepAwake',
+  setKeepAwake: 'setKeepAwake',
 };
 
 /** RPC 频道（与宿主 apply 里的 CHANNEL 一致）。 */

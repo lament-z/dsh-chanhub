@@ -1595,6 +1595,69 @@ test('渲染用量：degraded 时警告如实显示，渠道/账号维度仍可�
   }
 });
 
+test('渲染用量：已删除的 key 折成一行（不占排行、不挤真实消费者、id 走 tooltip）', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    const value = (await base(endpoint, payload)).value;
+    if (endpoint === 'getUsage') {
+      // 真机形态（720h）：2 个真实消费者 + 7 把废弃 key，每把 1~3 次被拒的探针请求、0 token。
+      // 逐把渲染会占掉 8 行预算里的 6 行 —— 这正是本次改动的起因。
+      const gone = Array.from({ length: 7 }, (_, i) => ({
+        key: `k_gone${i}`, requests: 1, failed: 1, success: 0,
+        prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, credit: 0, avg_latency_ms: 0,
+      }));
+      return {
+        ok: true,
+        value: {
+          available: true,
+          usage: {
+            ...value.usage,
+            by_key: [
+              { key: 'master', label: '主 key', requests: 1639, failed: 16, success: 1623, total_tokens: 357418199, credit: 71.93, avg_latency_ms: 0 },
+              { key: 'k_live', label: 'workbuddyswitch', requests: 17, failed: 7, success: 10, total_tokens: 393683, credit: 0, avg_latency_ms: 0 },
+              ...gone,
+            ],
+          },
+        },
+      };
+    }
+    return { ok: true, value };
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    const app = await openUsage(document);
+    const card = app.querySelector('[data-card="consumers"]');
+    assert.ok(card, '网关给了 by_key，消费者卡必须渲染');
+
+    const rows = [...card.querySelectorAll('.dshc-ust-rank-row')];
+    assert.equal(rows.length, 3, '2 个真实消费者 + 1 行汇总 —— 7 把废弃 key 不得占 7 行');
+
+    const summary = card.querySelectorAll('[data-row="deleted-consumers"]');
+    assert.equal(summary.length, 1, '已删除的 key 必须恰好折成一行');
+    assert.equal(rows[rows.length - 1], summary[0], '汇总行必须排在末位（不进排行）');
+    assert.match(summary[0].textContent, /已删除的 7 个 key/, '汇总行必须给出数量');
+
+    // 名字列只有 104px（窄屏 84px）：再挂一个「拒 X%」chip 会把它挤到 36px，
+    // 真机实测只剩「已删…」—— 汇总行最该看清的数量反而看不见。故这一行
+    // 只允许有一个子 span（名字本体），被拒次数走 tooltip。
+    const nameKids = summary[0].querySelector('.dshc-ust-rank-name').children;
+    assert.equal(nameKids.length, 1, '汇总行不得挂 chip（会挤掉名字列）');
+    assert.ok(!/拒 /.test(summary[0].querySelector('.dshc-ust-rank-name').textContent), '汇总行行内不得出现「拒 X%」');
+
+    // 行宽只有 104px：id 明细只能走 tooltip，不得进可见文本（否则会撑破/被省略号吃掉）
+    assert.ok(!summary[0].textContent.includes('k_gone0'), 'id 不得出现在可见文本里');
+    const title = summary[0].querySelector('.dshc-ust-rank-name span').getAttribute('title');
+    assert.match(title, /k_gone0/, 'tooltip 必须列出具体 id（信息不能丢）');
+    assert.match(title, /k_gone6/, 'tooltip 必须列全 7 个 id');
+    assert.match(title, /被拒 7 次/, '被拒次数必须在 tooltip 里（行内不放 chip，不能就此丢掉）');
+
+    // 真实消费者不得被废弃 key 挤掉
+    assert.match(card.textContent, /workbuddyswitch/, '真实消费者的行必须还在');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('渲染接入方：列出 key、区分全量/空集、绝不出现明文', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
