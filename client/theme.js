@@ -708,6 +708,57 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 .dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
 
+/* ── 模型 Tab（结论条 / 筛选条 / 分组表格） ──
+   设计语言与其他页面同源：卡片用 layer-1（白）浮在灰页面上（s.card 的注释：用
+   layer-2 会让卡片「后退、整页发闷」）；按钮走 s.btnPri / s.btnGhost（32px 高、
+   999 圆角、13px）；筛选 chip 对齐用量页 .dshc-seg 的形态（26px 高、12px、选中态
+   白底 + 品牌色描边）；数字一律 tabular-nums；颜色只走 --dsw-alias-* 语义 token。 */
+.dshc-ma-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-stats { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; }
+/* 统计块之间用 1px 竖线分隔（与概览卡「渠道竖排 + 竖线」同一手法），
+   比一排胶囊安静，也更像仪表盘。 */
+.dshc-ma-stat { display: flex; flex-direction: column; gap: 1px; padding: 0 14px; border-right: 1px solid var(--dsw-alias-border-l2,#eef0f3); }
+.dshc-ma-stat:first-child { padding-left: 0; }
+.dshc-ma-stat:last-child { border-right: none; }
+.dshc-ma-stat-v { font-size: 16px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; letter-spacing: -.01em; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ma-stat-k { font-size: 10.5px; line-height: 1.3; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
+.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.dshc-ma-more { display: flex; flex-direction: column; gap: 10px; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dshc-ma-searchwrap { position: relative; display: inline-flex; align-items: center; flex: 1 1 200px; max-width: 320px; }
+.dshc-ma-searchicon { position: absolute; left: 9px; font-size: 13px; line-height: 1; color: var(--dsw-alias-label-tertiary,#8b93a1); pointer-events: none; }
+.dshc-ma-searchwrap > input.dshc-ma-search { font: inherit; font-size: 12px; height: 28px; width: 100%; padding: 0 10px 0 26px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); background: var(--dsw-alias-bg-layer-2,#f9fafb); color: var(--dsw-alias-label-primary,currentColor); box-sizing: border-box; }
+.dshc-ma-searchwrap > input.dshc-ma-search:focus { outline: none; border-color: var(--dsw-alias-brand-primary,#4f6ef7); background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-chip { font: inherit; cursor: pointer; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); background: var(--dsw-alias-bg-layer-2,#f9fafb); color: var(--dsw-alias-label-secondary,#61666b); font-size: 12px; line-height: 1; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.dshc-ma-chip > i { font-style: normal; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-chip:hover { color: var(--dsw-alias-label-primary,currentColor); border-color: var(--dsw-alias-border-l2,#d1d5db); }
+/* 选中态用 is-on 而不是 on：宿主有一条全局 button.on 规则（brand 底 + 白字），
+   在暗色主题下 --dsw-alias-brand-primary 本身就是近白（#f9fafb），于是"白底白字"
+   完全看不见（真机实测确认）。换名字比堆 specificity 干净，也不会再撞别的全局类。 */
+.dshc-ma-chip.is-on { background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-brand-primary,#4f6ef7); border-color: var(--dsw-alias-brand-primary,#4f6ef7); font-weight: 600; }
+.dshc-ma-chip.is-on > i { color: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .75; }
+.dshc-ma-chip.clear { border-style: dashed; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-count { margin-left: auto; white-space: nowrap; }
+/* 滚动容器 + 吸顶表头：110 行不该把整页撑爆，滚到哪儿都知道在看哪一列 */
+.dshc-ma-scroll { max-height: 62vh; overflow: auto; }
+.dshc-ma-scroll thead th { position: sticky; top: 0; z-index: 2; }
+.dshc-ma-scroll tbody tr:hover > td { background: var(--dsw-alias-interactive-bg-hover,#f7f8fa); }
+.dshc-ma-scroll tbody tr.dshc-ma-group:hover > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
+.dshc-ma-group > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-ma-grouptoggle { font: inherit; cursor: pointer; border: none; background: none; padding: 0; font-size: 12px; font-weight: 600; letter-spacing: -.01em; font-family: ui-monospace,Menlo,monospace; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ma-grouptoggle:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-ma-notes > summary { cursor: pointer; font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-notes > p { margin: 6px 0 0; }
+
+/* ── 结构化 tooltip（fixed 定位；参考实现的 tooltip 样式） ── */
+.dshc-ust-tooltip { position: fixed; left: 0; top: 0; transform: translate(-50%, -110%); background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); color: var(--dsw-alias-label-primary,currentColor); padding: 5px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); opacity: 0; transition: opacity .1s; z-index: 9999; }
+.dshc-ust-tooltip.show { opacity: 1; }
+.dshc-ust-tooltip-title { font-size: 11px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; }
+.dshc-ust-tooltip-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dsw-alias-label-secondary,#6b7280); white-space: nowrap; line-height: 1.6; }
+.dshc-ust-tooltip-row i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
+
 /* ── 模型 Tab 信息架构（结论条 / 筛选条 / 分组表格） ──
    背景：真机 110 个模型 × 8 列平铺，一屏看不过来；而真正需要动手的通常个位数。
    这一层做的是"导航"：先给规模（结论条），再给筛选（搜索 + chips），最后按渠道

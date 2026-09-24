@@ -108,6 +108,8 @@ test('常量与路径助手', () => {
 
 const CAT = [
   { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', supportsImages: true, official: true },
+  // B 不带 official：模拟 traework/qoder（网关只对 workbuddy 输出该字段）——
+  // 三态必须原样穿过快照，缺失不能被压成 false
   { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, supportsImages: false },
 ];
 
@@ -117,7 +119,7 @@ test('snapshotFromCatalog：字段都存（id/name/ctx/maxOut/credits/vision）�
   assert.equal(snap.provider, 'chanhub2api');
   assert.equal(snap.count, 2);
   assert.deepEqual(snap.models[0], { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', ctx: 1000000, maxOut: 64000, credits: 'x0.06', note: '', noteDetail: '', vision: true, official: true });
-  assert.deepEqual(snap.models[1], { id: 'traework:cn:glm-5.3', name: 'B', ctx: 200000, maxOut: undefined, credits: '', note: '', noteDetail: '', vision: false, official: false });
+  assert.deepEqual(snap.models[1], { id: 'traework:cn:glm-5.3', name: 'B', ctx: 200000, maxOut: undefined, credits: '', note: '', noteDetail: '', vision: false }, '缺失的 official 不得被压成 false');
 });
 
 test('parseSnapshot：坏 JSON / 形状不对一律降级为 null（不抛）', () => {
@@ -180,7 +182,7 @@ test('catalogFromSnapshot：短名还原回目录名，视觉能力随 vision �
   const out = catalogFromSnapshot(snap);
   assert.deepEqual(out, [
     { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: true, official: true },
-    { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false, official: false },
+    { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false },
   ]);
 });
 
@@ -268,6 +270,6 @@ test('catalogFromSnapshot：空/坏输入一律给空数组，且名称缺失回
   assert.deepEqual(catalogFromSnapshot({}), []);
   assert.deepEqual(catalogFromSnapshot({ models: null }), []);
   assert.deepEqual(catalogFromSnapshot({ models: [{ id: '' }, null, { id: 'x' }] }), [
-    { id: 'x', name: 'x', contextWindow: undefined, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false, official: false },
+    { id: 'x', name: 'x', contextWindow: undefined, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false },
   ]);
 });

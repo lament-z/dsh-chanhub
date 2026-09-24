@@ -709,6 +709,57 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 .dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
 
+/* \u2500\u2500 \u6A21\u578B Tab\uFF08\u7ED3\u8BBA\u6761 / \u7B5B\u9009\u6761 / \u5206\u7EC4\u8868\u683C\uFF09 \u2500\u2500
+   \u8BBE\u8BA1\u8BED\u8A00\u4E0E\u5176\u4ED6\u9875\u9762\u540C\u6E90\uFF1A\u5361\u7247\u7528 layer-1\uFF08\u767D\uFF09\u6D6E\u5728\u7070\u9875\u9762\u4E0A\uFF08s.card \u7684\u6CE8\u91CA\uFF1A\u7528
+   layer-2 \u4F1A\u8BA9\u5361\u7247\u300C\u540E\u9000\u3001\u6574\u9875\u53D1\u95F7\u300D\uFF09\uFF1B\u6309\u94AE\u8D70 s.btnPri / s.btnGhost\uFF0832px \u9AD8\u3001
+   999 \u5706\u89D2\u300113px\uFF09\uFF1B\u7B5B\u9009 chip \u5BF9\u9F50\u7528\u91CF\u9875 .dshc-seg \u7684\u5F62\u6001\uFF0826px \u9AD8\u300112px\u3001\u9009\u4E2D\u6001
+   \u767D\u5E95 + \u54C1\u724C\u8272\u63CF\u8FB9\uFF09\uFF1B\u6570\u5B57\u4E00\u5F8B tabular-nums\uFF1B\u989C\u8272\u53EA\u8D70 --dsw-alias-* \u8BED\u4E49 token\u3002 */
+.dshc-ma-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-stats { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; }
+/* \u7EDF\u8BA1\u5757\u4E4B\u95F4\u7528 1px \u7AD6\u7EBF\u5206\u9694\uFF08\u4E0E\u6982\u89C8\u5361\u300C\u6E20\u9053\u7AD6\u6392 + \u7AD6\u7EBF\u300D\u540C\u4E00\u624B\u6CD5\uFF09\uFF0C
+   \u6BD4\u4E00\u6392\u80F6\u56CA\u5B89\u9759\uFF0C\u4E5F\u66F4\u50CF\u4EEA\u8868\u76D8\u3002 */
+.dshc-ma-stat { display: flex; flex-direction: column; gap: 1px; padding: 0 14px; border-right: 1px solid var(--dsw-alias-border-l2,#eef0f3); }
+.dshc-ma-stat:first-child { padding-left: 0; }
+.dshc-ma-stat:last-child { border-right: none; }
+.dshc-ma-stat-v { font-size: 16px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; letter-spacing: -.01em; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ma-stat-k { font-size: 10.5px; line-height: 1.3; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
+.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.dshc-ma-more { display: flex; flex-direction: column; gap: 10px; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dshc-ma-searchwrap { position: relative; display: inline-flex; align-items: center; flex: 1 1 200px; max-width: 320px; }
+.dshc-ma-searchicon { position: absolute; left: 9px; font-size: 13px; line-height: 1; color: var(--dsw-alias-label-tertiary,#8b93a1); pointer-events: none; }
+.dshc-ma-searchwrap > input.dshc-ma-search { font: inherit; font-size: 12px; height: 28px; width: 100%; padding: 0 10px 0 26px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); background: var(--dsw-alias-bg-layer-2,#f9fafb); color: var(--dsw-alias-label-primary,currentColor); box-sizing: border-box; }
+.dshc-ma-searchwrap > input.dshc-ma-search:focus { outline: none; border-color: var(--dsw-alias-brand-primary,#4f6ef7); background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-chip { font: inherit; cursor: pointer; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); background: var(--dsw-alias-bg-layer-2,#f9fafb); color: var(--dsw-alias-label-secondary,#61666b); font-size: 12px; line-height: 1; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.dshc-ma-chip > i { font-style: normal; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-chip:hover { color: var(--dsw-alias-label-primary,currentColor); border-color: var(--dsw-alias-border-l2,#d1d5db); }
+/* \u9009\u4E2D\u6001\u7528 is-on \u800C\u4E0D\u662F on\uFF1A\u5BBF\u4E3B\u6709\u4E00\u6761\u5168\u5C40 button.on \u89C4\u5219\uFF08brand \u5E95 + \u767D\u5B57\uFF09\uFF0C
+   \u5728\u6697\u8272\u4E3B\u9898\u4E0B --dsw-alias-brand-primary \u672C\u8EAB\u5C31\u662F\u8FD1\u767D\uFF08#f9fafb\uFF09\uFF0C\u4E8E\u662F"\u767D\u5E95\u767D\u5B57"
+   \u5B8C\u5168\u770B\u4E0D\u89C1\uFF08\u771F\u673A\u5B9E\u6D4B\u786E\u8BA4\uFF09\u3002\u6362\u540D\u5B57\u6BD4\u5806 specificity \u5E72\u51C0\uFF0C\u4E5F\u4E0D\u4F1A\u518D\u649E\u522B\u7684\u5168\u5C40\u7C7B\u3002 */
+.dshc-ma-chip.is-on { background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-brand-primary,#4f6ef7); border-color: var(--dsw-alias-brand-primary,#4f6ef7); font-weight: 600; }
+.dshc-ma-chip.is-on > i { color: var(--dsw-alias-brand-primary,#4f6ef7); opacity: .75; }
+.dshc-ma-chip.clear { border-style: dashed; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-count { margin-left: auto; white-space: nowrap; }
+/* \u6EDA\u52A8\u5BB9\u5668 + \u5438\u9876\u8868\u5934\uFF1A110 \u884C\u4E0D\u8BE5\u628A\u6574\u9875\u6491\u7206\uFF0C\u6EDA\u5230\u54EA\u513F\u90FD\u77E5\u9053\u5728\u770B\u54EA\u4E00\u5217 */
+.dshc-ma-scroll { max-height: 62vh; overflow: auto; }
+.dshc-ma-scroll thead th { position: sticky; top: 0; z-index: 2; }
+.dshc-ma-scroll tbody tr:hover > td { background: var(--dsw-alias-interactive-bg-hover,#f7f8fa); }
+.dshc-ma-scroll tbody tr.dshc-ma-group:hover > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
+.dshc-ma-group > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-ma-grouptoggle { font: inherit; cursor: pointer; border: none; background: none; padding: 0; font-size: 12px; font-weight: 600; letter-spacing: -.01em; font-family: ui-monospace,Menlo,monospace; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ma-grouptoggle:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-ma-notes > summary { cursor: pointer; font-size: 11px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-notes > p { margin: 6px 0 0; }
+
+/* \u2500\u2500 \u7ED3\u6784\u5316 tooltip\uFF08fixed \u5B9A\u4F4D\uFF1B\u53C2\u8003\u5B9E\u73B0\u7684 tooltip \u6837\u5F0F\uFF09 \u2500\u2500 */
+.dshc-ust-tooltip { position: fixed; left: 0; top: 0; transform: translate(-50%, -110%); background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); color: var(--dsw-alias-label-primary,currentColor); padding: 5px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); opacity: 0; transition: opacity .1s; z-index: 9999; }
+.dshc-ust-tooltip.show { opacity: 1; }
+.dshc-ust-tooltip-title { font-size: 11px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; }
+.dshc-ust-tooltip-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dsw-alias-label-secondary,#6b7280); white-space: nowrap; line-height: 1.6; }
+.dshc-ust-tooltip-row i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
+
 /* \u2500\u2500 \u6A21\u578B Tab \u4FE1\u606F\u67B6\u6784\uFF08\u7ED3\u8BBA\u6761 / \u7B5B\u9009\u6761 / \u5206\u7EC4\u8868\u683C\uFF09 \u2500\u2500
    \u80CC\u666F\uFF1A\u771F\u673A 110 \u4E2A\u6A21\u578B \xD7 8 \u5217\u5E73\u94FA\uFF0C\u4E00\u5C4F\u770B\u4E0D\u8FC7\u6765\uFF1B\u800C\u771F\u6B63\u9700\u8981\u52A8\u624B\u7684\u901A\u5E38\u4E2A\u4F4D\u6570\u3002
    \u8FD9\u4E00\u5C42\u505A\u7684\u662F"\u5BFC\u822A"\uFF1A\u5148\u7ED9\u89C4\u6A21\uFF08\u7ED3\u8BBA\u6761\uFF09\uFF0C\u518D\u7ED9\u7B5B\u9009\uFF08\u641C\u7D22 + chips\uFF09\uFF0C\u6700\u540E\u6309\u6E20\u9053
@@ -4896,7 +4947,8 @@ function ModelAbilityTab({ rpcCall, showToast }) {
     [models]
   );
   const officialCount = (models ?? []).filter((m) => m.official === true).length;
-  const extensionCount = (models ?? []).filter((m) => m.official !== true).length;
+  const extensionCount = (models ?? []).filter((m) => m.official === false).length;
+  const unknownCount = (models ?? []).filter((m) => typeof m.official !== "boolean").length;
   const gapCount = Object.keys(configuredGaps).length;
   const activeFilters = import_react6.default.useMemo(
     () => [...filters].filter((id) => id !== "official" || officialAvailable),
@@ -4904,10 +4956,12 @@ function ModelAbilityTab({ rpcCall, showToast }) {
   );
   const matchChip = import_react6.default.useCallback((m, id) => {
     switch (id) {
+      // 「隐藏扩展」= 只藏**明确**不在官方名单的（workbuddy 的扩展）；
+      // 没有官方名单的渠道（缺失）一律照常显示。
       case "official":
-        return m.official === true;
+        return m.official !== false;
       case "extension":
-        return m.official !== true;
+        return m.official === false;
       case "undecided":
         return undecided.includes(m.id);
       case "conflict":
@@ -4926,8 +4980,12 @@ function ModelAbilityTab({ rpcCall, showToast }) {
     const list = models ?? [];
     const defs = [];
     if (officialAvailable) {
-      defs.push({ id: "official", label: "\u53EA\u770B\u5B98\u65B9", count: officialCount, title: "\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF\uFF08agents[cli]\uFF09\u540D\u5355\u91CC\u7684\u6A21\u578B" });
-      defs.push({ id: "extension", label: "\u6269\u5C55", count: extensionCount, title: "\u5B98\u65B9\u6CA1\u5217\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528\u7684\u6A21\u578B\uFF08\u4E0D\u5220\uFF0C\u53EA\u5206\u5C42\uFF09" });
+      defs.push({
+        id: "official",
+        label: "\u9690\u85CF\u6269\u5C55",
+        count: extensionCount,
+        title: `\u85CF\u6389\u5B98\u65B9\u540D\u5355\u5916\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528\u7684 ${extensionCount} \u6761\u6269\u5C55\u6A21\u578B\uFF08\u53EA\u6298\u53E0\u4E0D\u5220\u9664\uFF09\u3002\u5B98\u65B9\u540D\u5355\u6765\u81EA WorkBuddy \u4E0A\u6E38\u7684 agents[cli] \u2014\u2014 traework / qoder \u6CA1\u6709\u8FD9\u4E2A\u540D\u5355\uFF0C\u5B83\u4EEC\u7684 ${unknownCount} \u6761\u6A21\u578B\u4E0D\u53D7\u6B64\u7B5B\u9009\u5F71\u54CD\uFF0C\u59CB\u7EC8\u663E\u793A\u3002`
+      });
     }
     defs.push({ id: "undecided", label: "\u5F85\u786E\u8BA4", count: undecided.length, title: "\u76EE\u5F55\u5224\u5B9A\u4E3A\u501F\u5224/\u51B2\u7A81/\u65E0\u6536\u5F55 \u2014\u2014 \u53EF\u70B9\u300C\u5B9E\u6D4B\u672A\u5B9A\u9879\u300D\u7528\u771F\u53D1\u56FE\u5B9A\u6848" });
     defs.push({ id: "conflict", label: "\u53CC\u6E90\u51B2\u7A81", count: list.filter((m) => (catalog?.verdicts?.get(m.id)?.status ?? "") === "conflict").length, title: "\u4E24\u4E2A\u540C\u7EA7\u6765\u6E90\u7ED9\u51FA\u76F8\u53CD\u7ED3\u8BBA" });
@@ -5076,11 +5134,11 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       "div",
       { className: "dshc-ma-head" },
       models && models.length > 0 ? import_react6.default.createElement(
-        import_react6.default.Fragment,
-        null,
-        statChip("\u4E2A\u6A21\u578B", models.length, "\u7F51\u5173\u76EE\u5F55\u91CC\u7684\u5168\u90E8\u6761\u76EE\uFF08\u5B98\u65B9 + \u6269\u5C55\uFF09"),
-        officialAvailable ? statChip("\u5B98\u65B9", officialCount, "\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF agents[cli] \u540D\u5355\u91CC\u7684\u6A21\u578B") : null,
-        officialAvailable ? statChip("\u6269\u5C55", extensionCount, "\u5B98\u65B9\u6CA1\u5217\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528 \u2014\u2014 \u4E0D\u5220\uFF0C\u53EA\u5206\u5C42") : null,
+        "div",
+        { className: "dshc-ma-stats" },
+        statChip("\u4E2A\u6A21\u578B", models.length, "\u7F51\u5173\u76EE\u5F55\u91CC\u7684\u5168\u90E8\u6761\u76EE\uFF08\u5B98\u65B9 + \u6269\u5C55 + \u65E0\u5B98\u65B9\u540D\u5355\u7684\u6E20\u9053\uFF09"),
+        officialAvailable ? statChip("\u5B98\u65B9", officialCount, `\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF agents[cli] \u540D\u5355\u91CC\u7684\u6A21\u578B\uFF08workbuddy \u6E20\u9053\uFF1B\u53E6\u6709 ${unknownCount} \u6761\u6765\u81EA\u6CA1\u6709\u5B98\u65B9\u540D\u5355\u7684\u6E20\u9053\uFF0C\u4E0D\u8BA1\u5165\uFF09`) : null,
+        officialAvailable ? statChip("\u6269\u5C55", extensionCount, `\u5B98\u65B9\u6CA1\u5217\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528\uFF08workbuddy \u6E20\u9053\uFF09\u2014\u2014 \u53EA\u6298\u53E0\u4E0D\u5220\u9664`) : null,
         statChip("\u53EF\u52FE\u9009", alreadyImage, "\u767D\u540D\u5355/\u57FA\u7EBF\u8BA4\u5B9A\u4E3A\u591A\u6A21\u6001\uFF0C\u53EF\u52FE\u9009\u8865\u89C6\u89C9\u80FD\u529B"),
         undecided.length > 0 ? statChip("\u5F85\u786E\u8BA4", undecided.length, "\u76EE\u5F55\u5224\u5B9A\u4E3A\u501F\u5224/\u51B2\u7A81/\u65E0\u6536\u5F55 \u2014\u2014 \u53EF\u7528\u771F\u53D1\u56FE\u5B9E\u6D4B\u5B9A\u6848") : null,
         gapCount > 0 ? statChip("\u672A\u5199\u5165", gapCount, "DSH \u914D\u7F6E\u91CC\u7F3A contextWindow/maxTokens\uFF0C\u4F1A\u56DE\u843D\u5230 256K/32K") : null
@@ -5362,20 +5420,29 @@ function ModelAbilityTab({ rpcCall, showToast }) {
     models && models.length > 0 ? import_react6.default.createElement(
       "div",
       { className: "dshc-ma-filter" },
-      import_react6.default.createElement("input", {
-        className: "dshc-ma-search",
-        style: { ...s.input, flex: "1 1 200px", maxWidth: 320 },
-        value: query,
-        placeholder: "\u641C\u7D22\u6A21\u578B id / \u540D\u79F0\u2026",
-        onChange: (ev) => setQuery(ev.target.value)
-      }),
-      ...chips.map((chip) => import_react6.default.createElement("button", {
-        key: chip.id,
-        type: "button",
-        className: `dshc-ma-chip${activeFilters.includes(chip.id) ? " on" : ""}`,
-        title: chip.title,
-        onClick: () => toggleFilter(chip.id)
-      }, `${chip.label} ${chip.count}`)),
+      import_react6.default.createElement(
+        "label",
+        { className: "dshc-ma-searchwrap" },
+        import_react6.default.createElement("span", { className: "dshc-ma-searchicon", "aria-hidden": "true" }, "\u2315"),
+        import_react6.default.createElement("input", {
+          className: "dshc-ma-search",
+          value: query,
+          placeholder: "\u641C\u7D22\u6A21\u578B id / \u540D\u79F0\u2026",
+          onChange: (ev) => setQuery(ev.target.value)
+        })
+      ),
+      ...chips.map((chip) => import_react6.default.createElement(
+        "button",
+        {
+          key: chip.id,
+          type: "button",
+          className: `dshc-ma-chip${activeFilters.includes(chip.id) ? " is-on" : ""}`,
+          title: chip.title,
+          onClick: () => toggleFilter(chip.id)
+        },
+        chip.label,
+        import_react6.default.createElement("i", null, String(chip.count))
+      )),
       activeFilters.length > 0 || query !== "" ? import_react6.default.createElement("button", {
         type: "button",
         className: "dshc-ma-chip clear",
@@ -5471,8 +5538,10 @@ function th(text, width) {
     style: {
       textAlign: "left",
       fontWeight: 600,
-      color: "var(--dsw-alias-label-secondary,#6b7280)",
-      padding: "8px 10px",
+      fontSize: 11,
+      letterSpacing: ".02em",
+      color: "var(--dsw-alias-label-tertiary,#8b93a1)",
+      padding: "9px 10px",
       whiteSpace: "nowrap",
       borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
       background: "var(--dsw-alias-bg-layer-2,#f9fafb)",
@@ -5487,9 +5556,10 @@ function th(text, width) {
 var tdStyle = {
   padding: "7px 8px",
   boxSizing: "border-box",
-  borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
+  borderBottom: "1px solid var(--dsw-alias-border-l2,#f1f2f5)",
+  fontSize: 12.5,
   color: "var(--dsw-alias-label-primary,currentColor)",
-  verticalAlign: "top",
+  verticalAlign: "middle",
   maxWidth: 280
 };
 

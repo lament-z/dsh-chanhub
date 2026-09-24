@@ -2385,6 +2385,46 @@ test('渲染：配置 Tab 出现「界面」开关，且网关配置不可读时
   }
 });
 
+// 真机事故（2026-09-24）：官方标记是 WorkBuddy 上游专有概念（data.agents[cli]），
+// traework / qoder 走各自上游协议、没有这个名单。网关早期给它们也写了 official=false，
+// 于是默认「隐藏扩展」把这两个渠道 42 条模型全藏掉（用户报「除了 workbuddy 渠道，
+// 其他渠道的模型被丢了」）。三态语义：true=官方 / false=明确不在官方名单 /
+// **缺失=没有该名单（照常显示）**。这条用例把缺失那一态钉死。
+test('渲染模型 Tab：没有官方名单的渠道（official 缺失）不被「隐藏扩展」藏掉', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  // workbuddy 两条（一官方一扩展）+ traework/qoder 各一条（**不带 official 字段**）
+  const models = [
+    { id: 'workbuddy:cn:official-one', name: '官方', contextWindow: 1000000, maxTokens: 64000, supportsImages: false, official: true },
+    { id: 'workbuddy:cn:ext-one', name: '扩展', contextWindow: 1000000, maxTokens: 64000, supportsImages: false, official: false },
+    { id: 'traework:cn:trae-one', name: 'Trae', contextWindow: 200000, maxTokens: 32000, supportsImages: false },
+    { id: 'qoder:cn:qoder-one', name: 'Qoder', contextWindow: 200000, maxTokens: 32000, supportsImages: false },
+  ];
+  const rpc = async (endpoint, payload) => {
+    const res = await base(endpoint, payload);
+    if (endpoint !== 'getModelRecord' || res?.ok !== true) return res;
+    return { ok: true, value: { ...res.value, models } };
+  };
+  const { cleanup, document } = await mount(rpc);
+  try {
+    await clickTab(document, '模型');
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const app = document.getElementById('app');
+    const rows = [...app.querySelectorAll('.dshc-ma-scroll tbody tr')]
+      .filter((tr) => !tr.classList.contains('dshc-ma-group'));
+    const ids = rows.map((tr) => tr.textContent);
+    assert.equal(rows.length, 3, `默认应显示 3 条（官方 1 + 无名单渠道 2），实际 ${rows.length}`);
+    assert.ok(ids.some((t) => t.includes('traework:cn:trae-one')), 'traework 模型不得被藏');
+    assert.ok(ids.some((t) => t.includes('qoder:cn:qoder-one')), 'qoder 模型不得被藏');
+    assert.ok(!ids.some((t) => t.includes('ext-one')), 'workbuddy 的扩展才该被藏');
+    // 结论条只把 workbuddy 的官方/扩展计数摆出来（缺失那一类不计入）
+    const head = app.querySelector('.dshc-ma-head').textContent;
+    assert.match(head, /1\s*官方/, '官方计数');
+    assert.match(head, /1\s*扩展/, '扩展计数');
+  } finally {
+    await cleanup();
+  }
+});
+
 // 模型 Tab 的信息架构（2026-09-24 重做）：真机 110 个模型 × 8 列平铺，一屏看不过来，
 // 而真正需要动手的通常个位数。这一层是**导航**：结论条给规模、筛选条给收窄、
 // 表格按渠道分组 + 滚动吸顶。分层用网关的 official 标记（不删数据）。
@@ -2424,8 +2464,12 @@ test('渲染模型 Tab：结论条 + 搜索/筛选 chips + 按渠道分组 + 滚
     assert.match(head.textContent, /2\s*官方/, '结论条要报官方数');
     assert.match(head.textContent, /2\s*扩展/, '结论条要报扩展数');
 
-    // ② 默认「只看官方」：4 条里只显示 2 条官方
-    assert.equal(rows().length, 2, '默认应只显示官方条目');
+    // ② 默认「隐藏扩展」：4 条里只藏掉 2 条扩展（官方 2 条留下）
+    assert.equal(rows().length, 2, '默认应藏掉扩展条目');
+    assert.ok(chip('隐藏扩展').textContent.includes('2'), 'chip 要带扩展条数');
+    // 选中态类名必须是 is-on：宿主有全局 `button.on`（brand 底 + 白字），
+    // 暗色下 brand 近白 → 用 `.on` 会渲染成白底白字（真机实测）
+    assert.ok(chip('隐藏扩展').className.includes('is-on'), '选中 chip 要带 is-on');
     assert.match(app.querySelector('.dshc-ma-count').textContent, /显示 2 \/ 4 个 · 2 组/, '计数行');
     assert.ok(app.querySelector('.dshc-ma-scroll'), '缺滚动容器（110 行不该撑爆整页）');
     assert.equal(app.querySelectorAll('.dshc-ma-notes').length, 1, '口径说明要收进折叠');
@@ -2436,16 +2480,16 @@ test('渲染模型 Tab：结论条 + 搜索/筛选 chips + 按渠道分组 + 滚
     assert.ok(heads.some((t) => t.includes('workbuddy:cn')), '缺 workbuddy:cn 组头');
     assert.ok(heads.some((t) => t.includes('workbuddy:global')), '缺 workbuddy:global 组头');
 
-    // ④ 关掉「只看官方」→ 4 条全出；再开「扩展」→ 只剩 2 条扩展
-    await click(chip('只看官方'));
-    assert.equal(rows().length, 4, '关掉官方筛选应看到全部');
-    await click(chip('扩展'));
-    assert.equal(rows().length, 2, '官方 + 扩展同时选中＝空集之外，这里只看扩展');
-    assert.match(app.querySelector('.dshc-ma-count').textContent, /显示 2 \/ 4 个/);
+    // ④ 关掉「隐藏扩展」→ 4 条全出；再开「待确认」→ 只剩借判那条
+    await click(chip('隐藏扩展'));
+    assert.equal(rows().length, 4, '关掉扩展折叠应看到全部');
+    await click(chip('待确认'));
+    // 夹具里两个未定项（借判 kimi-k3-1 + 无收录/别名那条）—— 与「实测未定项 2/2」同源
+    assert.equal(rows().length, 2, '待确认只剩未定的那两条');
+    await click(chip('待确认'));
+    assert.equal(rows().length, 4, '再点一次取消该筛选');
 
-    // ⑤ 搜索：按 id/名称即时过滤（先关掉 chips，只留搜索这一层）
-    await click(chip('扩展'));
-    assert.equal(rows().length, 4, 'chips 全关应看到全部');
+    // ⑤ 搜索：按 id/名称即时过滤（chips 已全关，只留搜索这一层）
     const search = app.querySelector('.dshc-ma-search');
     assert.ok(search, '缺搜索框');
     const propsKey = Object.keys(search).find((k) => k.startsWith('__reactProps$'));

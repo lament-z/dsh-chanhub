@@ -554,8 +554,12 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     () => (models ?? []).some((m) => m.official === true),
     [models],
   );
+  // 官方标记是**三态**：true / false（明确不在官方名单）/ 缺失（该渠道没有官方名单）。
+  // 网关只对 workbuddy 输出该字段 —— traework / qoder 走各自上游协议，没有这个概念。
+  // 缺失必须当成"未知、照常显示"，压成 false 就会把这两个渠道的模型全藏掉（真机事故）。
   const officialCount = (models ?? []).filter((m) => m.official === true).length;
-  const extensionCount = (models ?? []).filter((m) => m.official !== true).length;
+  const extensionCount = (models ?? []).filter((m) => m.official === false).length;
+  const unknownCount = (models ?? []).filter((m) => typeof m.official !== 'boolean').length;
   const gapCount = Object.keys(configuredGaps).length;
 
   // 默认「只看官方」，但**旧快照没有 official 字段时该筛选自动失效** —— 否则会把
@@ -569,8 +573,10 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
   /** 单个 chip 的谓词。新增维度只在这里加一条 + chipDefs 里加一项。 */
   const matchChip = React.useCallback((m, id) => {
     switch (id) {
-      case 'official': return m.official === true;
-      case 'extension': return m.official !== true;
+      // 「隐藏扩展」= 只藏**明确**不在官方名单的（workbuddy 的扩展）；
+      // 没有官方名单的渠道（缺失）一律照常显示。
+      case 'official': return m.official !== false;
+      case 'extension': return m.official === false;
       case 'undecided': return undecided.includes(m.id);
       case 'conflict': return (catalog?.verdicts?.get(m.id)?.status ?? '') === 'conflict';
       case 'gap': return (configuredGaps[m.id] ?? []).length > 0;
@@ -584,8 +590,14 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     const list = models ?? [];
     const defs = [];
     if (officialAvailable) {
-      defs.push({ id: 'official', label: '只看官方', count: officialCount, title: '在官方客户端（agents[cli]）名单里的模型' });
-      defs.push({ id: 'extension', label: '扩展', count: extensionCount, title: '官方没列、但网关实测可用的模型（不删，只分层）' });
+      defs.push({
+        id: 'official',
+        label: '隐藏扩展',
+        count: extensionCount,
+        title: `藏掉官方名单外、但网关实测可用的 ${extensionCount} 条扩展模型（只折叠不删除）。`
+          + '官方名单来自 WorkBuddy 上游的 agents[cli] —— traework / qoder 没有这个名单，'
+          + `它们的 ${unknownCount} 条模型不受此筛选影响，始终显示。`,
+      });
     }
     defs.push({ id: 'undecided', label: '待确认', count: undecided.length, title: '目录判定为借判/冲突/无收录 —— 可点「实测未定项」用真发图定案' });
     defs.push({ id: 'conflict', label: '双源冲突', count: list.filter((m) => (catalog?.verdicts?.get(m.id)?.status ?? '') === 'conflict').length, title: '两个同级来源给出相反结论' });
@@ -737,13 +749,13 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     // 这些低频且破坏性的收进「更多」。
     React.createElement('div', { className: 'dshc-ma-head' },
       models && models.length > 0
-        ? React.createElement(React.Fragment, null,
-            statChip('个模型', models.length, '网关目录里的全部条目（官方 + 扩展）'),
+        ? React.createElement('div', { className: 'dshc-ma-stats' },
+            statChip('个模型', models.length, '网关目录里的全部条目（官方 + 扩展 + 无官方名单的渠道）'),
             officialAvailable
-              ? statChip('官方', officialCount, '在官方客户端 agents[cli] 名单里的模型')
+              ? statChip('官方', officialCount, `在官方客户端 agents[cli] 名单里的模型（workbuddy 渠道；另有 ${unknownCount} 条来自没有官方名单的渠道，不计入）`)
               : null,
             officialAvailable
-              ? statChip('扩展', extensionCount, '官方没列、但网关实测可用 —— 不删，只分层')
+              ? statChip('扩展', extensionCount, `官方没列、但网关实测可用（workbuddy 渠道）—— 只折叠不删除`)
               : null,
             statChip('可勾选', alreadyImage, '白名单/基线认定为多模态，可勾选补视觉能力'),
             undecided.length > 0
@@ -1048,20 +1060,24 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     // ── ③ 搜索 + 快捷筛选（纯前端；chips 之间是"同时满足"） ──
     models && models.length > 0
       ? React.createElement('div', { className: 'dshc-ma-filter' },
-          React.createElement('input', {
-            className: 'dshc-ma-search',
-            style: { ...s.input, flex: '1 1 200px', maxWidth: 320 },
-            value: query,
-            placeholder: '搜索模型 id / 名称…',
-            onChange: (ev) => setQuery(ev.target.value),
-          }),
+          React.createElement('label', { className: 'dshc-ma-searchwrap' },
+            React.createElement('span', { className: 'dshc-ma-searchicon', 'aria-hidden': 'true' }, '⌕'),
+            React.createElement('input', {
+              className: 'dshc-ma-search',
+              value: query,
+              placeholder: '搜索模型 id / 名称…',
+              onChange: (ev) => setQuery(ev.target.value),
+            }),
+          ),
           ...chips.map((chip) => React.createElement('button', {
             key: chip.id,
             type: 'button',
-            className: `dshc-ma-chip${activeFilters.includes(chip.id) ? ' on' : ''}`,
+            className: `dshc-ma-chip${activeFilters.includes(chip.id) ? ' is-on' : ''}`,
             title: chip.title,
             onClick: () => toggleFilter(chip.id),
-          }, `${chip.label} ${chip.count}`)),
+          },
+            chip.label,
+            React.createElement('i', null, String(chip.count)))),
           activeFilters.length > 0 || query !== ''
             ? React.createElement('button', {
                 type: 'button',
@@ -1140,8 +1156,9 @@ function statChip(label, value, title) {
 function th(text, width) {
   return React.createElement('th', {
     style: {
-      textAlign: 'left', fontWeight: 600, color: 'var(--dsw-alias-label-secondary,#6b7280)',
-      padding: '8px 10px', whiteSpace: 'nowrap', borderBottom: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
+      textAlign: 'left', fontWeight: 600, fontSize: 11, letterSpacing: '.02em',
+      color: 'var(--dsw-alias-label-tertiary,#8b93a1)',
+      padding: '9px 10px', whiteSpace: 'nowrap', borderBottom: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
       background: 'var(--dsw-alias-bg-layer-2,#f9fafb)',
       // border-box：否则 width 是内容宽，加上左右 padding（20px/列 × 6 列 = 120px）
       // 实测把表撑到 678px，又把最后一列挤出 558px 的可视区。
@@ -1154,8 +1171,9 @@ function th(text, width) {
 const tdStyle = {
   padding: '7px 8px',
   boxSizing: 'border-box',
-  borderBottom: '1px solid var(--dsw-alias-border-l2,#e5e7eb)',
+  borderBottom: '1px solid var(--dsw-alias-border-l2,#f1f2f5)',
+  fontSize: 12.5,
   color: 'var(--dsw-alias-label-primary,currentColor)',
-  verticalAlign: 'top',
+  verticalAlign: 'middle',
   maxWidth: 280,
 };
