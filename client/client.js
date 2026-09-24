@@ -708,6 +708,31 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 .dshc-ust-tooltip-row i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 .dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
+
+/* \u2500\u2500 \u6A21\u578B Tab \u4FE1\u606F\u67B6\u6784\uFF08\u7ED3\u8BBA\u6761 / \u7B5B\u9009\u6761 / \u5206\u7EC4\u8868\u683C\uFF09 \u2500\u2500
+   \u80CC\u666F\uFF1A\u771F\u673A 110 \u4E2A\u6A21\u578B \xD7 8 \u5217\u5E73\u94FA\uFF0C\u4E00\u5C4F\u770B\u4E0D\u8FC7\u6765\uFF1B\u800C\u771F\u6B63\u9700\u8981\u52A8\u624B\u7684\u901A\u5E38\u4E2A\u4F4D\u6570\u3002
+   \u8FD9\u4E00\u5C42\u505A\u7684\u662F"\u5BFC\u822A"\uFF1A\u5148\u7ED9\u89C4\u6A21\uFF08\u7ED3\u8BBA\u6761\uFF09\uFF0C\u518D\u7ED9\u7B5B\u9009\uFF08\u641C\u7D22 + chips\uFF09\uFF0C\u6700\u540E\u6309\u6E20\u9053
+   \u5206\u7EC4\u3002\u884C\u5185\u5BC6\u5EA6\u8FD9\u4E00\u7248\u6CA1\u52A8\uFF08\u5217\u4E0E\u5FBD\u7AE0\u539F\u6837\uFF09\uFF0C\u5206\u7EC4\u53EA\u6539"\u600E\u4E48\u6446"\u3002 */
+.dshc-ma-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-2,#f9fafb); }
+.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.dshc-ma-stat { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-ma-stat-v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ma-stat-k { font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-more { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--dsw-alias-border-l2,#d1d5db); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dshc-ma-chip { font: inherit; cursor: pointer; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-label-secondary,#6b7280); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.dshc-ma-chip:hover { border-color: var(--dsw-alias-brand-primary,#4f6ef7); color: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-ma-chip.on { background: var(--dsw-alias-brand-primary,#4f6ef7); border-color: var(--dsw-alias-brand-primary,#4f6ef7); color: #fff; }
+.dshc-ma-chip.clear { border-style: dashed; }
+.dshc-ma-count { margin-left: auto; white-space: nowrap; }
+/* \u6EDA\u52A8\u5BB9\u5668 + \u5438\u9876\u8868\u5934\uFF1A110 \u884C\u4E0D\u8BE5\u628A\u6574\u9875\u6491\u7206\uFF0C\u6EDA\u5230\u54EA\u513F\u90FD\u77E5\u9053\u81EA\u5DF1\u5728\u770B\u54EA\u4E00\u5217 */
+.dshc-ma-scroll { max-height: 62vh; overflow: auto; }
+.dshc-ma-scroll thead th { position: sticky; top: 0; z-index: 2; }
+.dshc-ma-group > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
+.dshc-ma-grouptoggle { font: inherit; cursor: pointer; border: none; background: none; padding: 0; font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
+.dshc-ma-grouptoggle:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
+.dshc-ma-notes > summary { cursor: pointer; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ma-notes > p { margin: 6px 0 0; }
 `;
 
 // client/ui.js
@@ -4434,6 +4459,8 @@ function ExportMenu({ open, onToggle, payload, days, byModelDaily, modelRows, ac
 // client/model-ability.js
 var import_react6 = __toESM(require("react"), 1);
 var DEFAULT_PROVIDER = "chanhub2api";
+var COL_W = { check: 22, id: 176, name: 112, size: 114, vision: 50, verdict: 84 };
+var CELL_PAD_X = 16;
 var FIELD_LABEL = { name: "\u540D\u79F0", ctx: "\u4E0A\u6587", maxOut: "\u8F93\u51FA", credits: "\u500D\u7387", vision: "\u80FD\u529B" };
 var COMPLETION_LABEL = {
   contextWindow: "\u4E0A\u4E0B\u6587",
@@ -4523,15 +4550,15 @@ function CatalogBadge({ verdict, whitelisted }) {
     "\u8FD9\u53EA\u662F\u76EE\u5F55\u6807\u6CE8\uFF0C\u4E0D\u4F1A\u6539\u52A8 DSH \u914D\u7F6E\u3002"
   ].filter(Boolean).join("\n");
   const conflictWithWhitelist = whitelisted === true && verdict.verdict === "text" || whitelisted === false && verdict.verdict === "image";
+  const statusMark = { confirmed: "\u2713", borrowed: "?", conflict: "!", alias: "\u2014", missing: "\xB7" }[verdict.status] ?? "?";
   return import_react6.default.createElement(
     "span",
     { style: { display: "inline-flex", alignItems: "center", gap: 4 }, title },
     import_react6.default.createElement("span", { style: { ...s.tag, color: colors.fg, background: colors.bg } }, text),
-    import_react6.default.createElement(
-      "span",
-      { style: { ...type.text.caption, color: tone.idle.fg } },
-      `${status}${verdict.tier ? ` \xB7 ${CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier}` : ""}`
-    ),
+    import_react6.default.createElement("span", {
+      style: { ...type.text.caption, color: colors.fg, fontWeight: 600 },
+      title: `${status}${verdict.tier ? ` \xB7 ${CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier}` : ""}`
+    }, statusMark),
     conflictWithWhitelist ? import_react6.default.createElement("span", {
       style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg },
       title: "\u4E0E\u672C\u5730\u767D\u540D\u5355\u4E0D\u4E00\u81F4 \u2014\u2014 \u767D\u540D\u5355\u53EF\u80FD\u6807\u9519\uFF0C\u6216\u76EE\u5F55\u6536\u5F55\u7684\u4E0D\u662F\u540C\u4E00\u4E2A\u6A21\u578B"
@@ -4859,101 +4886,320 @@ function ModelAbilityTab({ rpcCall, showToast }) {
   const changedMap = new Map((diff?.changed ?? []).map((c) => [c.id, c.fields]));
   const addedSet = new Set(diff?.added ?? []);
   const alreadyImage = models ? models.filter((m) => m.supportsImages === true).length : 0;
+  const [query, setQuery] = import_react6.default.useState("");
+  const [filters, setFilters] = import_react6.default.useState(() => /* @__PURE__ */ new Set(["official"]));
+  const [collapsedGroups, setCollapsedGroups] = import_react6.default.useState(() => /* @__PURE__ */ new Set());
+  const [moreOpen, setMoreOpen] = import_react6.default.useState(false);
+  const undecided = import_react6.default.useMemo(() => catalog?.summary?.undecided ?? [], [catalog]);
+  const officialAvailable = import_react6.default.useMemo(
+    () => (models ?? []).some((m) => m.official === true),
+    [models]
+  );
+  const officialCount = (models ?? []).filter((m) => m.official === true).length;
+  const extensionCount = (models ?? []).filter((m) => m.official !== true).length;
+  const gapCount = Object.keys(configuredGaps).length;
+  const activeFilters = import_react6.default.useMemo(
+    () => [...filters].filter((id) => id !== "official" || officialAvailable),
+    [filters, officialAvailable]
+  );
+  const matchChip = import_react6.default.useCallback((m, id) => {
+    switch (id) {
+      case "official":
+        return m.official === true;
+      case "extension":
+        return m.official !== true;
+      case "undecided":
+        return undecided.includes(m.id);
+      case "conflict":
+        return (catalog?.verdicts?.get(m.id)?.status ?? "") === "conflict";
+      case "gap":
+        return (configuredGaps[m.id] ?? []).length > 0;
+      case "changed":
+        return changedMap.has(m.id) || addedSet.has(m.id);
+      case "vision":
+        return m.supportsImages === true;
+      default:
+        return true;
+    }
+  }, [undecided, catalog, configuredGaps, changedMap, addedSet]);
+  const chips = import_react6.default.useMemo(() => {
+    const list = models ?? [];
+    const defs = [];
+    if (officialAvailable) {
+      defs.push({ id: "official", label: "\u53EA\u770B\u5B98\u65B9", count: officialCount, title: "\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF\uFF08agents[cli]\uFF09\u540D\u5355\u91CC\u7684\u6A21\u578B" });
+      defs.push({ id: "extension", label: "\u6269\u5C55", count: extensionCount, title: "\u5B98\u65B9\u6CA1\u5217\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528\u7684\u6A21\u578B\uFF08\u4E0D\u5220\uFF0C\u53EA\u5206\u5C42\uFF09" });
+    }
+    defs.push({ id: "undecided", label: "\u5F85\u786E\u8BA4", count: undecided.length, title: "\u76EE\u5F55\u5224\u5B9A\u4E3A\u501F\u5224/\u51B2\u7A81/\u65E0\u6536\u5F55 \u2014\u2014 \u53EF\u70B9\u300C\u5B9E\u6D4B\u672A\u5B9A\u9879\u300D\u7528\u771F\u53D1\u56FE\u5B9A\u6848" });
+    defs.push({ id: "conflict", label: "\u53CC\u6E90\u51B2\u7A81", count: list.filter((m) => (catalog?.verdicts?.get(m.id)?.status ?? "") === "conflict").length, title: "\u4E24\u4E2A\u540C\u7EA7\u6765\u6E90\u7ED9\u51FA\u76F8\u53CD\u7ED3\u8BBA" });
+    defs.push({ id: "gap", label: "\u672A\u5199\u5165", count: gapCount, title: "DSH \u914D\u7F6E\u91CC\u6CA1\u5199 contextWindow / maxTokens \u7B49\u5B57\u6BB5\uFF0C\u4F1A\u56DE\u843D\u5230 256K/32K" });
+    defs.push({ id: "changed", label: "\u53D8\u5316", count: list.filter((m) => changedMap.has(m.id) || addedSet.has(m.id)).length, title: "\u4E0E\u4E0A\u6B21\u62C9\u53D6\u76F8\u6BD4\u65B0\u589E\u6216\u5B57\u6BB5\u6709\u53D8" });
+    defs.push({ id: "vision", label: "\u53EF\u52FE\u9009", count: alreadyImage, title: "\u767D\u540D\u5355/\u57FA\u7EBF\u8BA4\u5B9A\u4E3A\u591A\u6A21\u6001 \u2014\u2014 \u8FD9\u4E9B\u884C\u53EF\u4EE5\u52FE\u9009\u8865\u89C6\u89C9\u80FD\u529B" });
+    return defs;
+  }, [models, officialAvailable, officialCount, extensionCount, undecided, catalog, gapCount, changedMap, addedSet, alreadyImage]);
+  const filtered = import_react6.default.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (models ?? []).filter((m) => {
+      if (q !== "" && !`${m.id} ${m.name ?? ""}`.toLowerCase().includes(q)) return false;
+      return activeFilters.every((id) => matchChip(m, id));
+    });
+  }, [models, query, activeFilters, matchChip]);
+  const groups = import_react6.default.useMemo(() => {
+    const out = [];
+    const index = /* @__PURE__ */ new Map();
+    for (const m of filtered) {
+      const parts = String(m.id).split(":");
+      const key = parts.length >= 3 ? `${parts[0]}:${parts[1]}` : parts[0] || "\u5176\u4ED6";
+      let group = index.get(key);
+      if (!group) {
+        group = { key, models: [] };
+        index.set(key, group);
+        out.push(group);
+      }
+      group.models.push(m);
+    }
+    return out;
+  }, [filtered]);
+  const toggleFilter = import_react6.default.useCallback((id) => {
+    setFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const toggleGroup = import_react6.default.useCallback((key) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
   const mono = { fontFamily: type.text.code.fontFamily, fontSize: 12, wordBreak: "break-all", color: s.label.color };
+  const monoCell = { ...mono, wordBreak: "normal", display: "inline-block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" };
+  const renderRow = (m) => {
+    const checked = selected.has(m.id);
+    const changedFields = changedMap.get(m.id);
+    const isNew = addedSet.has(m.id);
+    const sizeGaps = (configuredGaps[m.id] ?? []).filter((f) => f === "contextWindow" || f === "maxTokens");
+    return import_react6.default.createElement(
+      "tr",
+      {
+        key: m.id,
+        style: { background: checked ? "rgba(11,110,67,.06)" : "transparent" }
+      },
+      import_react6.default.createElement(
+        "td",
+        tdStyle,
+        import_react6.default.createElement("input", {
+          type: "checkbox",
+          checked,
+          onChange: () => toggle(m.id),
+          disabled: m.supportsImages !== true,
+          style: { cursor: m.supportsImages === true ? "pointer" : "not-allowed", accentColor: "var(--dsw-alias-button-info-fill,#4176e6)" }
+        })
+      ),
+      import_react6.default.createElement(
+        "td",
+        { ...tdStyle, whiteSpace: "nowrap", overflow: "hidden" },
+        // 真机：设置弹窗只有 ~800px（内容区实测 558px），id 不 nowrap 会被 break-all
+        // 折成三行（workbuddy:cn:auto → 三行），整表高度翻倍。超长走省略号（全 id 在
+        // title 里）。span 的 maxWidth 必须是 100% —— 写死像素会大于列宽，
+        // 于是省略号按那个像素算、结果被单元格硬裁掉，看起来像"没加省略号"。
+        import_react6.default.createElement("span", {
+          style: { ...monoCell, maxWidth: COL_W.id - CELL_PAD_X - 2 },
+          title: m.id
+        }, m.id),
+        isNew ? import_react6.default.createElement("span", {
+          style: { ...s.tag, marginLeft: 6, color: tone.ok.fg, background: tone.ok.bg }
+        }, "\u65B0\u589E") : changedFields ? import_react6.default.createElement("span", {
+          style: { ...s.tag, marginLeft: 6, color: tone.warn.fg, background: tone.warn.bg },
+          title: `\u4E0E\u4E0A\u6B21\u62C9\u53D6\u76F8\u6BD4\uFF1A${changedFields.map((f) => FIELD_LABEL[f] ?? f).join("\u3001")} \u53D8\u4E86`
+        }, `\u53D8\u5316 ${changedFields.map((f) => FIELD_LABEL[f] ?? f).join("/")}`) : null
+      ),
+      // 名称去掉 "[渠道] " 前缀：组头已经写了 workbuddy:cn，前缀是纯噪音，
+      // 而且它占掉 ~70px —— 窄面板（实测容器 558px）里这一下就能把名称挤没。
+      import_react6.default.createElement(
+        "td",
+        { ...tdStyle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+        import_react6.default.createElement("span", { title: m.name }, String(m.name ?? "").replace(/^\[[^\]]+\]\s*/, ""))
+      ),
+      // 上文 / 输出 / 倍率 三列并成一列（`256k / 32k x0.21`）：设置弹窗 ~800px，
+      // 8 列会把「目录判定」——最该看的一列——挤出可视区（真机截图确认）。
+      // 合并后 6 列刚好放得下，且行高不再被折行撑开。
+      import_react6.default.createElement(
+        "td",
+        { ...tdStyle, whiteSpace: "nowrap" },
+        import_react6.default.createElement("span", null, fmtWindow(m.contextWindow), " / ", fmtWindow(m.maxTokens)),
+        typeof m.credits === "string" && m.credits !== "" ? import_react6.default.createElement("span", { style: { ...type.text.caption, marginLeft: 6 } }, m.credits) : null,
+        sizeGaps.length > 0 ? import_react6.default.createElement(NotWrittenMark, {
+          fields: sizeGaps.map((f) => COMPLETION_LABEL[f] ?? f)
+        }, "") : null,
+        // 倍率补充（qoder 错峰折扣等）：小字跟在下面，
+        // 长说明（含折扣时段）进 tooltip。上游没给就整块不渲染。
+        typeof m.creditsNote === "string" && m.creditsNote !== "" ? import_react6.default.createElement("div", {
+          style: { ...type.text.caption, color: tone.info.fg, marginTop: 2 },
+          title: typeof m.creditsNoteDetail === "string" && m.creditsNoteDetail !== "" ? m.creditsNoteDetail : m.creditsNote
+        }, m.creditsNote) : null
+      ),
+      import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge)),
+      import_react6.default.createElement(
+        "td",
+        tdStyle,
+        import_react6.default.createElement(
+          "div",
+          { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
+          import_react6.default.createElement(CatalogBadge, {
+            verdict: catalog?.verdicts?.get(m.id) ?? null,
+            whitelisted: catalog?.verdicts?.get(m.id)?.whitelist
+          }),
+          import_react6.default.createElement(ProbeMark, {
+            result: probeResults[m.id] ?? null,
+            capability: catalog?.capabilities?.[m.id] ?? null,
+            verdict: catalog?.verdicts?.get(m.id) ?? null,
+            canProbe: undecided.includes(m.id) && !probeResults[m.id],
+            busy: probeBusy,
+            onProbe: () => runProbe([m.id])
+          })
+        )
+      )
+    );
+  };
   return import_react6.default.createElement(
     "div",
     { style: { display: "flex", flexDirection: "column", gap: 12, minWidth: 0, padding: "4px 2px" } },
-    // 工具栏
+    // ── ① 结论条：一屏先回答「现在该做什么」 ──
+    // 原来散在 10 个信息块里的数字收成一行 chip；动作按「要不要动手」排序：
+    // 补齐配置字段是唯一会写 DSH 配置的动作，放主位；provider / 覆盖 / 回滚
+    // 这些低频且破坏性的收进「更多」。
     import_react6.default.createElement(
       "div",
-      { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
-      import_react6.default.createElement(
-        "span",
-        { style: type.text.secondary },
-        "provider"
-      ),
-      import_react6.default.createElement("input", {
-        style: { ...s.input, flex: "1 1 200px", maxWidth: 240 },
-        value: provider,
-        placeholder: "chanhub2api",
-        onChange: (ev) => setProvider(ev.target.value.trim() || DEFAULT_PROVIDER)
-      }),
-      import_react6.default.createElement(
-        "button",
-        {
-          style: overwrite ? { ...s.btnPri, background: tone.err.fg, borderColor: tone.err.fg } : s.btnPri,
-          type: "button",
-          disabled: applyBusy,
-          onClick: () => load(overwrite),
-          title: overwrite ? "\u62C9\u53D6\u540E\u4EE5\u7F51\u5173\u76EE\u5F55\u6574\u4F53\u8986\u76D6 DSH \u7684\u8BE5 provider \u6A21\u578B\u914D\u7F6E\uFF08\u8986\u76D6\u524D\u81EA\u52A8\u5907\u4EFD\uFF09" : "\u53EA\u62C9\u53D6\u76EE\u5F55\u5E76\u8BB0\u5F55\uFF0C\u4E0D\u6539\u52A8 DSH \u6A21\u578B\u914D\u7F6E"
-        },
-        state.kind === "loading" ? "\u62C9\u53D6\u4E2D\u2026" : overwrite ? "\u62C9\u53D6\u5E76\u8986\u76D6 DSH \u6A21\u578B\u914D\u7F6E" : state.kind === "cached" ? "\u91CD\u65B0\u62C9\u53D6\uFF08\u5237\u65B0\uFF09" : "\u62C9\u53D6\u5168\u6E20\u9053\u6A21\u578B"
-      ),
-      import_react6.default.createElement(
-        "label",
-        { style: { ...type.text.caption, display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" } },
-        import_react6.default.createElement("input", {
-          type: "checkbox",
-          checked: overwrite,
-          onChange: (ev) => setOverwrite(ev.target.checked),
-          style: { cursor: "pointer" }
-        }),
-        "\u62C9\u53D6\u65F6\u8986\u76D6\uFF08\u7F51\u5173\u4E3A\u51C6\uFF09"
-      ),
+      { className: "dshc-ma-head" },
       models && models.length > 0 ? import_react6.default.createElement(
-        "button",
-        { ...s.btnGhost, style: { ...s.btnGhost, opacity: applyBusy || selected.size === 0 ? 0.6 : 1 }, type: "button", disabled: applyBusy || selected.size === 0, onClick: apply2 },
-        applyBusy ? "\u5E94\u7528\u4E2D\u2026" : `\u5E94\u7528\u8865\u4E01\uFF08${selected.size}\uFF09`
+        import_react6.default.Fragment,
+        null,
+        statChip("\u4E2A\u6A21\u578B", models.length, "\u7F51\u5173\u76EE\u5F55\u91CC\u7684\u5168\u90E8\u6761\u76EE\uFF08\u5B98\u65B9 + \u6269\u5C55\uFF09"),
+        officialAvailable ? statChip("\u5B98\u65B9", officialCount, "\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF agents[cli] \u540D\u5355\u91CC\u7684\u6A21\u578B") : null,
+        officialAvailable ? statChip("\u6269\u5C55", extensionCount, "\u5B98\u65B9\u6CA1\u5217\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528 \u2014\u2014 \u4E0D\u5220\uFF0C\u53EA\u5206\u5C42") : null,
+        statChip("\u53EF\u52FE\u9009", alreadyImage, "\u767D\u540D\u5355/\u57FA\u7EBF\u8BA4\u5B9A\u4E3A\u591A\u6A21\u6001\uFF0C\u53EF\u52FE\u9009\u8865\u89C6\u89C9\u80FD\u529B"),
+        undecided.length > 0 ? statChip("\u5F85\u786E\u8BA4", undecided.length, "\u76EE\u5F55\u5224\u5B9A\u4E3A\u501F\u5224/\u51B2\u7A81/\u65E0\u6536\u5F55 \u2014\u2014 \u53EF\u7528\u771F\u53D1\u56FE\u5B9E\u6D4B\u5B9A\u6848") : null,
+        gapCount > 0 ? statChip("\u672A\u5199\u5165", gapCount, "DSH \u914D\u7F6E\u91CC\u7F3A contextWindow/maxTokens\uFF0C\u4F1A\u56DE\u843D\u5230 256K/32K") : null
       ) : null,
       import_react6.default.createElement(
-        "button",
-        {
-          ...s.btnGhost,
-          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+        "div",
+        { className: "dshc-ma-head-actions" },
+        // 应用补丁是「我已经勾好了」的收尾动作：只有选了才出现（按状态显隐）
+        models && models.length > 0 && selected.size > 0 ? import_react6.default.createElement("button", {
+          ...s.btnPri,
+          style: { ...s.btnPri, opacity: applyBusy ? 0.6 : 1 },
           type: "button",
-          disabled: catalogBusy,
-          onClick: refreshCatalog,
-          title: "\u8054\u7F51\u6293\u53D6 models.dev \u4E0E OpenRouter \u7684\u591A\u6A21\u6001\u6807\u6CE8\uFF0C\u843D\u76D8\u5230 ~/.dsh/dsh-chanhub/model-catalog.json\uFF1B\u5E73\u65F6\u6253\u5F00\u9762\u677F\u53EA\u8BFB\u7F13\u5B58\uFF0C\u4E0D\u8054\u7F51\u3001\u4E0D\u6539 DSH \u914D\u7F6E"
-        },
-        catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"
-      ),
-      catalog && (catalog.summary?.undecided ?? []).length > 0 ? import_react6.default.createElement(
-        "button",
-        {
+          disabled: applyBusy,
+          onClick: apply2
+        }, applyBusy ? "\u5E94\u7528\u4E2D\u2026" : `\u5E94\u7528\u8865\u4E01\uFF08${selected.size}\uFF09`) : null,
+        models && models.length > 0 && gapCount > 0 ? import_react6.default.createElement("button", {
+          ...s.btnPri,
+          style: { ...s.btnPri, opacity: completeBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: completeBusy,
+          onClick: previewCompletion,
+          title: "\u7ED9 DSH \u914D\u7F6E\u91CC\u5DF2\u5B58\u5728\u7684\u6761\u76EE\u8865\u4E0A contextWindow / maxTokens / \u63A8\u7406\u6863\u4F4D\uFF08+ \u89C6\u89C9 input\uFF09\uFF1A\u53EA\u586B\u7A7A\u7F3A\uFF0C\u4E0D\u589E\u4E0D\u5220\u6761\u76EE\uFF0C\u4E5F\u4E0D\u52A8\u4F60\u624B\u6539\u8FC7\u7684\u5176\u5B83\u5B57\u6BB5\u3002\u7F3A\u5B57\u6BB5\u65F6 pi-ai \u4F1A\u56DE\u843D\u5230 256K / 32K \u2014\u2014 \u8FD9\u5C31\u662F\u300C\u4E0A\u6E38 1M\u3001DSH \u663E\u793A 256K\u300D\u7684\u539F\u56E0\u3002"
+        }, completeBusy ? "\u5904\u7406\u4E2D\u2026" : `\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\uFF08${gapCount}\uFF09`) : null,
+        catalog && undecided.length > 0 ? import_react6.default.createElement("button", {
           ...s.btnGhost,
           style: { ...s.btnGhost, opacity: probeBusy ? 0.6 : 1 },
           type: "button",
           disabled: probeBusy,
           onClick: () => runProbe(),
           title: "\u771F\u53D1\u4E00\u5F20\u56FE\u95EE\u8FD9\u6761\u6E20\u9053\u8BA4\u4E0D\u8BA4\u5F97\uFF1A\u56FE\u91CC\u753B\u4E86\u300C\u80CC\u666F\u8272 + \u6570\u5B57\u300D\uFF0C\u53EA\u6709\u7B54\u5BF9\u624D\u7B97\u770B\u89C1 \u2014\u2014 \u5B9E\u6D4B\u53D1\u73B0\u53EA\u53D1\u56FE\u770B\u62A5\u9519\u6839\u672C\u8BC1\u660E\u4E0D\u4E86\u4EC0\u4E48\uFF08\u7EAF\u6587\u672C\u6A21\u578B\u7167\u6837\u56DE 200\uFF0C\u751A\u81F3\u4F1A\u7F16\u4E00\u4E2A\u989C\u8272\uFF09\u3002\u76EE\u5F55\u662F\u522B\u4EBA\u7684\u4E8C\u624B\u6807\u6CE8\uFF0C\u767D\u540D\u5355\u662F\u4EBA\u5DE5\u8BA4\u5B9A\uFF0C\u5B9E\u6D4B\u624D\u662F\u6700\u7EC8\u88C1\u51B3\u3002\u4E32\u884C + 300ms \u95F4\u9694 + \u5355\u6279 12 \u4E2A\uFF08\u4FDD\u62A4\u8D26\u53F7\uFF09\uFF1B\u62FF\u4E0D\u51C6\u7684\u4E00\u5F8B\u8BB0\u300C\u672A\u5B9A\u300D\uFF0C\u4E0D\u5199\u914D\u7F6E\u3002\u786E\u8BA4\u7ED3\u8BBA\u4F1A\u6C89\u6DC0\u8FDB\u80FD\u529B\u57FA\u7EBF\uFF08\u7B49\u7EA7 L0 \u5B9E\u6D4B\uFF09\u3002"
-        },
-        probeBusy ? "\u5B9E\u6D4B\u4E2D\u2026" : `\u5B9E\u6D4B\u672A\u5B9A\u9879\uFF08${Math.min(catalog.summary.undecided.length, 12)}/${catalog.summary.undecided.length}\uFF09`
-      ) : null,
-      models && models.length > 0 && Object.keys(configuredGaps).length > 0 ? import_react6.default.createElement(
-        "button",
-        {
-          ...s.btnGhost,
-          style: { ...s.btnGhost, opacity: completeBusy ? 0.6 : 1 },
-          type: "button",
-          disabled: completeBusy,
-          onClick: previewCompletion,
-          title: "\u7ED9 DSH \u914D\u7F6E\u91CC\u5DF2\u5B58\u5728\u7684\u6761\u76EE\u8865\u4E0A contextWindow / maxTokens / \u63A8\u7406\u6863\u4F4D\uFF08+ \u89C6\u89C9 input\uFF09\uFF1A\u53EA\u586B\u7A7A\u7F3A\uFF0C\u4E0D\u589E\u4E0D\u5220\u6761\u76EE\uFF0C\u4E5F\u4E0D\u52A8\u4F60\u624B\u6539\u8FC7\u7684\u5176\u5B83\u5B57\u6BB5\u3002\u7F3A\u5B57\u6BB5\u65F6 pi-ai \u4F1A\u56DE\u843D\u5230 256K / 32K \u2014\u2014 \u8FD9\u5C31\u662F\u300C\u4E0A\u6E38 1M\u3001DSH \u663E\u793A 256K\u300D\u7684\u539F\u56E0\u3002"
-        },
-        completeBusy ? "\u5904\u7406\u4E2D\u2026" : `\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\uFF08${Object.keys(configuredGaps).length}\uFF09`
-      ) : null,
-      catalog && (catalog.baseline?.pending ?? 0) > 0 ? import_react6.default.createElement(
-        "button",
-        {
+        }, probeBusy ? "\u5B9E\u6D4B\u4E2D\u2026" : `\u5B9E\u6D4B\u672A\u5B9A\u9879\uFF08${Math.min(undecided.length, 12)}/${undecided.length}\uFF09`) : null,
+        catalog && (catalog.baseline?.pending ?? 0) > 0 ? import_react6.default.createElement("button", {
           ...s.btnGhost,
           style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
           type: "button",
           disabled: catalogBusy,
           onClick: commitCapabilities,
           title: "\u628A\u76EE\u5F55\u6BD4\u5BF9\u4E2D**\u786E\u8BA4\u6001**\u7684\u7ED3\u8BBA\u5199\u8FDB\u80FD\u529B\u57FA\u7EBF\uFF08settings.modelCapabilities\uFF09\uFF1A\u786E\u8BA4\u591A\u6A21\u6001\u7684\u6A21\u578B\u4F1A\u83B7\u5F97\u89C6\u89C9\u80FD\u529B\uFF0C\u786E\u8BA4\u7EAF\u6587\u672C\u7684\u4F1A\u88AB\u8BB0\u4E0B\u6765\u3002\u501F\u5224/\u6A21\u7CCA/\u51B2\u7A81/\u522B\u540D/\u65E0\u6536\u5F55\u4E00\u5F8B\u4E0D\u5199\u3002\u53EA\u6539\u63D2\u4EF6 settings\uFF0C\u4E0D\u52A8 DSH \u6A21\u578B\u914D\u7F6E\u3002"
-        },
-        `\u6C89\u6DC0\u786E\u8BA4\u9879\uFF08${catalog.baseline.pending}\uFF09`
-      ) : null
+        }, `\u6C89\u6DC0\u786E\u8BA4\u9879\uFF08${catalog.baseline.pending}\uFF09`) : null,
+        import_react6.default.createElement("button", {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: catalogBusy,
+          onClick: refreshCatalog,
+          title: "\u8054\u7F51\u6293\u53D6 models.dev \u4E0E OpenRouter \u7684\u591A\u6A21\u6001\u6807\u6CE8\uFF0C\u843D\u76D8\u5230 ~/.dsh/dsh-chanhub/model-catalog.json\uFF1B\u5E73\u65F6\u6253\u5F00\u9762\u677F\u53EA\u8BFB\u7F13\u5B58\uFF0C\u4E0D\u8054\u7F51\u3001\u4E0D\u6539 DSH \u914D\u7F6E"
+        }, catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"),
+        import_react6.default.createElement("button", {
+          style: overwrite ? { ...s.btnPri, background: tone.err.fg, borderColor: tone.err.fg } : s.btnPri,
+          type: "button",
+          disabled: applyBusy,
+          onClick: () => load(overwrite),
+          title: overwrite ? "\u62C9\u53D6\u540E\u4EE5\u7F51\u5173\u76EE\u5F55\u6574\u4F53\u8986\u76D6 DSH \u7684\u8BE5 provider \u6A21\u578B\u914D\u7F6E\uFF08\u8986\u76D6\u524D\u81EA\u52A8\u5907\u4EFD\uFF09" : "\u53EA\u62C9\u53D6\u76EE\u5F55\u5E76\u8BB0\u5F55\uFF0C\u4E0D\u6539\u52A8 DSH \u6A21\u578B\u914D\u7F6E"
+        }, state.kind === "loading" ? "\u62C9\u53D6\u4E2D\u2026" : overwrite ? "\u62C9\u53D6\u5E76\u8986\u76D6 DSH \u6A21\u578B\u914D\u7F6E" : state.kind === "cached" ? "\u91CD\u65B0\u62C9\u53D6\uFF08\u5237\u65B0\uFF09" : "\u62C9\u53D6\u5168\u6E20\u9053\u6A21\u578B"),
+        import_react6.default.createElement("button", {
+          ...s.btnGhost,
+          type: "button",
+          onClick: () => setMoreOpen((v) => !v),
+          title: "provider\u3001\u8986\u76D6\u5F00\u5173\u3001\u62C9\u53D6\u8BB0\u5F55\u4E0E\u56DE\u6EDA\u3001\u8BF4\u660E"
+        }, moreOpen ? "\u6536\u8D77 \u25B4" : "\u66F4\u591A \u25BE")
+      )
     ),
+    // ── 更多：低频 / 破坏性动作 + provider + 拉取记录 + 说明 ──
+    moreOpen ? import_react6.default.createElement(
+      "div",
+      { className: "dshc-ma-more" },
+      import_react6.default.createElement(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+        import_react6.default.createElement("span", { style: type.text.secondary }, "provider"),
+        import_react6.default.createElement("input", {
+          style: { ...s.input, flex: "1 1 200px", maxWidth: 240 },
+          value: provider,
+          placeholder: "chanhub2api",
+          onChange: (ev) => setProvider(ev.target.value.trim() || DEFAULT_PROVIDER)
+        }),
+        import_react6.default.createElement(
+          "label",
+          {
+            style: { ...type.text.caption, display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }
+          },
+          import_react6.default.createElement("input", {
+            type: "checkbox",
+            checked: overwrite,
+            onChange: (ev) => setOverwrite(ev.target.checked),
+            style: { cursor: "pointer" }
+          }),
+          "\u62C9\u53D6\u65F6\u8986\u76D6\uFF08\u7F51\u5173\u4E3A\u51C6\uFF09"
+        )
+      ),
+      // 拉取记录：上次拉取时刻 + 与本次的差异（每次拉取都是**整体覆盖**）
+      record ? import_react6.default.createElement(
+        "div",
+        { style: { ...type.text.caption, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+        import_react6.default.createElement(
+          "span",
+          null,
+          `\u4E0A\u6B21\u62C9\u53D6\uFF1A${relativeTime(record.at) || "\u2014"} \xB7 ${record.count} \u4E2A\u6A21\u578B` + (record.recorded === true ? "" : "\uFF08\u8BB0\u5F55\u5199\u5165\u5931\u8D25\uFF09")
+        ),
+        diff && !diff.first ? import_react6.default.createElement(
+          "span",
+          { style: { color: tone.info.fg } },
+          `\u672C\u6B21\u65B0\u589E ${diff.added.length} / \u6D88\u5931 ${diff.removed.length} / \u53D8\u5316 ${diff.changed.length}`
+        ) : diff && diff.first ? import_react6.default.createElement("span", { style: { color: tone.idle.fg } }, "\uFF08\u9996\u6B21\u8BB0\u5F55\uFF0C\u65E0\u5386\u53F2\u53EF\u6BD4\uFF09") : null,
+        import_react6.default.createElement("button", {
+          type: "button",
+          style: { ...s.btnGhost, height: 24, padding: "0 8px", fontSize: 11.5 },
+          onClick: clearRecord,
+          title: "\u53EA\u6E05\u7A7A\u8FD9\u4EFD\u62C9\u53D6\u8BB0\u5F55\uFF0C\u4E0D\u52A8 DSH \u6A21\u578B\u914D\u7F6E"
+        }, "\u6E05\u7A7A\u8BB0\u5F55"),
+        backup && backup.at > 0 ? import_react6.default.createElement("button", {
+          type: "button",
+          style: { ...s.btnGhost, height: 24, padding: "0 8px", fontSize: 11.5 },
+          disabled: rollbackBusy,
+          onClick: rollback,
+          title: `\u56DE\u6EDA\u5230\u8986\u76D6\u524D\uFF08\u5907\u4EFD\u4E8E ${new Date(backup.at).toLocaleString()}\uFF0C${backup.count} \u4E2A\u6A21\u578B\uFF09`
+        }, rollbackBusy ? "\u56DE\u6EDA\u4E2D\u2026" : `\u56DE\u6EDA\u4E0A\u6B21\u8986\u76D6\uFF08${backup.count}\uFF09`) : null
+      ) : null
+    ) : null,
     // 拉取记录：上次拉取时刻 + 与本次的差异（记录每次拉取都是**整体覆盖**）
     record ? import_react6.default.createElement(
       "div",
@@ -5031,9 +5277,15 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         `\u6E90\u5931\u8D25\uFF1A${catalog.failures.map((f) => f.source).join("\u3001")}`
       ) : null
     ) : null,
-    // 说明
-    import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, '\u300C\u591A\u6A21\u6001\u300D= \u672C\u5730\u8BC4\u5BA1\u767D\u540D\u5355\u5185\u3001\u771F\u5B9E\u652F\u6301\u56FE\u7247\u8F93\u5165\u7684\u6A21\u578B\uFF08\u4E0A\u6E38 supports_images \u5B57\u6BB5\u4E0D\u53EF\u9760\uFF0C\u6545\u672A\u91C7\u4FE1\uFF09\u3002\u5E94\u7528\u8865\u4E01\u4F1A\u628A\u52FE\u9009\u7684\u6A21\u578B\u5199\u5165 DSH \u8BBE\u7F6E llm-pi-ai \u7684 providers.&lt;provider&gt;.models[].input = ["text","image"]\uFF0C\u8BA9 DSH \u5141\u8BB8\u56FE\u7247\u4E0A\u4F20\u3002\u6CE8\u610F\uFF1A\u4E4B\u540E\u522B\u5728\u300C\u8BBE\u7F6E\u2192\u6A21\u578B\u300D\u91CC\u91CD\u65B0\u300C\u4ECE\u63D0\u4F9B\u5546\u641C\u7D22\u300D\uFF0C\u5426\u5219\u89C6\u89C9\u6807\u8BB0\u4F1A\u88AB\u6E05\u56DE\u3002'),
-    import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, "\u300C\u76EE\u5F55\u5224\u5B9A\u300D= \u62FF\u516C\u5F00\u7ED3\u6784\u5316\u76EE\u5F55\uFF08DSH \u81EA\u5E26 pi-ai \u76EE\u5F55 + models.dev + OpenRouter\uFF09\u6BD4\u5BF9\u51FA\u6765\u7684\u7ED3\u8BBA\uFF0C\u53EA\u4F5C\u6807\u6CE8\u3001**\u4E0D\u4F1A\u6539\u52A8\u4EFB\u4F55\u914D\u7F6E**\u3002\u88C1\u51B3\u6309\u6765\u6E90\u5206\u7EA7\uFF1A\u539F\u5382(L1) > \u4E91\u6258\u7BA1(L2) > \u8F6C\u552E(L3)\uFF0C\u540C\u7EA7\u5E73\u7968\u624D\u7B97\u51B2\u7A81\uFF1B\u5265\u540E\u7F00/\u6A21\u7CCA\u547D\u4E2D\u7684\u7ED3\u8BBA\u662F\u300C\u501F\u5224\u300D\uFF0C\u76EE\u5F55\u67E5\u4E0D\u5230\u7684\u6807\u300C\u65E0\u6536\u5F55\u300D\uFF0C\u6E20\u9053\u6863\u4F4D\u522B\u540D\uFF08auto / fast-model \u7B49\uFF09\u4E0D\u53C2\u4E0E\u6BD4\u5BF9\u3002"),
+    // 说明：两段口径长文收进原生 <details>（默认收起）—— 它们是参考材料，
+    // 不该和每天要看的数字争同一块版面。
+    import_react6.default.createElement(
+      "details",
+      { className: "dshc-ma-notes" },
+      import_react6.default.createElement("summary", { style: type.text.caption }, "\u53E3\u5F84\u8BF4\u660E\uFF08\u591A\u6A21\u6001 / \u76EE\u5F55\u5224\u5B9A\u662F\u600E\u4E48\u6765\u7684\uFF09"),
+      import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, '\u300C\u591A\u6A21\u6001\u300D= \u672C\u5730\u8BC4\u5BA1\u767D\u540D\u5355\u5185\u3001\u771F\u5B9E\u652F\u6301\u56FE\u7247\u8F93\u5165\u7684\u6A21\u578B\uFF08\u4E0A\u6E38 supports_images \u5B57\u6BB5\u4E0D\u53EF\u9760\uFF0C\u6545\u672A\u91C7\u4FE1\uFF09\u3002\u5E94\u7528\u8865\u4E01\u4F1A\u628A\u52FE\u9009\u7684\u6A21\u578B\u5199\u5165 DSH \u8BBE\u7F6E llm-pi-ai \u7684 providers.&lt;provider&gt;.models[].input = ["text","image"]\uFF0C\u8BA9 DSH \u5141\u8BB8\u56FE\u7247\u4E0A\u4F20\u3002\u6CE8\u610F\uFF1A\u4E4B\u540E\u522B\u5728\u300C\u8BBE\u7F6E\u2192\u6A21\u578B\u300D\u91CC\u91CD\u65B0\u300C\u4ECE\u63D0\u4F9B\u5546\u641C\u7D22\u300D\uFF0C\u5426\u5219\u89C6\u89C9\u6807\u8BB0\u4F1A\u88AB\u6E05\u56DE\u3002'),
+      import_react6.default.createElement("p", { style: { ...type.text.caption, lineHeight: 1.7 } }, "\u300C\u76EE\u5F55\u5224\u5B9A\u300D= \u62FF\u516C\u5F00\u7ED3\u6784\u5316\u76EE\u5F55\uFF08DSH \u81EA\u5E26 pi-ai \u76EE\u5F55 + models.dev + OpenRouter\uFF09\u6BD4\u5BF9\u51FA\u6765\u7684\u7ED3\u8BBA\uFF0C\u53EA\u4F5C\u6807\u6CE8\u3001**\u4E0D\u4F1A\u6539\u52A8\u4EFB\u4F55\u914D\u7F6E**\u3002\u88C1\u51B3\u6309\u6765\u6E90\u5206\u7EA7\uFF1A\u539F\u5382(L1) > \u4E91\u6258\u7BA1(L2) > \u8F6C\u552E(L3)\uFF0C\u540C\u7EA7\u5E73\u7968\u624D\u7B97\u51B2\u7A81\uFF1B\u5265\u540E\u7F00/\u6A21\u7CCA\u547D\u4E2D\u7684\u7ED3\u8BBA\u662F\u300C\u501F\u5224\u300D\uFF0C\u76EE\u5F55\u67E5\u4E0D\u5230\u7684\u6807\u300C\u65E0\u6536\u5F55\u300D\uFF0C\u6E20\u9053\u6863\u4F4D\u522B\u540D\uFF08auto / fast-model \u7B49\uFF09\u4E0D\u53C2\u4E0E\u6BD4\u5BF9\u3002")
+    ),
     state.kind === "cached" ? import_react6.default.createElement(
       "div",
       { style: s.tip },
@@ -5106,120 +5358,115 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       )
     ) : null,
     lastErr ? import_react6.default.createElement("div", { style: s.err }, lastErr) : null,
-    // 表格
+    // ── ③ 搜索 + 快捷筛选（纯前端；chips 之间是"同时满足"） ──
+    models && models.length > 0 ? import_react6.default.createElement(
+      "div",
+      { className: "dshc-ma-filter" },
+      import_react6.default.createElement("input", {
+        className: "dshc-ma-search",
+        style: { ...s.input, flex: "1 1 200px", maxWidth: 320 },
+        value: query,
+        placeholder: "\u641C\u7D22\u6A21\u578B id / \u540D\u79F0\u2026",
+        onChange: (ev) => setQuery(ev.target.value)
+      }),
+      ...chips.map((chip) => import_react6.default.createElement("button", {
+        key: chip.id,
+        type: "button",
+        className: `dshc-ma-chip${activeFilters.includes(chip.id) ? " on" : ""}`,
+        title: chip.title,
+        onClick: () => toggleFilter(chip.id)
+      }, `${chip.label} ${chip.count}`)),
+      activeFilters.length > 0 || query !== "" ? import_react6.default.createElement("button", {
+        type: "button",
+        className: "dshc-ma-chip clear",
+        onClick: () => {
+          setFilters(/* @__PURE__ */ new Set());
+          setQuery("");
+        }
+      }, "\u6E05\u7A7A\u7B5B\u9009") : null,
+      import_react6.default.createElement(
+        "span",
+        { className: "dshc-ma-count", style: type.text.caption },
+        `\u663E\u793A ${filtered.length} / ${models.length} \u4E2A \xB7 ${groups.length} \u7EC4`
+      )
+    ) : null,
+    // ── ④ 表格：滚动容器 + sticky 表头 + 按渠道分组 ──
     models && models.length > 0 ? import_react6.default.createElement(
       "div",
       { style: { ...s.card, padding: 0, overflow: "hidden", marginBottom: 0 } },
-      import_react6.default.createElement(
-        "table",
-        { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 } },
+      filtered.length === 0 ? import_react6.default.createElement(
+        "div",
+        { style: { ...s.tip, margin: 12 } },
+        "\u5F53\u524D\u7B5B\u9009\u6CA1\u6709\u547D\u4E2D\u4EFB\u4F55\u6A21\u578B \u2014\u2014 \u70B9\u300C\u6E05\u7A7A\u7B5B\u9009\u300D\u56DE\u5230\u5168\u90E8\u3002"
+      ) : import_react6.default.createElement(
+        "div",
+        { className: "dshc-ma-scroll" },
         import_react6.default.createElement(
-          "thead",
-          null,
+          "table",
+          // table-layout: fixed + 逐列定宽：实测容器只有 558px（设置弹窗
+          // 800px 减去侧栏与内边距），自适应布局会撑到 765px 把「目录判定」
+          // 挤出可视区。定宽后 6 列刚好放得下，超长一律省略号（title 带全值）。
+          { style: { width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" } },
           import_react6.default.createElement(
-            "tr",
+            "thead",
             null,
-            th(""),
-            th("\u6A21\u578B ID"),
-            th("\u540D\u79F0"),
-            th("\u4E0A\u6587"),
-            th("\u8F93\u51FA"),
-            th("\u500D\u7387"),
-            th("\u80FD\u529B"),
-            th("\u76EE\u5F55\u5224\u5B9A")
-          )
-        ),
-        import_react6.default.createElement(
-          "tbody",
-          null,
-          models.map((m) => {
-            const checked = selected.has(m.id);
-            const changedFields = changedMap.get(m.id);
-            const isNew = addedSet.has(m.id);
-            return import_react6.default.createElement(
+            import_react6.default.createElement(
               "tr",
-              {
-                key: m.id,
-                style: { background: checked ? "rgba(11,110,67,.06)" : "transparent" }
-              },
-              import_react6.default.createElement(
-                "td",
-                tdStyle,
-                import_react6.default.createElement("input", {
-                  type: "checkbox",
-                  checked,
-                  onChange: () => toggle(m.id),
-                  disabled: m.supportsImages !== true,
-                  style: { cursor: m.supportsImages === true ? "pointer" : "not-allowed", accentColor: "var(--dsw-alias-button-info-fill,#4176e6)" }
-                })
-              ),
-              import_react6.default.createElement(
-                "td",
-                tdStyle,
-                import_react6.default.createElement("span", { style: mono }, m.id),
-                isNew ? import_react6.default.createElement("span", {
-                  style: { ...s.tag, marginLeft: 6, color: tone.ok.fg, background: tone.ok.bg }
-                }, "\u65B0\u589E") : changedFields ? import_react6.default.createElement("span", {
-                  style: { ...s.tag, marginLeft: 6, color: tone.warn.fg, background: tone.warn.bg },
-                  title: `\u4E0E\u4E0A\u6B21\u62C9\u53D6\u76F8\u6BD4\uFF1A${changedFields.map((f) => FIELD_LABEL[f] ?? f).join("\u3001")} \u53D8\u4E86`
-                }, `\u53D8\u5316 ${changedFields.map((f) => FIELD_LABEL[f] ?? f).join("/")}`) : null
-              ),
-              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.name),
-              import_react6.default.createElement(
-                "td",
-                { ...tdStyle, whiteSpace: "nowrap" },
-                configuredGaps[m.id]?.includes("contextWindow") ? import_react6.default.createElement(NotWrittenMark, { fields: ["contextWindow"] }, fmtWindow(m.contextWindow)) : fmtWindow(m.contextWindow)
-              ),
-              import_react6.default.createElement(
-                "td",
-                { ...tdStyle, whiteSpace: "nowrap" },
-                configuredGaps[m.id]?.includes("maxTokens") ? import_react6.default.createElement(NotWrittenMark, { fields: ["maxTokens"] }, fmtWindow(m.maxTokens)) : fmtWindow(m.maxTokens)
-              ),
-              import_react6.default.createElement(
-                "td",
-                { ...tdStyle, whiteSpace: "nowrap" },
-                typeof m.credits === "string" && m.credits !== "" ? m.credits : "\u2014",
-                // 倍率补充（qoder 错峰折扣等）：小字跟在倍率下面，
-                // 长说明（含折扣时段）进 tooltip。上游没给就整块不渲染。
-                typeof m.creditsNote === "string" && m.creditsNote !== "" ? import_react6.default.createElement("div", {
-                  style: { ...type.text.caption, color: tone.info.fg, marginTop: 2 },
-                  title: typeof m.creditsNoteDetail === "string" && m.creditsNoteDetail !== "" ? m.creditsNoteDetail : m.creditsNote
-                }, m.creditsNote) : null
-              ),
-              import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge)),
-              import_react6.default.createElement(
-                "td",
-                tdStyle,
+              null,
+              th("", COL_W.check),
+              th("\u6A21\u578B ID", COL_W.id),
+              th("\u540D\u79F0", COL_W.name),
+              th("\u4E0A\u6587 / \u8F93\u51FA / \u500D\u7387", COL_W.size),
+              th("\u80FD\u529B", COL_W.vision),
+              th("\u76EE\u5F55\u5224\u5B9A", COL_W.verdict)
+            )
+          ),
+          import_react6.default.createElement(
+            "tbody",
+            null,
+            ...groups.flatMap((group) => {
+              const collapsed = collapsedGroups.has(group.key);
+              const head = import_react6.default.createElement(
+                "tr",
+                { key: `g:${group.key}`, className: "dshc-ma-group" },
                 import_react6.default.createElement(
-                  "div",
-                  { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
-                  import_react6.default.createElement(CatalogBadge, {
-                    verdict: catalog?.verdicts?.get(m.id) ?? null,
-                    whitelisted: catalog?.verdicts?.get(m.id)?.whitelist
-                  }),
-                  import_react6.default.createElement(ProbeMark, {
-                    result: probeResults[m.id] ?? null,
-                    capability: catalog?.capabilities?.[m.id] ?? null,
-                    verdict: catalog?.verdicts?.get(m.id) ?? null,
-                    canProbe: (catalog?.summary?.undecided ?? []).includes(m.id) && !probeResults[m.id],
-                    busy: probeBusy,
-                    onProbe: () => runProbe([m.id])
-                  })
+                  "td",
+                  { colSpan: 6, style: { padding: "6px 10px" } },
+                  import_react6.default.createElement("button", {
+                    type: "button",
+                    className: "dshc-ma-grouptoggle",
+                    onClick: () => toggleGroup(group.key),
+                    title: collapsed ? "\u5C55\u5F00\u8FD9\u4E00\u7EC4" : "\u6536\u8D77\u8FD9\u4E00\u7EC4"
+                  }, `${collapsed ? "\u25B8" : "\u25BE"} ${group.key}`),
+                  import_react6.default.createElement(
+                    "span",
+                    { style: { ...type.text.caption, marginLeft: 8 } },
+                    `${group.models.length} \u4E2A`
+                  )
                 )
-              )
-            );
-          })
+              );
+              return collapsed ? [head] : [head, ...group.models.map(renderRow)];
+            })
+          )
         )
       ),
       import_react6.default.createElement(
         "p",
         { style: { ...type.text.caption, padding: "8px 14px" } },
-        `${models.length} \u4E2A\u6A21\u578B \xB7 ${alreadyImage} \u4E2A\u591A\u6A21\u6001\uFF08\u53EF\u52FE\u9009\uFF09\u3002`
+        `${models.length} \u4E2A\u6A21\u578B \xB7 ${alreadyImage} \u4E2A\u591A\u6A21\u6001\uFF08\u53EF\u52FE\u9009\uFF09` + (officialAvailable ? ` \xB7 \u5B98\u65B9 ${officialCount} / \u6269\u5C55 ${extensionCount}` : "") + "\u3002"
       )
     ) : models && (state.kind === "loaded" || state.kind === "cached") ? import_react6.default.createElement("div", { style: s.tip }, "\u8BE5 provider \u6CA1\u6709\u6A21\u578B\u76EE\u5F55\u3002") : null
   );
 }
-function th(text) {
+function statChip(label, value, title) {
+  return import_react6.default.createElement(
+    "span",
+    { key: label, className: "dshc-ma-stat", title },
+    import_react6.default.createElement("span", { className: "dshc-ma-stat-v" }, String(value)),
+    import_react6.default.createElement("span", { className: "dshc-ma-stat-k" }, label)
+  );
+}
+function th(text, width) {
   return import_react6.default.createElement("th", {
     style: {
       textAlign: "left",
@@ -5228,12 +5475,18 @@ function th(text) {
       padding: "8px 10px",
       whiteSpace: "nowrap",
       borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
-      background: "var(--dsw-alias-bg-layer-2,#f9fafb)"
+      background: "var(--dsw-alias-bg-layer-2,#f9fafb)",
+      // border-box：否则 width 是内容宽，加上左右 padding（20px/列 × 6 列 = 120px）
+      // 实测把表撑到 678px，又把最后一列挤出 558px 的可视区。
+      boxSizing: "border-box",
+      // 定宽（配合 table-layout: fixed）：窄面板下不让某一列抢走别人的空间
+      ...width ? { width, minWidth: width, maxWidth: width } : {}
     }
   }, text);
 }
 var tdStyle = {
-  padding: "7px 10px",
+  padding: "7px 8px",
+  boxSizing: "border-box",
   borderBottom: "1px solid var(--dsw-alias-border-l2,#e5e7eb)",
   color: "var(--dsw-alias-label-primary,currentColor)",
   verticalAlign: "top",

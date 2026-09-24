@@ -107,7 +107,7 @@ test('常量与路径助手', () => {
 // ---------------------------------------------------------------------------
 
 const CAT = [
-  { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', supportsImages: true },
+  { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', supportsImages: true, official: true },
   { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, supportsImages: false },
 ];
 
@@ -116,8 +116,8 @@ test('snapshotFromCatalog：字段都存（id/name/ctx/maxOut/credits/vision）�
   assert.equal(snap.at, 123);
   assert.equal(snap.provider, 'chanhub2api');
   assert.equal(snap.count, 2);
-  assert.deepEqual(snap.models[0], { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', ctx: 1000000, maxOut: 64000, credits: 'x0.06', note: '', noteDetail: '', vision: true });
-  assert.deepEqual(snap.models[1], { id: 'traework:cn:glm-5.3', name: 'B', ctx: 200000, maxOut: undefined, credits: '', note: '', noteDetail: '', vision: false });
+  assert.deepEqual(snap.models[0], { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', ctx: 1000000, maxOut: 64000, credits: 'x0.06', note: '', noteDetail: '', vision: true, official: true });
+  assert.deepEqual(snap.models[1], { id: 'traework:cn:glm-5.3', name: 'B', ctx: 200000, maxOut: undefined, credits: '', note: '', noteDetail: '', vision: false, official: false });
 });
 
 test('parseSnapshot：坏 JSON / 形状不对一律降级为 null（不抛）', () => {
@@ -179,9 +179,25 @@ test('catalogFromSnapshot：短名还原回目录名，视觉能力随 vision �
   const snap = snapshotFromCatalog(CAT, { at: 7, provider: 'p' });
   const out = catalogFromSnapshot(snap);
   assert.deepEqual(out, [
-    { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: true },
-    { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false },
+    { id: 'workbuddy:cn:glm-5.3-flash', name: 'A', contextWindow: 1000000, maxTokens: 64000, credits: 'x0.06', creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: true, official: true },
+    { id: 'traework:cn:glm-5.3', name: 'B', contextWindow: 200000, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false, official: false },
   ]);
+});
+
+test('diffModelSnapshots：同内容的 efforts 数组不算「变化」（引用比较会让变化数恒假）', () => {
+  // 真机踩到：efforts 是数组，用 !== 比引用时两次拉取的同内容数组永远不相等 ——
+  // 「变化 N」恒定报 51（所有带档位的模型），面板上那个筛选等于没有。
+  const a = snapshotFromCatalog([{ id: 'x', name: 'X', reasoningEfforts: ['low', 'high'] }], { at: 1, provider: 'p' });
+  const b = snapshotFromCatalog([{ id: 'x', name: 'X', reasoningEfforts: ['low', 'high'] }], { at: 2, provider: 'p' });
+  assert.notEqual(a.models[0].efforts, b.models[0].efforts, '两次快照拿到的确实是不同数组实例');
+  assert.deepEqual(diffModelSnapshots(a, b).changed, [], '内容相同就不该报变化');
+
+  // 真变了（少一档）必须报出来
+  const c = snapshotFromCatalog([{ id: 'x', name: 'X', reasoningEfforts: ['low'] }], { at: 3, provider: 'p' });
+  assert.deepEqual(diffModelSnapshots(b, c).changed, [{ id: 'x', fields: ['efforts'] }]);
+  // 一侧有、一侧没有也算变
+  const d = snapshotFromCatalog([{ id: 'x', name: 'X' }], { at: 4, provider: 'p' });
+  assert.deepEqual(diffModelSnapshots(c, d).changed, [{ id: 'x', fields: ['efforts'] }]);
 });
 
 // ---------------------------------------------------------------------------
@@ -252,6 +268,6 @@ test('catalogFromSnapshot：空/坏输入一律给空数组，且名称缺失回
   assert.deepEqual(catalogFromSnapshot({}), []);
   assert.deepEqual(catalogFromSnapshot({ models: null }), []);
   assert.deepEqual(catalogFromSnapshot({ models: [{ id: '' }, null, { id: 'x' }] }), [
-    { id: 'x', name: 'x', contextWindow: undefined, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false },
+    { id: 'x', name: 'x', contextWindow: undefined, maxTokens: undefined, credits: undefined, creditsNote: undefined, creditsNoteDetail: undefined, supportsImages: false, official: false },
   ]);
 });

@@ -2385,6 +2385,93 @@ test('渲染：配置 Tab 出现「界面」开关，且网关配置不可读时
   }
 });
 
+// 模型 Tab 的信息架构（2026-09-24 重做）：真机 110 个模型 × 8 列平铺，一屏看不过来，
+// 而真正需要动手的通常个位数。这一层是**导航**：结论条给规模、筛选条给收窄、
+// 表格按渠道分组 + 滚动吸顶。分层用网关的 official 标记（不删数据）。
+test('渲染模型 Tab：结论条 + 搜索/筛选 chips + 按渠道分组 + 滚动吸顶', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  const OFFICIAL = new Set(['workbuddy:global:kimi-k3', 'workbuddy:cn:glm-5.3']);
+  const rpc = async (endpoint, payload) => {
+    const res = await base(endpoint, payload);
+    if (endpoint !== 'getModelRecord' || res?.ok !== true) return res;
+    return {
+      ok: true,
+      value: {
+        ...res.value,
+        models: (res.value.models ?? []).map((m) => ({ ...m, official: OFFICIAL.has(m.id) })),
+      },
+    };
+  };
+  const { cleanup, document } = await mount(rpc);
+  const click = (node) => React.act(async () => {
+    node.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+  });
+  const rows = () => [...document.querySelectorAll('.dshc-ma-scroll tbody tr')]
+    .filter((tr) => !tr.classList.contains('dshc-ma-group'));
+  const groupHeads = () => [...document.querySelectorAll('.dshc-ma-scroll tbody tr.dshc-ma-group')]
+    .map((tr) => tr.textContent);
+  const chip = (label) => [...document.querySelectorAll('.dshc-ma-chip')]
+    .find((b) => b.textContent.startsWith(label));
+  try {
+    await clickTab(document, '模型');
+    await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const app = document.getElementById('app');
+
+    // ① 结论条：规模一眼可见，且官方/扩展分开（分层而不是删除）
+    const head = app.querySelector('.dshc-ma-head');
+    assert.ok(head, '缺结论条');
+    assert.match(head.textContent, /4\s*个模型/, '结论条要报总数');
+    assert.match(head.textContent, /2\s*官方/, '结论条要报官方数');
+    assert.match(head.textContent, /2\s*扩展/, '结论条要报扩展数');
+
+    // ② 默认「只看官方」：4 条里只显示 2 条官方
+    assert.equal(rows().length, 2, '默认应只显示官方条目');
+    assert.match(app.querySelector('.dshc-ma-count').textContent, /显示 2 \/ 4 个 · 2 组/, '计数行');
+    assert.ok(app.querySelector('.dshc-ma-scroll'), '缺滚动容器（110 行不该撑爆整页）');
+    assert.equal(app.querySelectorAll('.dshc-ma-notes').length, 1, '口径说明要收进折叠');
+
+    // ③ 分组：按渠道前缀切，组头带计数
+    const heads = groupHeads();
+    assert.equal(heads.length, 2, `应分成 2 组，得到 ${heads.length}：${heads.join(' | ')}`);
+    assert.ok(heads.some((t) => t.includes('workbuddy:cn')), '缺 workbuddy:cn 组头');
+    assert.ok(heads.some((t) => t.includes('workbuddy:global')), '缺 workbuddy:global 组头');
+
+    // ④ 关掉「只看官方」→ 4 条全出；再开「扩展」→ 只剩 2 条扩展
+    await click(chip('只看官方'));
+    assert.equal(rows().length, 4, '关掉官方筛选应看到全部');
+    await click(chip('扩展'));
+    assert.equal(rows().length, 2, '官方 + 扩展同时选中＝空集之外，这里只看扩展');
+    assert.match(app.querySelector('.dshc-ma-count').textContent, /显示 2 \/ 4 个/);
+
+    // ⑤ 搜索：按 id/名称即时过滤（先关掉 chips，只留搜索这一层）
+    await click(chip('扩展'));
+    assert.equal(rows().length, 4, 'chips 全关应看到全部');
+    const search = app.querySelector('.dshc-ma-search');
+    assert.ok(search, '缺搜索框');
+    const propsKey = Object.keys(search).find((k) => k.startsWith('__reactProps$'));
+    assert.ok(propsKey, '找不到 React props 句柄');
+    await React.act(async () => {
+      // 直接调 React 的 onChange：jsdom 下派发原生 input 事件时 React 的 value
+      // tracker 会把这次赋值当作"没变"，onChange 不触发（本轮实测确认过），
+      // 所以走 props 句柄而不是模拟原生事件。
+      search[propsKey].onChange({ target: { value: 'kimi' } });
+    });
+    assert.equal(rows().length, 2, '搜索 kimi 应只剩两条 kimi 行');
+    assert.ok(rows().every((tr) => tr.textContent.includes('kimi')), '搜索结果必须都命中');
+
+    // ⑥ 清空筛选 + 收起一组
+    await click([...document.querySelectorAll('.dshc-ma-chip')].find((b) => b.textContent === '清空筛选'));
+    assert.equal(rows().length, 4, '清空筛选后回到全部');
+    const cnHead = [...document.querySelectorAll('.dshc-ma-grouptoggle')].find((b) => b.textContent.includes('workbuddy:cn'));
+    assert.ok(cnHead, '缺分组折叠按钮');
+    await click(cnHead);
+    assert.equal(rows().length, 1, '收起 workbuddy:cn 后只剩 global 那条');
+    assert.ok(groupHeads().some((t) => t.includes('workbuddy:cn')), '收起的组头必须留着（否则无法再展开）');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('渲染模型 Tab：只读目录判定列 + 刷新能力目录（不改配置）', { skip }, async () => {
   const rpc = fakeRpc(realStatusFixture());
   const { cleanup, document } = await mount(rpc);
