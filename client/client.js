@@ -5079,8 +5079,13 @@ function ModelAbilityTab({ rpcCall, showToast }) {
       // 而且它占掉 ~70px —— 窄面板（实测容器 558px）里这一下就能把名称挤没。
       import_react6.default.createElement(
         "td",
-        { ...tdStyle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-        import_react6.default.createElement("span", { title: m.name }, String(m.name ?? "").replace(/^\[[^\]]+\]\s*/, ""))
+        { ...tdStyle, whiteSpace: "nowrap" },
+        // 省略号放在 span 上而不是 td 上：td 的 overflow 行为在各浏览器里都不太一致
+        // （真机上出现过"没省略、直接换行"），span 加 display:block 才是确定行为。
+        import_react6.default.createElement("span", {
+          title: m.name,
+          style: { display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }
+        }, String(m.name ?? "").replace(/^\[[^\]]+\]\s*/, ""))
       ),
       // 上文 / 输出 / 倍率 三列并成一列（`256k / 32k x0.21`）：设置弹窗 ~800px，
       // 8 列会把「目录判定」——最该看的一列——挤出可视区（真机截图确认）。
