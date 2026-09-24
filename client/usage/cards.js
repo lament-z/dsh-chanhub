@@ -25,9 +25,11 @@ import {
   formatPercent,
   formatTokens,
   heatGrid,
+  heatLevel,
   hourlyProfile,
   latencyText,
   niceMax,
+  quartileThresholds,
   rankMetric,
   uptimeText,
   usageByDay,
@@ -162,9 +164,13 @@ export function Heatmap({ rows, metric = 'requests', onMetricChange, onTip }) {
   // rows 是「按槽」行（usageBySlot 的输出）；热力图的单位是「天」，
   // 必须先折叠 —— 直接把槽当格子会画出并不存在的日分布。
   const days = React.useMemo(() => usageByDay(rows), [rows]);
+  // 骨架固定 30 天（= 网关窗口上限），与 KPI / 排行 / 占比同口径；
+  // 不跟随每日柱状图的「近 N 天」缩放（那是那张卡自己的事，跨卡传染会
+  // 造成「热力图 7 格、KPI 30 天」这种更隐蔽的口径分裂）。
+  const windowDays = HEAT_WINDOW_DAYS;
   const grid = React.useMemo(
-    () => heatGrid(days, { windowDays: HEAT_WINDOW_DAYS, metric }),
-    [days, metric],
+    () => heatGrid(days, { windowDays, metric }),
+    [days, metric, windowDays],
   );
   const hours = React.useMemo(() => hourlyProfile(rows), [rows]);
 
@@ -181,7 +187,7 @@ export function Heatmap({ rows, metric = 'requests', onMetricChange, onTip }) {
       React.createElement('div', { className: 'dshc-ust-cardtitle' },
         React.createElement('h3', null, '活跃热力'),
         React.createElement('span', { className: 'dshc-ust-cardsub' },
-          `近 ${HEAT_WINDOW_DAYS} 天 · 本地时区`),
+          `近 ${windowDays} 天 · 本地时区`),
       ),
       React.createElement('div', { className: 'dshc-ust-cardactions' },
         onMetricChange
@@ -244,7 +250,7 @@ export function Heatmap({ rows, metric = 'requests', onMetricChange, onTip }) {
       React.createElement('span', { style: type.text.caption },
         hasDayData
           ? `活跃 ${grid.activeDays} 天 · 峰值 ${formatNumber(grid.max)} ${unit}/天`
-          : `近 ${HEAT_WINDOW_DAYS} 天暂无按天记录`),
+          : `近 ${windowDays} 天暂无按天记录`),
       React.createElement('span', {
         className: 'dshc-ust-hint',
         title: '色阶为分位法（对非零日取 4 分位）；长尾分布下线性映射会塌成一片浅色。数据只从网关落盘那刻开始积累。',
@@ -255,39 +261,57 @@ export function Heatmap({ rows, metric = 'requests', onMetricChange, onTip }) {
       ? React.createElement('div', { className: 'dshc-ust-subblock' },
           React.createElement('div', { style: type.text.caption },
             hasDayData
-              ? `按天记录只有 ${grid.activeDays} 天（网关小时槽只保 48 小时、日槽要跨天才产生）—— 按小时看更清楚：`
-              : '近 30 天没有按天记录 —— 按小时看当前这段：'),
-          React.createElement(HourProfile, { hours }),
+              ? `按天记录只有 ${grid.activeDays} 天 —— 网关近 48 小时存小时槽、更早才折叠成日槽，`
+                + '所以「按天」要跨天才长得出来；这段时间看小时分布更准：'
+              : `近 ${windowDays} 天没有按天记录 —— 按小时看当前这段：`),
+          React.createElement(HourProfile, { hours, metric }),
         )
       : null,
   );
 }
 
-/** 按小时分布条（24 根）—— 小时槽不足一天时的替代视图。 */
-function HourProfile({ hours }) {
-  const max = Math.max(1, ...hours.map((item) => item.requests));
+/**
+ * 时段分布条（24 小时）—— 小时槽不足一天时的替代视图。
+ *
+ * 四件事一起修（真机反馈「这个卡片是干嘛的、颜色不对、没有标注、总量里也没有」）：
+ *   1. **标注**：自带标题 + 单位 + 合计（此前是 24 根裸条，看不出画的是什么）；
+ *   2. **口径跟随**：按 `metric` 取 requests / tokens —— 此前硬编码 `item.requests`，
+ *      把卡片切到 Tokens 时下面还在画请求数（`hourlyProfile` 两个字段都给，数据现成）；
+ *   3. **配色**：用与热力图同一套分位色阶（h0..h4）—— 此前是品牌蓝单色，
+ *      与正上方图例的蓝 ramp 不是一套，同一张卡两种蓝；
+ *   4. **合计**：底部给窗口内该分布的合计。
+ *
+ * @param props - `{hours, metric}`：`hourlyProfile()` 的 24 项 + 卡片当前指标。
+ * @returns React 元素。
+ */
+function HourProfile({ hours, metric = 'requests' }) {
+  const isTokens = metric === 'tokens';
+  const unit = isTokens ? 'Tokens' : '请求';
+  const valueOf = (item) => (isTokens ? item.tokens : item.requests);
+  const values = hours.map(valueOf);
+  const max = Math.max(1, ...values);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const fmt = isTokens ? formatTokens : formatNumber;
+  // 分位色阶与热力图同源：同一张卡里的两张图必须能被同一个图例解释。
+  const thresholds = quartileThresholds(values);
   return React.createElement('div', null,
-    React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 3, height: 56 } },
-      ...hours.map((item) =>
-        React.createElement('span', {
+    React.createElement('div', { style: { ...type.text.caption, marginBottom: 4 } },
+      `24 小时时段分布 · ${unit}`,
+      total > 0 ? ` · 合计 ${fmt(total)}` : ' · 窗口内无记录'),
+    React.createElement('div', { className: 'dshc-ust-hourbar' },
+      ...hours.map((item) => {
+        const value = valueOf(item);
+        return React.createElement('span', {
           key: item.hour,
-          title: `${String(item.hour).padStart(2, '0')}:00 · ${formatNumber(item.requests)} 请求`,
-          style: {
-            flex: '1 1 0',
-            minWidth: 0,
-            height: `${Math.max(item.requests > 0 ? 6 : 2, Math.round((item.requests / max) * 100))}%`,
-            borderRadius: '2px 2px 0 0',
-            background: item.requests > 0
-              ? 'var(--dsw-alias-brand-primary,#4f6ef7)'
-              : 'var(--dsw-alias-border-l2,#e5e6eb)',
-            opacity: item.requests > 0 ? 0.85 : 0.6,
-          },
-        }),
-      ),
+          className: `h${heatLevel(value, thresholds)}`,
+          title: `${String(item.hour).padStart(2, '0')}:00 · ${fmt(value)} ${unit}`,
+          style: { height: `${Math.max(value > 0 ? 6 : 2, Math.round((value / max) * 100))}%` },
+        });
+      }),
     ),
-    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: 4 } },
+    React.createElement('div', { className: 'dshc-ust-hourfoot' },
       ...['00', '06', '12', '18', '23'].map((label) =>
-        React.createElement('span', { key: label, style: type.text.caption }, label)),
+        React.createElement('span', { key: label, style: type.text.caption }, `${label} 时`)),
     ),
   );
 }
@@ -433,7 +457,10 @@ export function DailyBars({ byModel, metric, range, onRangeChange, onMetricChang
     React.createElement('div', { className: 'dshc-ust-cardhead' },
       React.createElement('div', { className: 'dshc-ust-cardtitle' },
         React.createElement('h3', null, '每日用量'),
-        React.createElement('span', { className: 'dshc-ust-cardsub' }, `按模型堆叠 · ${metricLabel}`),
+        // 「近 N 天」是本卡的**缩放**（切的是这张图看多少天，不是全局窗口）——
+        // 必须写在这里，否则用户会以为上面 KPI 也跟着变了。
+        React.createElement('span', { className: 'dshc-ust-cardsub' },
+          `近 ${range} 天 · 按模型堆叠 · ${metricLabel}`),
       ),
       React.createElement('div', { className: 'dshc-ust-cardactions' },
         onMetricChange
@@ -464,6 +491,15 @@ export function DailyBars({ byModel, metric, range, onRangeChange, onMetricChang
                   formatPercent(grand > 0 ? row.total / grand : 0, 0)),
               ),
             ),
+          ),
+          // 合计：此前只被用作图例百分比的分母，数字本身从没露过面
+          // （真机反馈「总量里也没有」）。列在最后一行，与图例同列对齐。
+          React.createElement('div', { className: 'dshc-ust-cardfoot' },
+            React.createElement('span', { style: type.text.caption },
+              `合计 ${fmt(grand)} ${metricLabel} · ${dates.length} 天`),
+            React.createElement('span', { className: 'dshc-ust-hint',
+              title: '图例即明细：每个模型的合计与占比；「其他 N 项」是长尾合并（合并只影响配色，不影响合计）。' },
+              `按模型堆叠`),
           ),
         ),
   );

@@ -1263,8 +1263,63 @@ test('渲染用量：热力图为固定 30 天骨架 + 分位色阶图例 + 稀�
   }
 });
 
-test('渲染用量：账号排行映射昵称 + 渠道标签；渠道用量按渠道聚合', { skip }, async () => {
-  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
+// 真机反馈「按小时那张卡片是干嘛的 / 颜色不对 / 没有标注 / 总量里也没有」——
+// 四条一起钉死：标题+单位+合计、配色走热力同一套 h0..h4 分位类（不是品牌蓝内联色）、
+// 口径跟随卡片的指标开关（此前硬编码 requests，切到 Tokens 时下面还在画请求数）。
+test('渲染用量：稀疏时的时段分布条带标题/单位/合计，配色走热力分位色阶，口径跟随指标开关', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    const value = (await base(endpoint, payload)).value;
+    if (endpoint !== 'getUsage') return { ok: true, value };
+    // 只留一天的两个小时槽 → 活跃天数 < 3，触发稀疏降级（小时分布才是真实有数据的维度）
+    const sparse = [];
+    ['h:2026-09-21T09', 'h:2026-09-21T10'].forEach((slot, i) => {
+      for (const uid of ['uid-1', 'uid-2', 'uid-3']) {
+        for (const model of ['cn:glm-5.2', 'cn:glm-5.2-air']) {
+          sparse.push({
+            slot, realm: 'cn', uid, model, key: 'master',
+            requests: i + 1, failed: 0, streaming: 1,
+            prompt_tokens: 100, completion_tokens: 50, total_tokens: 150,
+            credit: 0.25, avg_latency_ms: 300,
+          });
+        }
+      }
+    });
+    return { ok: true, value: { ...value, usage: { ...value.usage, buckets: sparse } } };
+  };
+  const { cleanup, document } = await mount(rpc, { reducedMotion: true });
+  const click = (node) => React.act(async () => {
+    node.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+  });
+  try {
+    const app = await openUsage(document);
+    const bars = [...app.querySelectorAll('[data-card="heat"] .dshc-ust-hourbar > span')];
+    assert.equal(bars.length, 24, '时段分布必须是 24 根（0–23 时）');
+
+    const caption = app.querySelector('[data-card="heat"] .dshc-ust-subblock').textContent;
+    assert.match(caption, /24 小时时段分布 · 请求/, '必须写清这张图是什么、单位是什么');
+    assert.match(caption, /合计 18/, '合计要露出来（6×1 + 6×2 = 18 请求）');
+
+    // 配色：走与热力图同一套分位类，不得再用内联品牌蓝（同一张卡两种蓝＝「颜色不对」）
+    const classes = bars.map((b) => b.className);
+    assert.ok(classes.every((c) => /^h[0-4]$/.test(c)), `色阶类不符：${classes.join(',')}`);
+    assert.ok(classes.filter((c) => c !== 'h0').length === 2, '只有 09/10 两点有数据');
+    assert.ok(bars.every((b) => !b.style.background), '颜色必须来自 CSS 类，不得内联');
+    // 图例（h0..h4）就在同一张卡里 —— 分位色阶可被解释
+    assert.equal(app.querySelectorAll('[data-card="heat"] .dshc-ust-heat-legend > i').length, 5);
+
+    // 口径跟随指标开关：切到 Tokens 后标题与合计都要跟着变（此前恒为请求数）
+    const seg = app.querySelector('[data-seg="heatMetric"]');
+    await click([...seg.querySelectorAll('button')].find((b) => b.textContent === 'Tokens'));
+    const after = app.querySelector('[data-card="heat"] .dshc-ust-subblock').textContent;
+    assert.match(after, /24 小时时段分布 · Tokens/, '切到 Tokens 后标题单位必须跟着变');
+    assert.match(after, /合计 1\.8K/, 'Tokens 合计 = 12 行 × 150 = 1.8K');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：账号排行映射昵称 + 渠道标签；渠道用量按渠道聚合', { skip }, async () => {  const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     const app = await openUsage(document);
     // 账号列映射昵称（不是 uid 前 8 位）

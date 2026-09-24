@@ -591,6 +591,24 @@ body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h1 { background: #1e3a8a; }
 body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h2 { background: #2563eb; }
 body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h3 { background: #3b82f6; }
 body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
+/* 时段分布条（24 小时）：**与热力分位色阶同源**。
+   此前用 --dsw-alias-brand-primary 单色（#4f6ef7），与正上方图例的蓝 ramp
+   (#dbeafe→#1d4ed8) 不是一套 —— 同一张卡里两种蓝，用户读成「颜色不对」。
+   现在按同一 h0..h4 分位级上色，图例直接解释这张图。 */
+.dshc-ust-hourbar { display: flex; align-items: flex-end; gap: 3px; height: 56px; }
+.dshc-ust-hourbar > span { flex: 1 1 0; min-width: 0; display: block; border-radius: 2px 2px 0 0; }
+.dshc-ust-hourbar > span:hover { box-shadow: 0 0 0 1px var(--dsw-alias-border-l2,#d5d5d5); }
+.dshc-ust-hourbar > span.h0 { background: var(--dsw-alias-bg-layer-2,#f1f4f9); }
+.dshc-ust-hourbar > span.h1 { background: #dbeafe; }
+.dshc-ust-hourbar > span.h2 { background: #93c5fd; }
+.dshc-ust-hourbar > span.h3 { background: #3b82f6; }
+.dshc-ust-hourbar > span.h4 { background: #1d4ed8; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h0 { background: #1f2937; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h1 { background: #1e3a8a; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h2 { background: #2563eb; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h3 { background: #3b82f6; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
+.dshc-ust-hourfoot { display: flex; justify-content: space-between; margin-top: 4px; }
 /* 入场动效（逐列延迟的淡入） */
 @keyframes dshc-heat-in { from { opacity: 0 } to { opacity: 1 } }
 .dshc-heat > i.anim { animation: dshc-heat-in .45s linear both; }

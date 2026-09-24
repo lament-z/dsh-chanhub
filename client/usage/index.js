@@ -281,13 +281,19 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
                 ? React.createElement('span', { className: 'dshc-ust-scope-tag', 'data-scope-key': activeKey },
                     `只看 ${activeKeyLabel}`)
                 : null,
+              // 口径标签必须写真话：KPI/排行/占比/热力图取的都是**网关窗口**
+              // （720h = 30 天，网关保留上限），而「近 N 天」只是每日柱状图的
+              // 缩放（那张卡的副标题自己会写）。此前这里写「近 ${range} 天」，
+              // 切天数时标签变了、大数字却纹丝不动 —— 那是假口径。
               React.createElement('span', { style: type.text.caption, title: WINDOW_TIP },
-                `近 ${range} 天 · 数据落盘 data/usage.json，重启不清零`),
+                '窗口 30 天（网关保留上限 720h）· 数据落盘 data/usage.json，重启不清零'),
             ),
           ),
           React.createElement(KpiCards, { items: kpis }),
 
           // ── ② 活跃热力图 ──
+          // 不给 range：热力图的口径是**整个网关窗口（30 天）**，与 KPI/排行一致；
+          // 「近 N 天」是每日柱状图自己的缩放，不跨卡片传染。
           React.createElement(Heatmap, {
             rows, metric: heatMetric, onMetricChange: setHeatMetric, onTip: setTip,
           }),

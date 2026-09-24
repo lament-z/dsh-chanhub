@@ -592,6 +592,24 @@ body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h1 { background: #1e3a8a; }
 body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h2 { background: #2563eb; }
 body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h3 { background: #3b82f6; }
 body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
+/* \u65F6\u6BB5\u5206\u5E03\u6761\uFF0824 \u5C0F\u65F6\uFF09\uFF1A**\u4E0E\u70ED\u529B\u5206\u4F4D\u8272\u9636\u540C\u6E90**\u3002
+   \u6B64\u524D\u7528 --dsw-alias-brand-primary \u5355\u8272\uFF08#4f6ef7\uFF09\uFF0C\u4E0E\u6B63\u4E0A\u65B9\u56FE\u4F8B\u7684\u84DD ramp
+   (#dbeafe\u2192#1d4ed8) \u4E0D\u662F\u4E00\u5957 \u2014\u2014 \u540C\u4E00\u5F20\u5361\u91CC\u4E24\u79CD\u84DD\uFF0C\u7528\u6237\u8BFB\u6210\u300C\u989C\u8272\u4E0D\u5BF9\u300D\u3002
+   \u73B0\u5728\u6309\u540C\u4E00 h0..h4 \u5206\u4F4D\u7EA7\u4E0A\u8272\uFF0C\u56FE\u4F8B\u76F4\u63A5\u89E3\u91CA\u8FD9\u5F20\u56FE\u3002 */
+.dshc-ust-hourbar { display: flex; align-items: flex-end; gap: 3px; height: 56px; }
+.dshc-ust-hourbar > span { flex: 1 1 0; min-width: 0; display: block; border-radius: 2px 2px 0 0; }
+.dshc-ust-hourbar > span:hover { box-shadow: 0 0 0 1px var(--dsw-alias-border-l2,#d5d5d5); }
+.dshc-ust-hourbar > span.h0 { background: var(--dsw-alias-bg-layer-2,#f1f4f9); }
+.dshc-ust-hourbar > span.h1 { background: #dbeafe; }
+.dshc-ust-hourbar > span.h2 { background: #93c5fd; }
+.dshc-ust-hourbar > span.h3 { background: #3b82f6; }
+.dshc-ust-hourbar > span.h4 { background: #1d4ed8; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h0 { background: #1f2937; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h1 { background: #1e3a8a; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h2 { background: #2563eb; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h3 { background: #3b82f6; }
+body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
+.dshc-ust-hourfoot { display: flex; justify-content: space-between; margin-top: 4px; }
 /* \u5165\u573A\u52A8\u6548\uFF08\u9010\u5217\u5EF6\u8FDF\u7684\u6DE1\u5165\uFF09 */
 @keyframes dshc-heat-in { from { opacity: 0 } to { opacity: 1 } }
 .dshc-heat > i.anim { animation: dshc-heat-in .45s linear both; }
@@ -2941,9 +2959,10 @@ function formatKpi(value, kind) {
 }
 function Heatmap({ rows, metric = "requests", onMetricChange, onTip }) {
   const days = import_react4.default.useMemo(() => usageByDay(rows), [rows]);
+  const windowDays = HEAT_WINDOW_DAYS;
   const grid = import_react4.default.useMemo(
-    () => heatGrid(days, { windowDays: HEAT_WINDOW_DAYS, metric }),
-    [days, metric]
+    () => heatGrid(days, { windowDays, metric }),
+    [days, metric, windowDays]
   );
   const hours = import_react4.default.useMemo(() => hourlyProfile(rows), [rows]);
   const weekdayLabels = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D", "\u65E5"];
@@ -2964,7 +2983,7 @@ function Heatmap({ rows, metric = "requests", onMetricChange, onTip }) {
         import_react4.default.createElement(
           "span",
           { className: "dshc-ust-cardsub" },
-          `\u8FD1 ${HEAT_WINDOW_DAYS} \u5929 \xB7 \u672C\u5730\u65F6\u533A`
+          `\u8FD1 ${windowDays} \u5929 \xB7 \u672C\u5730\u65F6\u533A`
         )
       ),
       import_react4.default.createElement(
@@ -3038,7 +3057,7 @@ function Heatmap({ rows, metric = "requests", onMetricChange, onTip }) {
       import_react4.default.createElement(
         "span",
         { style: type.text.caption },
-        hasDayData ? `\u6D3B\u8DC3 ${grid.activeDays} \u5929 \xB7 \u5CF0\u503C ${formatNumber(grid.max)} ${unit}/\u5929` : `\u8FD1 ${HEAT_WINDOW_DAYS} \u5929\u6682\u65E0\u6309\u5929\u8BB0\u5F55`
+        hasDayData ? `\u6D3B\u8DC3 ${grid.activeDays} \u5929 \xB7 \u5CF0\u503C ${formatNumber(grid.max)} ${unit}/\u5929` : `\u8FD1 ${windowDays} \u5929\u6682\u65E0\u6309\u5929\u8BB0\u5F55`
       ),
       import_react4.default.createElement("span", {
         className: "dshc-ust-hint",
@@ -3052,39 +3071,47 @@ function Heatmap({ rows, metric = "requests", onMetricChange, onTip }) {
       import_react4.default.createElement(
         "div",
         { style: type.text.caption },
-        hasDayData ? `\u6309\u5929\u8BB0\u5F55\u53EA\u6709 ${grid.activeDays} \u5929\uFF08\u7F51\u5173\u5C0F\u65F6\u69FD\u53EA\u4FDD 48 \u5C0F\u65F6\u3001\u65E5\u69FD\u8981\u8DE8\u5929\u624D\u4EA7\u751F\uFF09\u2014\u2014 \u6309\u5C0F\u65F6\u770B\u66F4\u6E05\u695A\uFF1A` : "\u8FD1 30 \u5929\u6CA1\u6709\u6309\u5929\u8BB0\u5F55 \u2014\u2014 \u6309\u5C0F\u65F6\u770B\u5F53\u524D\u8FD9\u6BB5\uFF1A"
+        hasDayData ? `\u6309\u5929\u8BB0\u5F55\u53EA\u6709 ${grid.activeDays} \u5929 \u2014\u2014 \u7F51\u5173\u8FD1 48 \u5C0F\u65F6\u5B58\u5C0F\u65F6\u69FD\u3001\u66F4\u65E9\u624D\u6298\u53E0\u6210\u65E5\u69FD\uFF0C\u6240\u4EE5\u300C\u6309\u5929\u300D\u8981\u8DE8\u5929\u624D\u957F\u5F97\u51FA\u6765\uFF1B\u8FD9\u6BB5\u65F6\u95F4\u770B\u5C0F\u65F6\u5206\u5E03\u66F4\u51C6\uFF1A` : `\u8FD1 ${windowDays} \u5929\u6CA1\u6709\u6309\u5929\u8BB0\u5F55 \u2014\u2014 \u6309\u5C0F\u65F6\u770B\u5F53\u524D\u8FD9\u6BB5\uFF1A`
       ),
-      import_react4.default.createElement(HourProfile, { hours })
+      import_react4.default.createElement(HourProfile, { hours, metric })
     ) : null
   );
 }
-function HourProfile({ hours }) {
-  const max = Math.max(1, ...hours.map((item) => item.requests));
+function HourProfile({ hours, metric = "requests" }) {
+  const isTokens = metric === "tokens";
+  const unit = isTokens ? "Tokens" : "\u8BF7\u6C42";
+  const valueOf = (item) => isTokens ? item.tokens : item.requests;
+  const values = hours.map(valueOf);
+  const max = Math.max(1, ...values);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const fmt = isTokens ? formatTokens : formatNumber;
+  const thresholds = quartileThresholds(values);
   return import_react4.default.createElement(
     "div",
     null,
     import_react4.default.createElement(
       "div",
-      { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 56 } },
-      ...hours.map(
-        (item) => import_react4.default.createElement("span", {
-          key: item.hour,
-          title: `${String(item.hour).padStart(2, "0")}:00 \xB7 ${formatNumber(item.requests)} \u8BF7\u6C42`,
-          style: {
-            flex: "1 1 0",
-            minWidth: 0,
-            height: `${Math.max(item.requests > 0 ? 6 : 2, Math.round(item.requests / max * 100))}%`,
-            borderRadius: "2px 2px 0 0",
-            background: item.requests > 0 ? "var(--dsw-alias-brand-primary,#4f6ef7)" : "var(--dsw-alias-border-l2,#e5e6eb)",
-            opacity: item.requests > 0 ? 0.85 : 0.6
-          }
-        })
-      )
+      { style: { ...type.text.caption, marginBottom: 4 } },
+      `24 \u5C0F\u65F6\u65F6\u6BB5\u5206\u5E03 \xB7 ${unit}`,
+      total > 0 ? ` \xB7 \u5408\u8BA1 ${fmt(total)}` : " \xB7 \u7A97\u53E3\u5185\u65E0\u8BB0\u5F55"
     ),
     import_react4.default.createElement(
       "div",
-      { style: { display: "flex", justifyContent: "space-between", marginTop: 4 } },
-      ...["00", "06", "12", "18", "23"].map((label) => import_react4.default.createElement("span", { key: label, style: type.text.caption }, label))
+      { className: "dshc-ust-hourbar" },
+      ...hours.map((item) => {
+        const value = valueOf(item);
+        return import_react4.default.createElement("span", {
+          key: item.hour,
+          className: `h${heatLevel(value, thresholds)}`,
+          title: `${String(item.hour).padStart(2, "0")}:00 \xB7 ${fmt(value)} ${unit}`,
+          style: { height: `${Math.max(value > 0 ? 6 : 2, Math.round(value / max * 100))}%` }
+        });
+      })
+    ),
+    import_react4.default.createElement(
+      "div",
+      { className: "dshc-ust-hourfoot" },
+      ...["00", "06", "12", "18", "23"].map((label) => import_react4.default.createElement("span", { key: label, style: type.text.caption }, `${label} \u65F6`))
     )
   );
 }
@@ -3197,7 +3224,13 @@ function DailyBars({ byModel, metric, range, onRangeChange, onMetricChange, onTi
         "div",
         { className: "dshc-ust-cardtitle" },
         import_react4.default.createElement("h3", null, "\u6BCF\u65E5\u7528\u91CF"),
-        import_react4.default.createElement("span", { className: "dshc-ust-cardsub" }, `\u6309\u6A21\u578B\u5806\u53E0 \xB7 ${metricLabel}`)
+        // 「近 N 天」是本卡的**缩放**（切的是这张图看多少天，不是全局窗口）——
+        // 必须写在这里，否则用户会以为上面 KPI 也跟着变了。
+        import_react4.default.createElement(
+          "span",
+          { className: "dshc-ust-cardsub" },
+          `\u8FD1 ${range} \u5929 \xB7 \u6309\u6A21\u578B\u5806\u53E0 \xB7 ${metricLabel}`
+        )
       ),
       import_react4.default.createElement(
         "div",
@@ -3239,6 +3272,25 @@ function DailyBars({ byModel, metric, range, onRangeChange, onMetricChange, onTi
               formatPercent(grand > 0 ? row.total / grand : 0, 0)
             )
           )
+        )
+      ),
+      // 合计：此前只被用作图例百分比的分母，数字本身从没露过面
+      // （真机反馈「总量里也没有」）。列在最后一行，与图例同列对齐。
+      import_react4.default.createElement(
+        "div",
+        { className: "dshc-ust-cardfoot" },
+        import_react4.default.createElement(
+          "span",
+          { style: type.text.caption },
+          `\u5408\u8BA1 ${fmt(grand)} ${metricLabel} \xB7 ${dates.length} \u5929`
+        ),
+        import_react4.default.createElement(
+          "span",
+          {
+            className: "dshc-ust-hint",
+            title: "\u56FE\u4F8B\u5373\u660E\u7EC6\uFF1A\u6BCF\u4E2A\u6A21\u578B\u7684\u5408\u8BA1\u4E0E\u5360\u6BD4\uFF1B\u300C\u5176\u4ED6 N \u9879\u300D\u662F\u957F\u5C3E\u5408\u5E76\uFF08\u5408\u5E76\u53EA\u5F71\u54CD\u914D\u8272\uFF0C\u4E0D\u5F71\u54CD\u5408\u8BA1\uFF09\u3002"
+          },
+          `\u6309\u6A21\u578B\u5806\u53E0`
         )
       )
     )
@@ -4175,15 +4227,21 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
             { className: "dshc-ust-scope-tag", "data-scope-key": activeKey },
             `\u53EA\u770B ${activeKeyLabel}`
           ) : null,
+          // 口径标签必须写真话：KPI/排行/占比/热力图取的都是**网关窗口**
+          // （720h = 30 天，网关保留上限），而「近 N 天」只是每日柱状图的
+          // 缩放（那张卡的副标题自己会写）。此前这里写「近 ${range} 天」，
+          // 切天数时标签变了、大数字却纹丝不动 —— 那是假口径。
           import_react5.default.createElement(
             "span",
             { style: type.text.caption, title: WINDOW_TIP },
-            `\u8FD1 ${range} \u5929 \xB7 \u6570\u636E\u843D\u76D8 data/usage.json\uFF0C\u91CD\u542F\u4E0D\u6E05\u96F6`
+            "\u7A97\u53E3 30 \u5929\uFF08\u7F51\u5173\u4FDD\u7559\u4E0A\u9650 720h\uFF09\xB7 \u6570\u636E\u843D\u76D8 data/usage.json\uFF0C\u91CD\u542F\u4E0D\u6E05\u96F6"
           )
         )
       ),
       import_react5.default.createElement(KpiCards, { items: kpis }),
       // ── ② 活跃热力图 ──
+      // 不给 range：热力图的口径是**整个网关窗口（30 天）**，与 KPI/排行一致；
+      // 「近 N 天」是每日柱状图自己的缩放，不跨卡片传染。
       import_react5.default.createElement(Heatmap, {
         rows,
         metric: heatMetric,
