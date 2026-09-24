@@ -17,7 +17,7 @@ const DEFAULT_PROVIDER = 'chanhub2api';
  * 8 列会撑到 765px，把「目录判定」（最该看的一列）挤出可视区（真机截图确认）。
  * 改成 `table-layout: fixed` + 逐列定宽后 6 列合计正好 558。改列宽只改这里。
  */
-const COL_W = { check: 22, id: 176, name: 112, size: 114, vision: 50, verdict: 84 };
+const COL_W = { check: 22, id: 142, name: 104, size: 116, verdict: 174 };
 /** 单元格左右内边距合计（tdStyle 的 8px×2），用于算内部文本的可用宽度。 */
 const CELL_PAD_X = 16;
 
@@ -104,9 +104,12 @@ function ProbeMark({ result, capability, verdict, canProbe, busy, onProbe }) {
     conflict
       ? React.createElement('span', {
           style: { ...s.tag, color: tone.err.fg, background: tone.err.bg },
-          title: `实测与目录不一致：目录说「${label[catalogVerdict]}」（${verdict.status}），实测说「${label[measured]}」。`
-            + '按纪律以实测为准 —— 点「沉淀确认项」把实测结论写进基线。',
-        }, '与目录矛盾')
+          // 可见文字压成「矛盾」：真机 122px 的判定列里，4 个元素（多模态/状态/
+          // ≠白名单/实测）会折成三行、把行高从 34 顶到 63，整表看着错位。
+          // 全称进 title —— hover 与测试断言（读 innerHTML）都还能拿到。
+          title: `与目录矛盾：实测与目录不一致 —— 目录说「${label[catalogVerdict]}」（${verdict.status}），`
+            + `实测说「${label[measured]}」。按纪律以实测为准 —— 点「沉淀确认项」把实测结论写进基线。`,
+        }, '矛盾')
       : null,
     canProbe
       ? React.createElement('button', {
@@ -120,48 +123,59 @@ function ProbeMark({ result, capability, verdict, canProbe, busy, onProbe }) {
       : null);
 }
 
-/** 目录判定徽章（只读标注，不写配置）。hover 里带证据：等级/票数/命中方式/来源。 */
-function CatalogBadge({ verdict, whitelisted }) {
+/**
+ * 目录判定**一致性记号**（只读标注，不写配置）。
+ *
+ * 为什么从「徽章」压成一个记号：真机面板内容区只有 558px，这一列曾经同时塞
+ * 多模态/状态/≠白名单/实测/矛盾 五个元素，必然折成 2~3 行 —— 行高在 34/54/63
+ * 之间跳，整表看着"错位、挤在一起"（用户反馈）。现在可见的只有：
+ *
+ *   [能力徽章]  ← 由调用方渲染（白名单 ∪ 基线的本地结论）
+ *   [一致性记号] ← 本组件：✓ 目录与本地一致 / ≠ 不一致 / ? 目录未定 / · 未比对
+ *   [实测…] [矛盾] [实测按钮] ← 由 ProbeMark 渲染
+ *
+ * 目录那一侧的全部证据（判定文本 / 状态 / 等级 / 票数 / 命中方式 / 来源）
+ * 都进 title —— hover 可见，测试断言读 innerHTML 也仍能命中。
+ *
+ * @param props - `{verdict, local}`：目录判定对象 + 本地结论（'image' | 'text'）。
+ * @returns React 元素。
+ */
+function CatalogBadge({ verdict, local }) {
   if (!verdict) {
-    return React.createElement('span', { style: { ...s.tag, color: tone.idle.fg, background: tone.idle.bg } }, '未比对');
+    return React.createElement('span', {
+      style: { ...type.text.caption, color: tone.idle.fg, fontWeight: 600 },
+      title: '未比对：这份快照还没做过目录比对（点「刷新能力目录」或等一次拉取）',
+    }, '·');
   }
-  const colors = catalogColors(verdict);
-  const text = verdict.verdict === 'image' ? '多模态' : (verdict.verdict === 'text' ? '纯文本' : '待确认');
   const status = CATALOG_STATUS_LABEL[verdict.status] ?? verdict.status;
+  const tier = verdict.tier ? (CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier) : '无来源';
+  const text = verdict.verdict === 'image' ? '多模态' : (verdict.verdict === 'text' ? '纯文本' : '待确认');
   const tally = verdict.tally ? `图 ${verdict.tally.image} / 文 ${verdict.tally.text}` : '';
   const sources = (verdict.sources ?? []).slice(0, 6)
     .map((x) => `${x.source}/${x.provider || '?'}${x.image ? '图' : '文'}`).join('、');
   const more = (verdict.sources ?? []).length > 6 ? ` 等 ${verdict.sources.length} 条` : '';
+  const decided = verdict.verdict === 'image' || verdict.verdict === 'text';
+  const agree = decided && local ? verdict.verdict === local : null;
+  const mark = agree === true ? '✓' : agree === false ? '≠' : (verdict.status === 'missing' || verdict.status === 'alias' ? '·' : '?');
+  const colors = agree === true ? tone.ok : agree === false ? tone.err : tone.idle;
   const title = [
-    `${status}｜${verdict.tier ? (CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier) : '无来源'}`,
+    `目录判定：${text}（${status}｜${tier}）`,
+    agree === false
+      ? `与本地结论不一致 —— 本地：${local === 'image' ? '多模态' : '纯文本'}，目录：${text}。`
+        + '按本项目纪律以实测/本地为准，目录只作标注。'
+      : agree === true
+        ? '与本地结论一致。'
+        : '',
     tally,
     verdict.reason ?? '',
     verdict.how ? `命中方式：${verdict.how}` : '',
     sources ? `来源：${sources}${more}` : '',
     '这只是目录标注，不会改动 DSH 配置。',
   ].filter(Boolean).join('\n');
-  // 与本地白名单打架时额外打一个记号：白名单说图、目录说文（或反过来）
-  const conflictWithWhitelist = (whitelisted === true && verdict.verdict === 'text')
-    || (whitelisted === false && verdict.verdict === 'image');
-  // 状态压缩成单字记号：真机内容区只有 558px，`目录确认 · 原厂` 这种长文案会把
-  // 这一列顶成三行（"档位别/名"），整表高度翻倍。全称 + 等级 + 票数 + 来源
-  // 全在上面的 title 里（hover 可见，测试断言也仍能在这段 HTML 里找到）。
-  const statusMark = { confirmed: '✓', borrowed: '?', conflict: '!', alias: '—', missing: '·' }[verdict.status] ?? '?';
-  return React.createElement(
-    'span',
-    { style: { display: 'inline-flex', alignItems: 'center', gap: 4 }, title },
-    React.createElement('span', { style: { ...s.tag, color: colors.fg, background: colors.bg } }, text),
-    React.createElement('span', {
-      style: { ...type.text.caption, color: colors.fg, fontWeight: 600 },
-      title: `${status}${verdict.tier ? ` · ${CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier}` : ''}`,
-    }, statusMark),
-    conflictWithWhitelist
-      ? React.createElement('span', {
-          style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg },
-          title: '与本地白名单不一致 —— 白名单可能标错，或目录收录的不是同一个模型',
-        }, '≠白名单')
-      : null,
-  );
+  return React.createElement('span', {
+    style: { ...type.text.caption, color: colors.fg, fontWeight: 600 },
+    title,
+  }, mark);
 }
 
 function VisionBadge() {
@@ -703,19 +717,25 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
         React.createElement('span', {
           title: m.name,
           style: { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-        }, String(m.name ?? '').replace(/^\[[^\]]+\]\s*/, ''))),
+        }, String(m.name ?? '').replace(/^\[[^\]]+\]\s*/, ''))),  // 只去 [渠道] 前缀（组头已写渠道）
       // 上文 / 输出 / 倍率 三列并成一列（`256k / 32k x0.21`）：设置弹窗 ~800px，
       // 8 列会把「目录判定」——最该看的一列——挤出可视区（真机截图确认）。
       // 合并后 6 列刚好放得下，且行高不再被折行撑开。
       React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' },
         React.createElement('span', null, fmtWindow(m.contextWindow), ' / ', fmtWindow(m.maxTokens)),
-        typeof m.credits === 'string' && m.credits !== ''
-          ? React.createElement('span', { style: { ...type.text.caption, marginLeft: 6 } }, m.credits)
-          : null,
+        // 「未写入」标记压成小号：整尺寸的 s.tag（61px）会把这一列顶成两行，
+        // 于是同一张表里 34px 与 44px 行交替 —— 看起来就是"错位、挤在一起"。
+        // 全称与解释进 title（hover 可见；测试断言读 innerHTML 也仍命中）。
         sizeGaps.length > 0
-          ? React.createElement(NotWrittenMark, {
-              fields: sizeGaps.map((f) => COMPLETION_LABEL[f] ?? f),
-            }, '')
+          ? React.createElement('span', {
+              style: {
+                ...s.tag, padding: '1px 6px', fontSize: 10.5, marginLeft: 4,
+                color: tone.warn.fg, background: tone.warn.bg,
+              },
+              title: `未写入：DSH 配置里没写 ${sizeGaps.map((f) => COMPLETION_LABEL[f] ?? f).join('、')}\n`
+                + 'pi-ai 会回落到默认值（上下文 262144 / 输出 32768），面板这里显示的是网关自报值。\n'
+                + '点上方「补齐配置字段」即可写入。',
+            }, '未写入')
           : null,
         // 倍率补充（qoder 错峰折扣等）：小字跟在下面，
         // 长说明（含折扣时段）进 tooltip。上游没给就整块不渲染。
@@ -727,12 +747,12 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                 : m.creditsNote,
             }, m.creditsNote)
           : null),
-      React.createElement('td', { ...tdStyle, whiteSpace: 'nowrap' }, m.supportsImages === true ? React.createElement(VisionBadge) : React.createElement(TextBadge)),
       React.createElement('td', tdStyle,
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+          m.supportsImages === true ? React.createElement(VisionBadge) : React.createElement(TextBadge),
           React.createElement(CatalogBadge, {
             verdict: catalog?.verdicts?.get(m.id) ?? null,
-            whitelisted: catalog?.verdicts?.get(m.id)?.whitelist,
+            local: m.supportsImages === true ? 'image' : 'text',
           }),
           React.createElement(ProbeMark, {
             result: probeResults[m.id] ?? null,
@@ -753,6 +773,7 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
     // 补齐配置字段是唯一会写 DSH 配置的动作，放主位；provider / 覆盖 / 回滚
     // 这些低频且破坏性的收进「更多」。
     React.createElement('div', { className: 'dshc-ma-head' },
+      React.createElement('div', { className: 'dshc-ma-head-top' },
       models && models.length > 0
         ? React.createElement('div', { className: 'dshc-ma-stats' },
             statChip('个模型', models.length, '网关目录里的全部条目（官方 + 扩展 + 无官方名单的渠道）'),
@@ -771,8 +792,9 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
               : null,
           )
         : null,
-      React.createElement('div', { className: 'dshc-ma-head-actions' },
-        // 应用补丁是「我已经勾好了」的收尾动作：只有选了才出现（按状态显隐）
+      ),
+      // 上行右侧：唯一会写 DSH 配置的动作（应用补丁按已勾选显隐）
+      React.createElement('div', { className: 'dshc-ma-head-primary' },
         models && models.length > 0 && selected.size > 0
           ? React.createElement('button', {
               ...s.btnPri,
@@ -794,6 +816,9 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                 + '缺字段时 pi-ai 会回落到 256K / 32K —— 这就是「上游 1M、DSH 显示 256K」的原因。',
             }, completeBusy ? '处理中…' : `补齐配置字段（${gapCount}）`)
           : null,
+      ),
+      // 下行：次级动作（只读/联网/重拉），与上行用 1px 分隔
+      React.createElement('div', { className: 'dshc-ma-head-actions' },
         catalog && undecided.length > 0
           ? React.createElement('button', {
               ...s.btnGhost,
@@ -810,27 +835,6 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
               ? '实测中…'
               : `实测未定项（${Math.min(undecided.length, 12)}/${undecided.length}）`)
           : null,
-        catalog && (catalog.baseline?.pending ?? 0) > 0
-          ? React.createElement('button', {
-              ...s.btnGhost,
-              style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
-              type: 'button',
-              disabled: catalogBusy,
-              onClick: commitCapabilities,
-              title: '把目录比对中**确认态**的结论写进能力基线（settings.modelCapabilities）：'
-                + '确认多模态的模型会获得视觉能力，确认纯文本的会被记下来。'
-                + '借判/模糊/冲突/别名/无收录一律不写。只改插件 settings，不动 DSH 模型配置。',
-            }, `沉淀确认项（${catalog.baseline.pending}）`)
-          : null,
-        React.createElement('button', {
-          ...s.btnGhost,
-          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
-          type: 'button',
-          disabled: catalogBusy,
-          onClick: refreshCatalog,
-          title: '联网抓取 models.dev 与 OpenRouter 的多模态标注，落盘到 ~/.dsh/dsh-chanhub/model-catalog.json；'
-            + '平时打开面板只读缓存，不联网、不改 DSH 配置',
-        }, catalogBusy ? '刷新目录中…' : '刷新能力目录'),
         React.createElement('button', {
           style: overwrite ? { ...s.btnPri, background: tone.err.fg, borderColor: tone.err.fg } : s.btnPri,
           type: 'button',
@@ -872,6 +876,31 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
               }),
               '拉取时覆盖（网关为准）',
             ),
+          ),
+          // 维护类动作收进这里：它们低频，且窄面板（内容区实测 528px 可用）里
+          // 5 个按钮必然换行、看起来像"挤在一起"。放这里仍然是一次点击可达。
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+        React.createElement('button', {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+          type: 'button',
+          disabled: catalogBusy,
+          onClick: refreshCatalog,
+          title: '联网抓取 models.dev 与 OpenRouter 的多模态标注，落盘到 ~/.dsh/dsh-chanhub/model-catalog.json；'
+            + '平时打开面板只读缓存，不联网、不改 DSH 配置',
+        }, catalogBusy ? '刷新目录中…' : '刷新能力目录'),
+        catalog && (catalog.baseline?.pending ?? 0) > 0
+          ? React.createElement('button', {
+              ...s.btnGhost,
+              style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+              type: 'button',
+              disabled: catalogBusy,
+              onClick: commitCapabilities,
+              title: '把目录比对中**确认态**的结论写进能力基线（settings.modelCapabilities）：'
+                + '确认多模态的模型会获得视觉能力，确认纯文本的会被记下来。'
+                + '借判/模糊/冲突/别名/无收录一律不写。只改插件 settings，不动 DSH 模型配置。',
+            }, `沉淀确认项（${catalog.baseline.pending}）`)
+          : null,
           ),
           // 拉取记录：上次拉取时刻 + 与本次的差异（每次拉取都是**整体覆盖**）
           record
@@ -1114,16 +1143,17 @@ export function ModelAbilityTab({ rpcCall, showToast }) {
                       th('', COL_W.check),
                       th('模型 ID', COL_W.id),
                       th('名称', COL_W.name),
-                      th('上文 / 输出 / 倍率', COL_W.size),
-                      th('能力', COL_W.vision),
-                      th('目录判定', COL_W.verdict),
+                      th('上文 / 输出', COL_W.size),
+                      // 能力与目录判定并成一列：两者回答的是同一个问题（能不能看图），
+                      // 而且窄面板里分两列会把判定列压到 84px、内容折成三行。
+                      th('能力 / 目录判定', COL_W.verdict),
                     ),
                   ),
                   React.createElement('tbody', null,
                     ...groups.flatMap((group) => {
                       const collapsed = collapsedGroups.has(group.key);
                       const head = React.createElement('tr', { key: `g:${group.key}`, className: 'dshc-ma-group' },
-                        React.createElement('td', { colSpan: 6, style: { padding: '6px 10px' } },
+                        React.createElement('td', { colSpan: 5, style: { padding: '6px 10px' } },
                           React.createElement('button', {
                             type: 'button',
                             className: 'dshc-ma-grouptoggle',

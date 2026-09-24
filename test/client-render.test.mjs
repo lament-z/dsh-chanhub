@@ -2523,10 +2523,17 @@ test('渲染模型 Tab：只读目录判定列 + 刷新能力目录（不改配�
     await clickTab(document, '模型');
     // 让回显（getModelRecord）与比对（getModelCatalog）两个 effect 落地
     await React.act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-    const html = document.getElementById('app').innerHTML;
+    let html = document.getElementById('app').innerHTML;
 
     assert.ok(html.includes('目录判定'), '表头要有「目录判定」列');
-    assert.ok(html.includes('刷新能力目录'), '工具栏要有「刷新能力目录」按钮');
+    // 「刷新能力目录」等维护类动作收在「更多」里（窄面板里 5 个按钮必然换行、
+    // 看起来像挤在一起）—— 仍是一次点击可达，先展开再断言。
+    await React.act(async () => {
+      [...document.querySelectorAll('button')].find((b) => b.textContent.includes('更多'))
+        ?.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+    html = document.getElementById('app').innerHTML;
+    assert.ok(html.includes('刷新能力目录'), '「更多」里要有「刷新能力目录」按钮');
     assert.ok(html.includes('能力目录：'), '要有目录快照摘要行');
     assert.ok(html.includes('3759 个模型名'), '摘要要带真实目录规模');
 
@@ -2566,8 +2573,12 @@ test('渲染模型 Tab：沉淀确认项 —— 只把确认态写进基线，�
     assert.ok(html.includes('白名单可补 2 个'), '缺口计数');
     assert.ok(html.includes('其中借判 1'), '借判要单列');
 
+    await React.act(async () => {
+      [...document.querySelectorAll('button')].find((b) => b.textContent.includes('更多'))
+        ?.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
     const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('沉淀确认项'));
-    assert.ok(btn, '有确认项待沉淀时要出按钮');
+    assert.ok(btn, '有确认项待沉淀时要出按钮（在「更多」里）');
     assert.ok(btn.textContent.includes('2'), '按钮上带待沉淀数量');
 
     await React.act(async () => {

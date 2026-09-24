@@ -713,7 +713,12 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
    layer-2 会让卡片「后退、整页发闷」）；按钮走 s.btnPri / s.btnGhost（32px 高、
    999 圆角、13px）；筛选 chip 对齐用量页 .dshc-seg 的形态（26px 高、12px、选中态
    白底 + 品牌色描边）；数字一律 tabular-nums；颜色只走 --dsw-alias-* 语义 token。 */
-.dshc-ma-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+/* 结论条：两段式结构（上=规模数字 + 主按钮；下=次级动作，1px 分隔）。
+   为什么分段而不是一个大 flex-wrap：窄面板（内容区实测 558px）里 6 个按钮必然换行，
+   平铺换行看起来像"挤在一起"，分段后换行也是有意为之的结构。 */
+.dshc-ma-head { display: flex; flex-direction: column; gap: 12px; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-head-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.dshc-ma-head-primary { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .dshc-ma-stats { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; }
 /* 统计块之间用 1px 竖线分隔（与概览卡「渠道竖排 + 竖线」同一手法），
    比一排胶囊安静，也更像仪表盘。 */
@@ -722,7 +727,7 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 .dshc-ma-stat:last-child { border-right: none; }
 .dshc-ma-stat-v { font-size: 16px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; letter-spacing: -.01em; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-ma-stat-k { font-size: 10.5px; line-height: 1.3; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
-.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--dsw-alias-border-l2,#eef0f3); }
 .dshc-ma-more { display: flex; flex-direction: column; gap: 10px; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
 .dshc-ma-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dshc-ma-searchwrap { position: relative; display: inline-flex; align-items: center; flex: 1 1 200px; max-width: 320px; }
@@ -742,6 +747,7 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 /* 滚动容器 + 吸顶表头：110 行不该把整页撑爆，滚到哪儿都知道在看哪一列 */
 .dshc-ma-scroll { max-height: 62vh; overflow: auto; }
 .dshc-ma-scroll thead th { position: sticky; top: 0; z-index: 2; }
+.dshc-ma-scroll tbody tr { height: 34px; }
 .dshc-ma-scroll tbody tr:hover > td { background: var(--dsw-alias-interactive-bg-hover,#f7f8fa); }
 .dshc-ma-scroll tbody tr.dshc-ma-group:hover > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
 .dshc-ma-group > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
@@ -759,28 +765,5 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 .dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
 
-/* ── 模型 Tab 信息架构（结论条 / 筛选条 / 分组表格） ──
-   背景：真机 110 个模型 × 8 列平铺，一屏看不过来；而真正需要动手的通常个位数。
-   这一层做的是"导航"：先给规模（结论条），再给筛选（搜索 + chips），最后按渠道
-   分组。行内密度这一版没动（列与徽章原样），分组只改"怎么摆"。 */
-.dshc-ma-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-2,#f9fafb); }
-.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
-.dshc-ma-stat { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
-.dshc-ma-stat-v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary,currentColor); }
-.dshc-ma-stat-k { font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
-.dshc-ma-more { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--dsw-alias-border-l2,#d1d5db); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); }
-.dshc-ma-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.dshc-ma-chip { font: inherit; cursor: pointer; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-label-secondary,#6b7280); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.dshc-ma-chip:hover { border-color: var(--dsw-alias-brand-primary,#4f6ef7); color: var(--dsw-alias-brand-primary,#4f6ef7); }
-.dshc-ma-chip.on { background: var(--dsw-alias-brand-primary,#4f6ef7); border-color: var(--dsw-alias-brand-primary,#4f6ef7); color: #fff; }
-.dshc-ma-chip.clear { border-style: dashed; }
-.dshc-ma-count { margin-left: auto; white-space: nowrap; }
-/* 滚动容器 + 吸顶表头：110 行不该把整页撑爆，滚到哪儿都知道自己在看哪一列 */
-.dshc-ma-scroll { max-height: 62vh; overflow: auto; }
-.dshc-ma-scroll thead th { position: sticky; top: 0; z-index: 2; }
-.dshc-ma-group > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
-.dshc-ma-grouptoggle { font: inherit; cursor: pointer; border: none; background: none; padding: 0; font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
-.dshc-ma-grouptoggle:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
-.dshc-ma-notes > summary { cursor: pointer; color: var(--dsw-alias-label-tertiary,#8b93a1); }
-.dshc-ma-notes > p { margin: 6px 0 0; }
+
 `;

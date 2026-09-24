@@ -714,7 +714,12 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
    layer-2 \u4F1A\u8BA9\u5361\u7247\u300C\u540E\u9000\u3001\u6574\u9875\u53D1\u95F7\u300D\uFF09\uFF1B\u6309\u94AE\u8D70 s.btnPri / s.btnGhost\uFF0832px \u9AD8\u3001
    999 \u5706\u89D2\u300113px\uFF09\uFF1B\u7B5B\u9009 chip \u5BF9\u9F50\u7528\u91CF\u9875 .dshc-seg \u7684\u5F62\u6001\uFF0826px \u9AD8\u300112px\u3001\u9009\u4E2D\u6001
    \u767D\u5E95 + \u54C1\u724C\u8272\u63CF\u8FB9\uFF09\uFF1B\u6570\u5B57\u4E00\u5F8B tabular-nums\uFF1B\u989C\u8272\u53EA\u8D70 --dsw-alias-* \u8BED\u4E49 token\u3002 */
-.dshc-ma-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+/* \u7ED3\u8BBA\u6761\uFF1A\u4E24\u6BB5\u5F0F\u7ED3\u6784\uFF08\u4E0A=\u89C4\u6A21\u6570\u5B57 + \u4E3B\u6309\u94AE\uFF1B\u4E0B=\u6B21\u7EA7\u52A8\u4F5C\uFF0C1px \u5206\u9694\uFF09\u3002
+   \u4E3A\u4EC0\u4E48\u5206\u6BB5\u800C\u4E0D\u662F\u4E00\u4E2A\u5927 flex-wrap\uFF1A\u7A84\u9762\u677F\uFF08\u5185\u5BB9\u533A\u5B9E\u6D4B 558px\uFF09\u91CC 6 \u4E2A\u6309\u94AE\u5FC5\u7136\u6362\u884C\uFF0C
+   \u5E73\u94FA\u6362\u884C\u770B\u8D77\u6765\u50CF"\u6324\u5728\u4E00\u8D77"\uFF0C\u5206\u6BB5\u540E\u6362\u884C\u4E5F\u662F\u6709\u610F\u4E3A\u4E4B\u7684\u7ED3\u6784\u3002 */
+.dshc-ma-head { display: flex; flex-direction: column; gap: 12px; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
+.dshc-ma-head-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.dshc-ma-head-primary { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .dshc-ma-stats { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; }
 /* \u7EDF\u8BA1\u5757\u4E4B\u95F4\u7528 1px \u7AD6\u7EBF\u5206\u9694\uFF08\u4E0E\u6982\u89C8\u5361\u300C\u6E20\u9053\u7AD6\u6392 + \u7AD6\u7EBF\u300D\u540C\u4E00\u624B\u6CD5\uFF09\uFF0C
    \u6BD4\u4E00\u6392\u80F6\u56CA\u5B89\u9759\uFF0C\u4E5F\u66F4\u50CF\u4EEA\u8868\u76D8\u3002 */
@@ -723,7 +728,7 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 .dshc-ma-stat:last-child { border-right: none; }
 .dshc-ma-stat-v { font-size: 16px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; letter-spacing: -.01em; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-ma-stat-k { font-size: 10.5px; line-height: 1.3; color: var(--dsw-alias-label-tertiary,#8b93a1); white-space: nowrap; }
-.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--dsw-alias-border-l2,#eef0f3); }
 .dshc-ma-more { display: flex; flex-direction: column; gap: 10px; padding: 13px 16px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1,#fff); }
 .dshc-ma-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dshc-ma-searchwrap { position: relative; display: inline-flex; align-items: center; flex: 1 1 200px; max-width: 320px; }
@@ -743,6 +748,7 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 /* \u6EDA\u52A8\u5BB9\u5668 + \u5438\u9876\u8868\u5934\uFF1A110 \u884C\u4E0D\u8BE5\u628A\u6574\u9875\u6491\u7206\uFF0C\u6EDA\u5230\u54EA\u513F\u90FD\u77E5\u9053\u5728\u770B\u54EA\u4E00\u5217 */
 .dshc-ma-scroll { max-height: 62vh; overflow: auto; }
 .dshc-ma-scroll thead th { position: sticky; top: 0; z-index: 2; }
+.dshc-ma-scroll tbody tr { height: 34px; }
 .dshc-ma-scroll tbody tr:hover > td { background: var(--dsw-alias-interactive-bg-hover,#f7f8fa); }
 .dshc-ma-scroll tbody tr.dshc-ma-group:hover > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); }
 .dshc-ma-group > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
@@ -760,30 +766,7 @@ body[data-ds-dark-theme] .dshc-ust-hourbar > span.h4 { background: #60a5fa; }
 .dshc-ust-tooltip-label { flex: 1; color: var(--dsw-alias-label-primary,currentColor); }
 .dshc-ust-tooltip-value { color: var(--dsw-alias-label-primary,currentColor); font-variant-numeric: tabular-nums; }
 
-/* \u2500\u2500 \u6A21\u578B Tab \u4FE1\u606F\u67B6\u6784\uFF08\u7ED3\u8BBA\u6761 / \u7B5B\u9009\u6761 / \u5206\u7EC4\u8868\u683C\uFF09 \u2500\u2500
-   \u80CC\u666F\uFF1A\u771F\u673A 110 \u4E2A\u6A21\u578B \xD7 8 \u5217\u5E73\u94FA\uFF0C\u4E00\u5C4F\u770B\u4E0D\u8FC7\u6765\uFF1B\u800C\u771F\u6B63\u9700\u8981\u52A8\u624B\u7684\u901A\u5E38\u4E2A\u4F4D\u6570\u3002
-   \u8FD9\u4E00\u5C42\u505A\u7684\u662F"\u5BFC\u822A"\uFF1A\u5148\u7ED9\u89C4\u6A21\uFF08\u7ED3\u8BBA\u6761\uFF09\uFF0C\u518D\u7ED9\u7B5B\u9009\uFF08\u641C\u7D22 + chips\uFF09\uFF0C\u6700\u540E\u6309\u6E20\u9053
-   \u5206\u7EC4\u3002\u884C\u5185\u5BC6\u5EA6\u8FD9\u4E00\u7248\u6CA1\u52A8\uFF08\u5217\u4E0E\u5FBD\u7AE0\u539F\u6837\uFF09\uFF0C\u5206\u7EC4\u53EA\u6539"\u600E\u4E48\u6446"\u3002 */
-.dshc-ma-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-2,#f9fafb); }
-.dshc-ma-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
-.dshc-ma-stat { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--dsw-alias-bg-layer-1,#fff); border: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
-.dshc-ma-stat-v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary,currentColor); }
-.dshc-ma-stat-k { font-size: 10.5px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
-.dshc-ma-more { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--dsw-alias-border-l2,#d1d5db); border-radius: 10px; background: var(--dsw-alias-bg-layer-1,#fff); }
-.dshc-ma-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.dshc-ma-chip { font: inherit; cursor: pointer; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2,#d1d5db); background: var(--dsw-alias-bg-layer-1,#fff); color: var(--dsw-alias-label-secondary,#6b7280); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.dshc-ma-chip:hover { border-color: var(--dsw-alias-brand-primary,#4f6ef7); color: var(--dsw-alias-brand-primary,#4f6ef7); }
-.dshc-ma-chip.on { background: var(--dsw-alias-brand-primary,#4f6ef7); border-color: var(--dsw-alias-brand-primary,#4f6ef7); color: #fff; }
-.dshc-ma-chip.clear { border-style: dashed; }
-.dshc-ma-count { margin-left: auto; white-space: nowrap; }
-/* \u6EDA\u52A8\u5BB9\u5668 + \u5438\u9876\u8868\u5934\uFF1A110 \u884C\u4E0D\u8BE5\u628A\u6574\u9875\u6491\u7206\uFF0C\u6EDA\u5230\u54EA\u513F\u90FD\u77E5\u9053\u81EA\u5DF1\u5728\u770B\u54EA\u4E00\u5217 */
-.dshc-ma-scroll { max-height: 62vh; overflow: auto; }
-.dshc-ma-scroll thead th { position: sticky; top: 0; z-index: 2; }
-.dshc-ma-group > td { background: var(--dsw-alias-bg-layer-2,#f3f4f6); border-bottom: 1px solid var(--dsw-alias-border-l2,#e5e7eb); }
-.dshc-ma-grouptoggle { font: inherit; cursor: pointer; border: none; background: none; padding: 0; font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-primary,currentColor); }
-.dshc-ma-grouptoggle:hover { color: var(--dsw-alias-brand-primary,#4f6ef7); }
-.dshc-ma-notes > summary { cursor: pointer; color: var(--dsw-alias-label-tertiary,#8b93a1); }
-.dshc-ma-notes > p { margin: 6px 0 0; }
+
 `;
 
 // client/ui.js
@@ -4510,7 +4493,7 @@ function ExportMenu({ open, onToggle, payload, days, byModelDaily, modelRows, ac
 // client/model-ability.js
 var import_react6 = __toESM(require("react"), 1);
 var DEFAULT_PROVIDER = "chanhub2api";
-var COL_W = { check: 22, id: 176, name: 112, size: 114, vision: 50, verdict: 84 };
+var COL_W = { check: 22, id: 142, name: 104, size: 116, verdict: 174 };
 var CELL_PAD_X = 16;
 var FIELD_LABEL = { name: "\u540D\u79F0", ctx: "\u4E0A\u6587", maxOut: "\u8F93\u51FA", credits: "\u500D\u7387", vision: "\u80FD\u529B" };
 var COMPLETION_LABEL = {
@@ -4519,21 +4502,6 @@ var COMPLETION_LABEL = {
   reasoningEfforts: "\u63A8\u7406\u6863\u4F4D",
   input: "\u89C6\u89C9"
 };
-function NotWrittenMark({ fields, children }) {
-  return import_react6.default.createElement(
-    "span",
-    {
-      style: { display: "inline-flex", alignItems: "center", gap: 4 },
-      title: `DSH \u914D\u7F6E\u91CC\u6CA1\u5199\uFF1A${fields.join("\u3001")}
-pi-ai \u4F1A\u56DE\u843D\u5230\u9ED8\u8BA4\u503C\uFF08\u4E0A\u4E0B\u6587 262144 / \u8F93\u51FA 32768\uFF09\uFF0C\u9762\u677F\u8FD9\u91CC\u663E\u793A\u7684\u662F\u7F51\u5173\u81EA\u62A5\u503C\u3002
-\u70B9\u300C\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\u300D\u5373\u53EF\u5199\u5165\u3002`
-    },
-    import_react6.default.createElement("span", { style: { color: tone.warn.fg } }, children),
-    import_react6.default.createElement("span", {
-      style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg }
-    }, "\u672A\u5199\u5165")
-  );
-}
 function fmtWindow(n) {
   if (!n || n <= 0) return "\u2014";
   if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
@@ -4548,13 +4516,6 @@ var CATALOG_STATUS_LABEL = {
   missing: "\u76EE\u5F55\u65E0\u6536\u5F55"
 };
 var CATALOG_TIER_LABEL = { L1: "\u539F\u5382", L2: "\u4E91\u6258\u7BA1", L3: "\u8F6C\u552E" };
-function catalogColors(v) {
-  if (!v) return tone.idle;
-  if (v.status === "conflict") return tone.err;
-  if (v.status === "borrowed") return tone.warn;
-  if (v.verdict === "image") return tone.ok;
-  return tone.idle;
-}
 function ProbeMark({ result, capability, verdict, canProbe, busy, onProbe }) {
   const measured = result?.verdict ?? (capability?.tier === "L0" ? capability.image === true ? "image" : "text" : null);
   const label = { image: "\u56FE", text: "\u6587", unknown: "\u672A\u5B9A" };
@@ -4570,8 +4531,11 @@ function ProbeMark({ result, capability, verdict, canProbe, busy, onProbe }) {
     }, `${result ? "\u5B9E\u6D4B" : "\u5DF2\u6C89\u6DC0"}\uFF1A${label[measured] ?? measured}`) : null,
     conflict ? import_react6.default.createElement("span", {
       style: { ...s.tag, color: tone.err.fg, background: tone.err.bg },
-      title: `\u5B9E\u6D4B\u4E0E\u76EE\u5F55\u4E0D\u4E00\u81F4\uFF1A\u76EE\u5F55\u8BF4\u300C${label[catalogVerdict]}\u300D\uFF08${verdict.status}\uFF09\uFF0C\u5B9E\u6D4B\u8BF4\u300C${label[measured]}\u300D\u3002\u6309\u7EAA\u5F8B\u4EE5\u5B9E\u6D4B\u4E3A\u51C6 \u2014\u2014 \u70B9\u300C\u6C89\u6DC0\u786E\u8BA4\u9879\u300D\u628A\u5B9E\u6D4B\u7ED3\u8BBA\u5199\u8FDB\u57FA\u7EBF\u3002`
-    }, "\u4E0E\u76EE\u5F55\u77DB\u76FE") : null,
+      // 可见文字压成「矛盾」：真机 122px 的判定列里，4 个元素（多模态/状态/
+      // ≠白名单/实测）会折成三行、把行高从 34 顶到 63，整表看着错位。
+      // 全称进 title —— hover 与测试断言（读 innerHTML）都还能拿到。
+      title: `\u4E0E\u76EE\u5F55\u77DB\u76FE\uFF1A\u5B9E\u6D4B\u4E0E\u76EE\u5F55\u4E0D\u4E00\u81F4 \u2014\u2014 \u76EE\u5F55\u8BF4\u300C${label[catalogVerdict]}\u300D\uFF08${verdict.status}\uFF09\uFF0C\u5B9E\u6D4B\u8BF4\u300C${label[measured]}\u300D\u3002\u6309\u7EAA\u5F8B\u4EE5\u5B9E\u6D4B\u4E3A\u51C6 \u2014\u2014 \u70B9\u300C\u6C89\u6DC0\u786E\u8BA4\u9879\u300D\u628A\u5B9E\u6D4B\u7ED3\u8BBA\u5199\u8FDB\u57FA\u7EBF\u3002`
+    }, "\u77DB\u76FE") : null,
     canProbe ? import_react6.default.createElement("button", {
       ...s.btnGhost,
       style: { ...s.btnGhost, padding: "1px 6px", fontSize: 11, opacity: busy ? 0.5 : 1 },
@@ -4582,39 +4546,36 @@ function ProbeMark({ result, capability, verdict, canProbe, busy, onProbe }) {
     }, "\u5B9E\u6D4B") : null
   );
 }
-function CatalogBadge({ verdict, whitelisted }) {
+function CatalogBadge({ verdict, local }) {
   if (!verdict) {
-    return import_react6.default.createElement("span", { style: { ...s.tag, color: tone.idle.fg, background: tone.idle.bg } }, "\u672A\u6BD4\u5BF9");
+    return import_react6.default.createElement("span", {
+      style: { ...type.text.caption, color: tone.idle.fg, fontWeight: 600 },
+      title: "\u672A\u6BD4\u5BF9\uFF1A\u8FD9\u4EFD\u5FEB\u7167\u8FD8\u6CA1\u505A\u8FC7\u76EE\u5F55\u6BD4\u5BF9\uFF08\u70B9\u300C\u5237\u65B0\u80FD\u529B\u76EE\u5F55\u300D\u6216\u7B49\u4E00\u6B21\u62C9\u53D6\uFF09"
+    }, "\xB7");
   }
-  const colors = catalogColors(verdict);
-  const text = verdict.verdict === "image" ? "\u591A\u6A21\u6001" : verdict.verdict === "text" ? "\u7EAF\u6587\u672C" : "\u5F85\u786E\u8BA4";
   const status = CATALOG_STATUS_LABEL[verdict.status] ?? verdict.status;
+  const tier = verdict.tier ? CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier : "\u65E0\u6765\u6E90";
+  const text = verdict.verdict === "image" ? "\u591A\u6A21\u6001" : verdict.verdict === "text" ? "\u7EAF\u6587\u672C" : "\u5F85\u786E\u8BA4";
   const tally = verdict.tally ? `\u56FE ${verdict.tally.image} / \u6587 ${verdict.tally.text}` : "";
   const sources = (verdict.sources ?? []).slice(0, 6).map((x) => `${x.source}/${x.provider || "?"}${x.image ? "\u56FE" : "\u6587"}`).join("\u3001");
   const more = (verdict.sources ?? []).length > 6 ? ` \u7B49 ${verdict.sources.length} \u6761` : "";
+  const decided = verdict.verdict === "image" || verdict.verdict === "text";
+  const agree = decided && local ? verdict.verdict === local : null;
+  const mark = agree === true ? "\u2713" : agree === false ? "\u2260" : verdict.status === "missing" || verdict.status === "alias" ? "\xB7" : "?";
+  const colors = agree === true ? tone.ok : agree === false ? tone.err : tone.idle;
   const title = [
-    `${status}\uFF5C${verdict.tier ? CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier : "\u65E0\u6765\u6E90"}`,
+    `\u76EE\u5F55\u5224\u5B9A\uFF1A${text}\uFF08${status}\uFF5C${tier}\uFF09`,
+    agree === false ? `\u4E0E\u672C\u5730\u7ED3\u8BBA\u4E0D\u4E00\u81F4 \u2014\u2014 \u672C\u5730\uFF1A${local === "image" ? "\u591A\u6A21\u6001" : "\u7EAF\u6587\u672C"}\uFF0C\u76EE\u5F55\uFF1A${text}\u3002\u6309\u672C\u9879\u76EE\u7EAA\u5F8B\u4EE5\u5B9E\u6D4B/\u672C\u5730\u4E3A\u51C6\uFF0C\u76EE\u5F55\u53EA\u4F5C\u6807\u6CE8\u3002` : agree === true ? "\u4E0E\u672C\u5730\u7ED3\u8BBA\u4E00\u81F4\u3002" : "",
     tally,
     verdict.reason ?? "",
     verdict.how ? `\u547D\u4E2D\u65B9\u5F0F\uFF1A${verdict.how}` : "",
     sources ? `\u6765\u6E90\uFF1A${sources}${more}` : "",
     "\u8FD9\u53EA\u662F\u76EE\u5F55\u6807\u6CE8\uFF0C\u4E0D\u4F1A\u6539\u52A8 DSH \u914D\u7F6E\u3002"
   ].filter(Boolean).join("\n");
-  const conflictWithWhitelist = whitelisted === true && verdict.verdict === "text" || whitelisted === false && verdict.verdict === "image";
-  const statusMark = { confirmed: "\u2713", borrowed: "?", conflict: "!", alias: "\u2014", missing: "\xB7" }[verdict.status] ?? "?";
-  return import_react6.default.createElement(
-    "span",
-    { style: { display: "inline-flex", alignItems: "center", gap: 4 }, title },
-    import_react6.default.createElement("span", { style: { ...s.tag, color: colors.fg, background: colors.bg } }, text),
-    import_react6.default.createElement("span", {
-      style: { ...type.text.caption, color: colors.fg, fontWeight: 600 },
-      title: `${status}${verdict.tier ? ` \xB7 ${CATALOG_TIER_LABEL[verdict.tier] ?? verdict.tier}` : ""}`
-    }, statusMark),
-    conflictWithWhitelist ? import_react6.default.createElement("span", {
-      style: { ...s.tag, color: tone.warn.fg, background: tone.warn.bg },
-      title: "\u4E0E\u672C\u5730\u767D\u540D\u5355\u4E0D\u4E00\u81F4 \u2014\u2014 \u767D\u540D\u5355\u53EF\u80FD\u6807\u9519\uFF0C\u6216\u76EE\u5F55\u6536\u5F55\u7684\u4E0D\u662F\u540C\u4E00\u4E2A\u6A21\u578B"
-    }, "\u2260\u767D\u540D\u5355") : null
-  );
+  return import_react6.default.createElement("span", {
+    style: { ...type.text.caption, color: colors.fg, fontWeight: 600 },
+    title
+  }, mark);
 }
 function VisionBadge() {
   return import_react6.default.createElement(
@@ -5087,6 +5048,7 @@ function ModelAbilityTab({ rpcCall, showToast }) {
           style: { display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }
         }, String(m.name ?? "").replace(/^\[[^\]]+\]\s*/, ""))
       ),
+      // 只去 [渠道] 前缀（组头已写渠道）
       // 上文 / 输出 / 倍率 三列并成一列（`256k / 32k x0.21`）：设置弹窗 ~800px，
       // 8 列会把「目录判定」——最该看的一列——挤出可视区（真机截图确认）。
       // 合并后 6 列刚好放得下，且行高不再被折行撑开。
@@ -5094,10 +5056,22 @@ function ModelAbilityTab({ rpcCall, showToast }) {
         "td",
         { ...tdStyle, whiteSpace: "nowrap" },
         import_react6.default.createElement("span", null, fmtWindow(m.contextWindow), " / ", fmtWindow(m.maxTokens)),
-        typeof m.credits === "string" && m.credits !== "" ? import_react6.default.createElement("span", { style: { ...type.text.caption, marginLeft: 6 } }, m.credits) : null,
-        sizeGaps.length > 0 ? import_react6.default.createElement(NotWrittenMark, {
-          fields: sizeGaps.map((f) => COMPLETION_LABEL[f] ?? f)
-        }, "") : null,
+        // 「未写入」标记压成小号：整尺寸的 s.tag（61px）会把这一列顶成两行，
+        // 于是同一张表里 34px 与 44px 行交替 —— 看起来就是"错位、挤在一起"。
+        // 全称与解释进 title（hover 可见；测试断言读 innerHTML 也仍命中）。
+        sizeGaps.length > 0 ? import_react6.default.createElement("span", {
+          style: {
+            ...s.tag,
+            padding: "1px 6px",
+            fontSize: 10.5,
+            marginLeft: 4,
+            color: tone.warn.fg,
+            background: tone.warn.bg
+          },
+          title: `\u672A\u5199\u5165\uFF1ADSH \u914D\u7F6E\u91CC\u6CA1\u5199 ${sizeGaps.map((f) => COMPLETION_LABEL[f] ?? f).join("\u3001")}
+pi-ai \u4F1A\u56DE\u843D\u5230\u9ED8\u8BA4\u503C\uFF08\u4E0A\u4E0B\u6587 262144 / \u8F93\u51FA 32768\uFF09\uFF0C\u9762\u677F\u8FD9\u91CC\u663E\u793A\u7684\u662F\u7F51\u5173\u81EA\u62A5\u503C\u3002
+\u70B9\u4E0A\u65B9\u300C\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\u300D\u5373\u53EF\u5199\u5165\u3002`
+        }, "\u672A\u5199\u5165") : null,
         // 倍率补充（qoder 错峰折扣等）：小字跟在下面，
         // 长说明（含折扣时段）进 tooltip。上游没给就整块不渲染。
         typeof m.creditsNote === "string" && m.creditsNote !== "" ? import_react6.default.createElement("div", {
@@ -5105,16 +5079,16 @@ function ModelAbilityTab({ rpcCall, showToast }) {
           title: typeof m.creditsNoteDetail === "string" && m.creditsNoteDetail !== "" ? m.creditsNoteDetail : m.creditsNote
         }, m.creditsNote) : null
       ),
-      import_react6.default.createElement("td", { ...tdStyle, whiteSpace: "nowrap" }, m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge)),
       import_react6.default.createElement(
         "td",
         tdStyle,
         import_react6.default.createElement(
           "div",
           { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
+          m.supportsImages === true ? import_react6.default.createElement(VisionBadge) : import_react6.default.createElement(TextBadge),
           import_react6.default.createElement(CatalogBadge, {
             verdict: catalog?.verdicts?.get(m.id) ?? null,
-            whitelisted: catalog?.verdicts?.get(m.id)?.whitelist
+            local: m.supportsImages === true ? "image" : "text"
           }),
           import_react6.default.createElement(ProbeMark, {
             result: probeResults[m.id] ?? null,
@@ -5138,20 +5112,24 @@ function ModelAbilityTab({ rpcCall, showToast }) {
     import_react6.default.createElement(
       "div",
       { className: "dshc-ma-head" },
-      models && models.length > 0 ? import_react6.default.createElement(
-        "div",
-        { className: "dshc-ma-stats" },
-        statChip("\u4E2A\u6A21\u578B", models.length, "\u7F51\u5173\u76EE\u5F55\u91CC\u7684\u5168\u90E8\u6761\u76EE\uFF08\u5B98\u65B9 + \u6269\u5C55 + \u65E0\u5B98\u65B9\u540D\u5355\u7684\u6E20\u9053\uFF09"),
-        officialAvailable ? statChip("\u5B98\u65B9", officialCount, `\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF agents[cli] \u540D\u5355\u91CC\u7684\u6A21\u578B\uFF08workbuddy \u6E20\u9053\uFF1B\u53E6\u6709 ${unknownCount} \u6761\u6765\u81EA\u6CA1\u6709\u5B98\u65B9\u540D\u5355\u7684\u6E20\u9053\uFF0C\u4E0D\u8BA1\u5165\uFF09`) : null,
-        officialAvailable ? statChip("\u6269\u5C55", extensionCount, `\u5B98\u65B9\u6CA1\u5217\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528\uFF08workbuddy \u6E20\u9053\uFF09\u2014\u2014 \u53EA\u6298\u53E0\u4E0D\u5220\u9664`) : null,
-        statChip("\u53EF\u52FE\u9009", alreadyImage, "\u767D\u540D\u5355/\u57FA\u7EBF\u8BA4\u5B9A\u4E3A\u591A\u6A21\u6001\uFF0C\u53EF\u52FE\u9009\u8865\u89C6\u89C9\u80FD\u529B"),
-        undecided.length > 0 ? statChip("\u5F85\u786E\u8BA4", undecided.length, "\u76EE\u5F55\u5224\u5B9A\u4E3A\u501F\u5224/\u51B2\u7A81/\u65E0\u6536\u5F55 \u2014\u2014 \u53EF\u7528\u771F\u53D1\u56FE\u5B9E\u6D4B\u5B9A\u6848") : null,
-        gapCount > 0 ? statChip("\u672A\u5199\u5165", gapCount, "DSH \u914D\u7F6E\u91CC\u7F3A contextWindow/maxTokens\uFF0C\u4F1A\u56DE\u843D\u5230 256K/32K") : null
-      ) : null,
       import_react6.default.createElement(
         "div",
-        { className: "dshc-ma-head-actions" },
-        // 应用补丁是「我已经勾好了」的收尾动作：只有选了才出现（按状态显隐）
+        { className: "dshc-ma-head-top" },
+        models && models.length > 0 ? import_react6.default.createElement(
+          "div",
+          { className: "dshc-ma-stats" },
+          statChip("\u4E2A\u6A21\u578B", models.length, "\u7F51\u5173\u76EE\u5F55\u91CC\u7684\u5168\u90E8\u6761\u76EE\uFF08\u5B98\u65B9 + \u6269\u5C55 + \u65E0\u5B98\u65B9\u540D\u5355\u7684\u6E20\u9053\uFF09"),
+          officialAvailable ? statChip("\u5B98\u65B9", officialCount, `\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF agents[cli] \u540D\u5355\u91CC\u7684\u6A21\u578B\uFF08workbuddy \u6E20\u9053\uFF1B\u53E6\u6709 ${unknownCount} \u6761\u6765\u81EA\u6CA1\u6709\u5B98\u65B9\u540D\u5355\u7684\u6E20\u9053\uFF0C\u4E0D\u8BA1\u5165\uFF09`) : null,
+          officialAvailable ? statChip("\u6269\u5C55", extensionCount, `\u5B98\u65B9\u6CA1\u5217\u3001\u4F46\u7F51\u5173\u5B9E\u6D4B\u53EF\u7528\uFF08workbuddy \u6E20\u9053\uFF09\u2014\u2014 \u53EA\u6298\u53E0\u4E0D\u5220\u9664`) : null,
+          statChip("\u53EF\u52FE\u9009", alreadyImage, "\u767D\u540D\u5355/\u57FA\u7EBF\u8BA4\u5B9A\u4E3A\u591A\u6A21\u6001\uFF0C\u53EF\u52FE\u9009\u8865\u89C6\u89C9\u80FD\u529B"),
+          undecided.length > 0 ? statChip("\u5F85\u786E\u8BA4", undecided.length, "\u76EE\u5F55\u5224\u5B9A\u4E3A\u501F\u5224/\u51B2\u7A81/\u65E0\u6536\u5F55 \u2014\u2014 \u53EF\u7528\u771F\u53D1\u56FE\u5B9E\u6D4B\u5B9A\u6848") : null,
+          gapCount > 0 ? statChip("\u672A\u5199\u5165", gapCount, "DSH \u914D\u7F6E\u91CC\u7F3A contextWindow/maxTokens\uFF0C\u4F1A\u56DE\u843D\u5230 256K/32K") : null
+        ) : null
+      ),
+      // 上行右侧：唯一会写 DSH 配置的动作（应用补丁按已勾选显隐）
+      import_react6.default.createElement(
+        "div",
+        { className: "dshc-ma-head-primary" },
         models && models.length > 0 && selected.size > 0 ? import_react6.default.createElement("button", {
           ...s.btnPri,
           style: { ...s.btnPri, opacity: applyBusy ? 0.6 : 1 },
@@ -5166,7 +5144,12 @@ function ModelAbilityTab({ rpcCall, showToast }) {
           disabled: completeBusy,
           onClick: previewCompletion,
           title: "\u7ED9 DSH \u914D\u7F6E\u91CC\u5DF2\u5B58\u5728\u7684\u6761\u76EE\u8865\u4E0A contextWindow / maxTokens / \u63A8\u7406\u6863\u4F4D\uFF08+ \u89C6\u89C9 input\uFF09\uFF1A\u53EA\u586B\u7A7A\u7F3A\uFF0C\u4E0D\u589E\u4E0D\u5220\u6761\u76EE\uFF0C\u4E5F\u4E0D\u52A8\u4F60\u624B\u6539\u8FC7\u7684\u5176\u5B83\u5B57\u6BB5\u3002\u7F3A\u5B57\u6BB5\u65F6 pi-ai \u4F1A\u56DE\u843D\u5230 256K / 32K \u2014\u2014 \u8FD9\u5C31\u662F\u300C\u4E0A\u6E38 1M\u3001DSH \u663E\u793A 256K\u300D\u7684\u539F\u56E0\u3002"
-        }, completeBusy ? "\u5904\u7406\u4E2D\u2026" : `\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\uFF08${gapCount}\uFF09`) : null,
+        }, completeBusy ? "\u5904\u7406\u4E2D\u2026" : `\u8865\u9F50\u914D\u7F6E\u5B57\u6BB5\uFF08${gapCount}\uFF09`) : null
+      ),
+      // 下行：次级动作（只读/联网/重拉），与上行用 1px 分隔
+      import_react6.default.createElement(
+        "div",
+        { className: "dshc-ma-head-actions" },
         catalog && undecided.length > 0 ? import_react6.default.createElement("button", {
           ...s.btnGhost,
           style: { ...s.btnGhost, opacity: probeBusy ? 0.6 : 1 },
@@ -5175,22 +5158,6 @@ function ModelAbilityTab({ rpcCall, showToast }) {
           onClick: () => runProbe(),
           title: "\u771F\u53D1\u4E00\u5F20\u56FE\u95EE\u8FD9\u6761\u6E20\u9053\u8BA4\u4E0D\u8BA4\u5F97\uFF1A\u56FE\u91CC\u753B\u4E86\u300C\u80CC\u666F\u8272 + \u6570\u5B57\u300D\uFF0C\u53EA\u6709\u7B54\u5BF9\u624D\u7B97\u770B\u89C1 \u2014\u2014 \u5B9E\u6D4B\u53D1\u73B0\u53EA\u53D1\u56FE\u770B\u62A5\u9519\u6839\u672C\u8BC1\u660E\u4E0D\u4E86\u4EC0\u4E48\uFF08\u7EAF\u6587\u672C\u6A21\u578B\u7167\u6837\u56DE 200\uFF0C\u751A\u81F3\u4F1A\u7F16\u4E00\u4E2A\u989C\u8272\uFF09\u3002\u76EE\u5F55\u662F\u522B\u4EBA\u7684\u4E8C\u624B\u6807\u6CE8\uFF0C\u767D\u540D\u5355\u662F\u4EBA\u5DE5\u8BA4\u5B9A\uFF0C\u5B9E\u6D4B\u624D\u662F\u6700\u7EC8\u88C1\u51B3\u3002\u4E32\u884C + 300ms \u95F4\u9694 + \u5355\u6279 12 \u4E2A\uFF08\u4FDD\u62A4\u8D26\u53F7\uFF09\uFF1B\u62FF\u4E0D\u51C6\u7684\u4E00\u5F8B\u8BB0\u300C\u672A\u5B9A\u300D\uFF0C\u4E0D\u5199\u914D\u7F6E\u3002\u786E\u8BA4\u7ED3\u8BBA\u4F1A\u6C89\u6DC0\u8FDB\u80FD\u529B\u57FA\u7EBF\uFF08\u7B49\u7EA7 L0 \u5B9E\u6D4B\uFF09\u3002"
         }, probeBusy ? "\u5B9E\u6D4B\u4E2D\u2026" : `\u5B9E\u6D4B\u672A\u5B9A\u9879\uFF08${Math.min(undecided.length, 12)}/${undecided.length}\uFF09`) : null,
-        catalog && (catalog.baseline?.pending ?? 0) > 0 ? import_react6.default.createElement("button", {
-          ...s.btnGhost,
-          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
-          type: "button",
-          disabled: catalogBusy,
-          onClick: commitCapabilities,
-          title: "\u628A\u76EE\u5F55\u6BD4\u5BF9\u4E2D**\u786E\u8BA4\u6001**\u7684\u7ED3\u8BBA\u5199\u8FDB\u80FD\u529B\u57FA\u7EBF\uFF08settings.modelCapabilities\uFF09\uFF1A\u786E\u8BA4\u591A\u6A21\u6001\u7684\u6A21\u578B\u4F1A\u83B7\u5F97\u89C6\u89C9\u80FD\u529B\uFF0C\u786E\u8BA4\u7EAF\u6587\u672C\u7684\u4F1A\u88AB\u8BB0\u4E0B\u6765\u3002\u501F\u5224/\u6A21\u7CCA/\u51B2\u7A81/\u522B\u540D/\u65E0\u6536\u5F55\u4E00\u5F8B\u4E0D\u5199\u3002\u53EA\u6539\u63D2\u4EF6 settings\uFF0C\u4E0D\u52A8 DSH \u6A21\u578B\u914D\u7F6E\u3002"
-        }, `\u6C89\u6DC0\u786E\u8BA4\u9879\uFF08${catalog.baseline.pending}\uFF09`) : null,
-        import_react6.default.createElement("button", {
-          ...s.btnGhost,
-          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
-          type: "button",
-          disabled: catalogBusy,
-          onClick: refreshCatalog,
-          title: "\u8054\u7F51\u6293\u53D6 models.dev \u4E0E OpenRouter \u7684\u591A\u6A21\u6001\u6807\u6CE8\uFF0C\u843D\u76D8\u5230 ~/.dsh/dsh-chanhub/model-catalog.json\uFF1B\u5E73\u65F6\u6253\u5F00\u9762\u677F\u53EA\u8BFB\u7F13\u5B58\uFF0C\u4E0D\u8054\u7F51\u3001\u4E0D\u6539 DSH \u914D\u7F6E"
-        }, catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"),
         import_react6.default.createElement("button", {
           style: overwrite ? { ...s.btnPri, background: tone.err.fg, borderColor: tone.err.fg } : s.btnPri,
           type: "button",
@@ -5233,6 +5200,28 @@ function ModelAbilityTab({ rpcCall, showToast }) {
           }),
           "\u62C9\u53D6\u65F6\u8986\u76D6\uFF08\u7F51\u5173\u4E3A\u51C6\uFF09"
         )
+      ),
+      // 维护类动作收进这里：它们低频，且窄面板（内容区实测 528px 可用）里
+      // 5 个按钮必然换行、看起来像"挤在一起"。放这里仍然是一次点击可达。
+      import_react6.default.createElement(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+        import_react6.default.createElement("button", {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: catalogBusy,
+          onClick: refreshCatalog,
+          title: "\u8054\u7F51\u6293\u53D6 models.dev \u4E0E OpenRouter \u7684\u591A\u6A21\u6001\u6807\u6CE8\uFF0C\u843D\u76D8\u5230 ~/.dsh/dsh-chanhub/model-catalog.json\uFF1B\u5E73\u65F6\u6253\u5F00\u9762\u677F\u53EA\u8BFB\u7F13\u5B58\uFF0C\u4E0D\u8054\u7F51\u3001\u4E0D\u6539 DSH \u914D\u7F6E"
+        }, catalogBusy ? "\u5237\u65B0\u76EE\u5F55\u4E2D\u2026" : "\u5237\u65B0\u80FD\u529B\u76EE\u5F55"),
+        catalog && (catalog.baseline?.pending ?? 0) > 0 ? import_react6.default.createElement("button", {
+          ...s.btnGhost,
+          style: { ...s.btnGhost, opacity: catalogBusy ? 0.6 : 1 },
+          type: "button",
+          disabled: catalogBusy,
+          onClick: commitCapabilities,
+          title: "\u628A\u76EE\u5F55\u6BD4\u5BF9\u4E2D**\u786E\u8BA4\u6001**\u7684\u7ED3\u8BBA\u5199\u8FDB\u80FD\u529B\u57FA\u7EBF\uFF08settings.modelCapabilities\uFF09\uFF1A\u786E\u8BA4\u591A\u6A21\u6001\u7684\u6A21\u578B\u4F1A\u83B7\u5F97\u89C6\u89C9\u80FD\u529B\uFF0C\u786E\u8BA4\u7EAF\u6587\u672C\u7684\u4F1A\u88AB\u8BB0\u4E0B\u6765\u3002\u501F\u5224/\u6A21\u7CCA/\u51B2\u7A81/\u522B\u540D/\u65E0\u6536\u5F55\u4E00\u5F8B\u4E0D\u5199\u3002\u53EA\u6539\u63D2\u4EF6 settings\uFF0C\u4E0D\u52A8 DSH \u6A21\u578B\u914D\u7F6E\u3002"
+        }, `\u6C89\u6DC0\u786E\u8BA4\u9879\uFF08${catalog.baseline.pending}\uFF09`) : null
       ),
       // 拉取记录：上次拉取时刻 + 与本次的差异（每次拉取都是**整体覆盖**）
       record ? import_react6.default.createElement(
@@ -5488,9 +5477,10 @@ function ModelAbilityTab({ rpcCall, showToast }) {
               th("", COL_W.check),
               th("\u6A21\u578B ID", COL_W.id),
               th("\u540D\u79F0", COL_W.name),
-              th("\u4E0A\u6587 / \u8F93\u51FA / \u500D\u7387", COL_W.size),
-              th("\u80FD\u529B", COL_W.vision),
-              th("\u76EE\u5F55\u5224\u5B9A", COL_W.verdict)
+              th("\u4E0A\u6587 / \u8F93\u51FA", COL_W.size),
+              // 能力与目录判定并成一列：两者回答的是同一个问题（能不能看图），
+              // 而且窄面板里分两列会把判定列压到 84px、内容折成三行。
+              th("\u80FD\u529B / \u76EE\u5F55\u5224\u5B9A", COL_W.verdict)
             )
           ),
           import_react6.default.createElement(
@@ -5503,7 +5493,7 @@ function ModelAbilityTab({ rpcCall, showToast }) {
                 { key: `g:${group.key}`, className: "dshc-ma-group" },
                 import_react6.default.createElement(
                   "td",
-                  { colSpan: 6, style: { padding: "6px 10px" } },
+                  { colSpan: 5, style: { padding: "6px 10px" } },
                   import_react6.default.createElement("button", {
                     type: "button",
                     className: "dshc-ma-grouptoggle",
