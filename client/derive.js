@@ -1557,13 +1557,15 @@ export const RANK_METRICS = [
 export const DEFAULT_RANK_METRIC = 'tokens';
 
 /**
- * 「已删除的 key」汇总行的哨兵 key。
+ * 「已删除的 key」这一组的哨兵 id。
  *
- * 它是**前端合成的行**，网关不会返回同名 key（网关的 key id 一律 `k_` 前缀，
- * 主 key 是 `master`）。判身份一律用 `row.deleted`，这个常量只用于 React key
- * 与排查 —— 别拿它当判据，否则改一次常量就要全仓跟着改。
+ * 两个地方共用它，因为它们是同一个概念（「认不出名字的那一批」）：
+ *   · 消费者卡折叠出来的汇总行，`key` 取它；
+ *   · 选择器里「已删除的 N 个 key」那一项的 `id`，选中即把整页收窄到这一组。
+ *
+ * 判身份一律用 `row.deleted` / `row.deletedSummary`，别拿它当判据。
  */
-const DELETED_CONSUMER_KEY = '__deleted__';
+export const DELETED_CONSUMERS = '__deleted__';
 
 /** 取维度定义（未知 id 回落默认维度，不抛错）。 */
 export function rankMetric(id) {
@@ -1644,9 +1646,13 @@ export function accountShares(rows, total, accounts = [], channelOf = () => 'wor
  *
  * @param rows - `usage.by_key`（旧网关没有该字段 → 传 [] / undefined）。
  * @param metric - 维度 id（tokens / requests / credit）。**不接 total**：见下。
+ * @param options - `{foldDeleted}`：默认 true（折成一行）。**指定了某一把 key
+ *   来看时传 false** —— 用户既然点名要看这把 key，再把它折进「已删除的 N 个 key」
+ *   就是把他的选择藏起来。
  * @returns 已装饰的行：真实消费者按维度降序，末位（若有）是「已删除」汇总行。
  */
-export function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
+export function consumerShares(rows, metric = DEFAULT_RANK_METRIC, options = {}) {
+  const foldDeleted = options?.foldDeleted !== false;
   const list = Array.isArray(rows) ? rows : [];
   const field = rankMetric(metric).field;
   const decorated = list.map((row) => {
@@ -1709,11 +1715,18 @@ export function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
   //
   // 位置：**不进排行**。它不是可比较的消费者，而是「认不出名字的历史」，
   // 故固定排在末位（调用方据此把它渲染成末行、不占序号、不占 8 行预算）。
-  const gone = decorated.filter((row) => row.deleted);
+  const gone = foldDeleted ? decorated.filter((row) => row.deleted) : [];
   const merged = gone.length === 0 ? null : {
-    key: DELETED_CONSUMER_KEY,
+    key: DELETED_CONSUMERS,
     label: '',
+    // 两个标记分工必须分清（曾经混用过一次，直接让面板崩了）：
+    //   `deleted`        = 这把 key 已不在 key 表里（**单个 key 也可能为真**，
+    //                      比如用户点名要看一把已删除的 key）；
+    //   `deletedSummary` = 这是**折叠出来的汇总行**，只有它才有 deletedIds。
+    // 卡片判「汇总行」只能看 deletedSummary —— 看 deleted 会把单把已删除的 key
+    // 当成汇总行去读 deletedIds.join()，于是 TypeError 白屏。
     deleted: true,
+    deletedSummary: true,
     deletedCount: gone.length,
     deletedIds: gone.map((row) => row.key),
     name: `已删除的 ${gone.length} 个 key`,
@@ -1728,10 +1741,162 @@ export function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
   }
 
   const ranked = decorated
-    .filter((row) => !row.deleted)
+    .filter((row) => !(foldDeleted && row.deleted))
     .map(withShares)
     .sort((a, b) => b.value - a.value);
   return merged ? [...ranked, withShares(merged)] : ranked;
+}
+
+/* ──────────────────── 消费者（API key）作用域 ──────────────────── */
+
+/** 「全部消费者」哨兵。**不能**用空串 —— 空 key 是「未鉴权」这一真实分组。 */
+export const ALL_CONSUMERS = '__all__';
+
+/**
+ * 把分桶行按某一维聚合成与网关 `usageGroupPayload` **同构**的行。
+ *
+ * 为什么要在这里重算（而不是只让网关算）：网关的 `/v1/stats/buckets` 只接受
+ * `window`，没有按 key 过滤的参数。面板要「只看某一把 key」只能自己收窄 ——
+ * 而收窄后 `total` / `by_uid` / `by_model` 都必须跟着变，否则 KPI 与各卡会
+ * 各说各话。
+ *
+ * 与网关 `accumulate` / `addGroupRow` / `finalizeGroup` 逐条对齐：
+ *   · 空键**跳过**（降级模式下 uid/model 为空 → 这两个维度为空表，与网关一致；
+ *     `total` 例外：它把每一行都算进去，包括空键行）；
+ *   · 均值按**请求数加权**累加，收尾除以请求数；
+ *   · 命中率 = 命中 /（命中 + 未命中），**写入不进分母**；分母为 0 时留 0
+ *     （前端据此显示「—」而不是 0%）。
+ *
+ * @param rows - 分桶行（`usage.buckets`）。
+ * @param dim - `'uid'` / `'model'` / `'realm'` / `'key'`；传 `null` 表示合计。
+ * @returns 聚合行数组（合计时长度为 1）。
+ */
+function aggregateRows(rows, dim) {
+  const empty = (key) => ({
+    key, label: '',
+    requests: 0, success: 0, failed: 0, streaming: 0,
+    prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+    cache_hit_tokens: 0, cache_miss_tokens: 0, cache_write_tokens: 0,
+    cache_hit_rate: 0, credit: 0, avg_latency_ms: 0,
+  });
+  const table = new Map();
+  // 合计**先占位**：收窄到一把窗口内无数据的 key 时也要返回一个全 0 的 total，
+  // 而不是 undefined —— 否则调用方一个 `total.requests` 就是 TypeError。
+  if (dim === null) table.set('total', empty('total'));
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row) continue;
+    const key = dim === null ? 'total' : String(row[dim] ?? '');
+    if (dim !== null && key === '') continue;
+    let group = table.get(key);
+    if (!group) {
+      group = empty(key);
+      table.set(key, group);
+    }
+    const requests = Number(row.requests) || 0;
+    group.requests += requests;
+    group.success += Number(row.success) || 0;
+    group.failed += Number(row.failed) || 0;
+    group.streaming += Number(row.streaming) || 0;
+    group.prompt_tokens += Number(row.prompt_tokens) || 0;
+    group.completion_tokens += Number(row.completion_tokens) || 0;
+    group.total_tokens += Number(row.total_tokens) || 0;
+    group.cache_hit_tokens += Number(row.cache_hit_tokens) || 0;
+    group.cache_miss_tokens += Number(row.cache_miss_tokens) || 0;
+    group.cache_write_tokens += Number(row.cache_write_tokens) || 0;
+    group.credit += Number(row.credit) || 0;
+    group.avg_latency_ms += (Number(row.avg_latency_ms) || 0) * requests;
+  }
+  const out = [...table.values()];
+  for (const group of out) {
+    if (group.requests > 0) group.avg_latency_ms /= group.requests;
+    const denom = group.cache_hit_tokens + group.cache_miss_tokens;
+    group.cache_hit_rate = denom > 0 ? group.cache_hit_tokens / denom : 0;
+  }
+  // 与网关 sortedGroups 同序（请求数降序，同数按 key）—— 顺序稳定才不会有
+  // 「刷新一下排行榜换了个位置」的抖动。
+  return out.sort((a, b) => (b.requests - a.requests) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+}
+
+/**
+ * 把整个用量载荷**收窄**到一把消费者 key（纯前端，不新增请求）。
+ *
+ * 口径纪律：收窄的是**同一份窗口分桶**，不是新窗口 —— `buckets` 过滤后重算
+ * `total` / `by_uid` / `by_model` / `by_realm` / `by_key`，于是 KPI、热力图、
+ * 每日柱、账号/渠道/模型归因全部自动跟着走，不会出现「KPI 是全量、模型占比
+ * 是单 key」这种半新半旧。
+ *
+ * `label` 沿用网关在**读取时** join 的结果（客户端不重算名字，也不编造）。
+ *
+ * @param usage - `payload.usage`。
+ * @param keyId - 单把 key 的 id、一组 id（数组），或 `ALL_CONSUMERS`（不收窄）。
+ * @returns 新的 usage 对象（不收窄时原样返回同一个引用）。
+ */
+export function scopeUsage(usage, keyId) {
+  if (!usage || keyId == null || keyId === ALL_CONSUMERS) return usage;
+  const wanted = new Set(Array.isArray(keyId) ? keyId.map(String) : [String(keyId)]);
+  const buckets = (Array.isArray(usage.buckets) ? usage.buckets : [])
+    .filter((row) => wanted.has(String(row?.key ?? '')));
+  // 名字只可能来自网关的 by_key（客户端没有 key 表）——先建映射再回填。
+  const labels = new Map(
+    (Array.isArray(usage.by_key) ? usage.by_key : []).map((row) => [String(row?.key ?? ''), row?.label ?? '']),
+  );
+  return {
+    ...usage,
+    buckets,
+    by_uid: aggregateRows(buckets, 'uid'),
+    by_realm: aggregateRows(buckets, 'realm'),
+    by_model: aggregateRows(buckets, 'model'),
+    by_key: aggregateRows(buckets, 'key')
+      .map((row) => ({ ...row, label: labels.get(row.key) ?? '' })),
+    total: aggregateRows(buckets, null)[0],
+  };
+}
+
+/**
+ * 可选的消费者清单（供选择器渲染）：在用的 key 逐把列出，已删除的**折成一项**。
+ *
+ * 为什么选择器里也要折：真机 720h 窗口里 7 把废弃 key + 2 把在用的 key ——
+ * 逐把铺开就是 10 个按钮挤在 564px 的列里（实测被压到互相盖住），
+ * 而卡片那边刚刚因为同一批废弃 key 折过一回。同一个道理不能只在卡片上用。
+ * 折叠后选择器是「全部 / 在用的 key… / 已删除的 N 个 key」，选中最后一项
+ * 即把整页收窄到这一组（`scopeUsage` 支持一组 id）。
+ *
+ * 复用 `consumerShares` 的命名规则（label → 主 key → 未鉴权 → `k_xxx（已删除）`），
+ * 免得选择器和卡片对同一把 key 给出两个名字。
+ *
+ * @param byKey - `usage.by_key`（收窄前的那份）。
+ * @param metric - 维度 id（决定排序，不影响名字）。
+ * @returns `[{id, label, deleted, deletedIds?, requests, tokens, failRate}]`；不含「全部」。
+ */
+export function consumerOptions(byKey, metric = DEFAULT_RANK_METRIC) {
+  const rows = consumerShares(byKey, metric, { foldDeleted: false });
+  const live = [];
+  const gone = [];
+  for (const row of rows) {
+    const item = {
+      id: row.key,
+      label: row.name,
+      deleted: row.deleted === true,
+      requests: row.requests,
+      tokens: row.tokens,
+      failRate: row.failRate,
+    };
+    if (item.deleted) gone.push(item);
+    else live.push(item);
+  }
+  if (gone.length === 0) return live;
+  const sum = (field) => gone.reduce((acc, item) => acc + (Number(item[field]) || 0), 0);
+  const requests = sum('requests');
+  const failed = gone.reduce((acc, item) => acc + (Number(item.requests) || 0) * (Number(item.failRate) || 0), 0);
+  return [...live, {
+    id: DELETED_CONSUMERS,
+    label: `已删除的 ${gone.length} 个 key`,
+    deleted: true,
+    deletedIds: gone.map((item) => item.id),
+    requests,
+    tokens: sum('tokens'),
+    failRate: requests > 0 ? failed / requests : 0,
+  }];
 }
 
 /**

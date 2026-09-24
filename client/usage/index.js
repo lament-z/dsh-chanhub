@@ -20,15 +20,18 @@ import React from 'react';
 import { s, type } from '../theme.js';
 import { Icons, Fold } from '../ui.js';
 import {
+  ALL_CONSUMERS,
   DEFAULT_RANK_METRIC,
   accountShares,
   channelShares,
+  consumerOptions,
   consumerShares,
   creditBurn,
   creditStock,
   dailyByModel,
   daySeries,
   kpiCards,
+  scopeUsage,
   usageByDay,
   usageBySlot,
 } from '../derive.js';
@@ -37,6 +40,7 @@ import {
   BurnPanel,
   DailyBars,
   Heatmap,
+  KeyScope,
   KpiCards,
   ModelDonut,
   ProcessPanel,
@@ -79,6 +83,9 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   // 账号/渠道排行的维度：默认**按用量（Tokens）** —— 「谁在用得多」的第一
   // 答案是量而不是次数（一次长上下文顶几百次短请求）。
   const [rankMetricValue, setRankMetricValue] = React.useState(DEFAULT_RANK_METRIC);
+  // 消费者作用域（默认「全部」）。收窄是**纯前端**的：网关的 /v1/stats/buckets
+  // 只接受 window，没有按 key 过滤的参数 —— 见 derive.js 的 scopeUsage。
+  const [keyScope, setKeyScope] = React.useState(ALL_CONSUMERS);
   const [tip, setTip] = React.useState(null);
   const [exportOpen, setExportOpen] = React.useState(false);
   // 「有没有可显示的旧载荷」用 ref 跟踪：写进 useCallback 的闭包会拿到
@@ -124,8 +131,30 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   const available = payload?.available === true;
   const reason = payload?.reason ?? '';
   const stats = payload?.stats ?? null;
-  const total = usage?.total ?? {};
-  const buckets = Array.isArray(usage?.buckets) ? usage.buckets : [];
+
+  // ── 消费者（API key）作用域：把整页收窄到一把 key（或「已删除」那一组） ──
+  //
+  // 可选清单取自**收窄前**的 by_key（名字是网关读取时 join 的）；选中项若在当前
+  // 数据里已不存在（窗口变了 / key 连历史都没了），自动回落到「全部」——
+  // 不把一个空作用域留在页面上显示「该窗口内没有请求记录」，那看起来像数据坏了。
+  // 排序固定按 Tokens：切换排行维度不该让选择器里的按钮跳位置。
+  const keyOptions = React.useMemo(
+    () => (Array.isArray(usage?.by_key) ? consumerOptions(usage.by_key, DEFAULT_RANK_METRIC) : []),
+    [usage],
+  );
+  const activeKey = keyOptions.some((option) => option.id === keyScope) ? keyScope : ALL_CONSUMERS;
+  const keyScoped = activeKey !== ALL_CONSUMERS;
+  const activeOption = keyOptions.find((option) => option.id === activeKey) ?? null;
+  const activeKeyLabel = activeOption?.label ?? '';
+  // 作用域目标：单把 key = 它的 id（字符串）；「已删除的 N 个 key」= 一组 id（数组）；
+  // 「全部」= 不收窄。引用稳定（keyOptions 按 usage 记忆化），故可以直接进依赖。
+  const scopeTarget = keyScoped ? (activeOption?.deletedIds ?? activeKey) : ALL_CONSUMERS;
+  // 收窄后 total / by_uid / by_model / by_key 全部重算 —— 口径只有一份，
+  // 不会出现「KPI 是全量、模型占比是单 key」这种半新半旧（见 scopeUsage）。
+  const scopedUsage = React.useMemo(() => scopeUsage(usage, scopeTarget), [usage, scopeTarget]);
+
+  const total = scopedUsage?.total ?? {};
+  const buckets = Array.isArray(scopedUsage?.buckets) ? scopedUsage.buckets : [];
 
   // 全部派生都在同一份窗口分桶上做，不新增请求。
   const rows = React.useMemo(() => usageBySlot(buckets), [buckets]);
@@ -139,31 +168,39 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
     () => creditStock(accounts, null, channelOf ?? (() => 'workbuddy')),
     [accounts, channelOf],
   );
+  // 燃尽外推**只在「全部」下给**：它拿窗口积分消耗去外推**池子**还能撑多久，
+  // 而池子是所有 key 共享的 —— 用一把 key 的消耗率去外推池子寿命是错的
+  // （会得出「这把 key 单独能烧 N 天」这种没有意义的乐观数字）。
+  // 收窄时给 null，KPI 的「可用积分」退化成「活跃 N 天」，燃尽折叠卡整块不渲染。
   const burn = React.useMemo(
-    () => creditBurn(stock.usable, Number(total?.credit) || 0, '720h'),
-    [stock.usable, total?.credit],
+    () => (keyScoped ? null : creditBurn(stock.usable, Number(total?.credit) || 0, '720h')),
+    [keyScoped, stock.usable, total?.credit],
   );
   const kpis = React.useMemo(
     () => kpiCards({ total, stock, days: scoped, burn }),
     [total, stock, scoped, burn],
   );
   const accountRows = React.useMemo(
-    () => accountShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
-    [usage, total, accounts, channelOf, rankMetricValue],
+    () => accountShares(scopedUsage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [scopedUsage, total, accounts, channelOf, rankMetricValue],
   );
   const channelRows = React.useMemo(
-    () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
-    [usage, total, accounts, channelOf, rankMetricValue],
+    () => channelShares(scopedUsage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [scopedUsage, total, accounts, channelOf, rankMetricValue],
   );
   // 消费者维度（by_key）：网关 2026-09-24 起提供。旧网关没有该字段 →
   // consumersAvailable=false，卡片整块不渲染（而不是渲染一个恒空卡片，
-  // 那会被读成「没有消费者在用」）。
+  // 那会被读成「没有消费者在用」）。判可用性看**收窄前**的原载荷。
   const consumersAvailable = Array.isArray(usage?.by_key);
   // 注意不传 total：消费者维的分母必须取 by_key 各行之和（理由见 derive.js
   // consumerShares 的注释 —— by_key 的宇宙只是 total 的子集，用 total 会低估占比）。
+  // 收窄到**单把** key 时**不折叠**：用户点名要看它，再折进「已删除的 N 个 key」
+  // 就是把他的选择藏起来。收窄到「已删除的 N 个 key」这一组时仍要折 ——
+  // 那一组的正确呈现本来就是一行汇总。
+  const scopeIsSingleKey = keyScoped && typeof scopeTarget === 'string';
   const consumerRows = React.useMemo(
-    () => consumerShares(usage?.by_key ?? [], rankMetricValue),
-    [usage, rankMetricValue],
+    () => consumerShares(scopedUsage?.by_key ?? [], rankMetricValue, { foldDeleted: !scopeIsSingleKey }),
+    [scopedUsage, rankMetricValue, scopeIsSingleKey],
   );
 
   const subtitle = subtitleText({ freshness, error, lastOkAt });
@@ -183,10 +220,12 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         React.createElement(ExportMenu, {
           open: exportOpen,
           onToggle: () => setExportOpen((prev) => !prev),
-          payload: { usage, stats, at: lastOkAt },
+          // 导出与**所见一致**：收窄到某把 key 时导出的就是那把 key 的载荷
+          // （想要全量就切回「全部」），否则 JSON 与屏幕上其它卡片会对不上。
+          payload: { usage: scopedUsage, stats, at: lastOkAt, keyScope: activeKey },
           days: scoped,
           byModelDaily,
-          modelRows: usage?.by_model ?? [],
+          modelRows: scopedUsage?.by_model ?? [],
           accountRows,
         }),
         React.createElement('button', {
@@ -220,12 +259,28 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         )
       : null,
 
+    // ── 消费者作用域选择器：多 key 下「不要全混在一起」的唯一入口 ──
+    // 放在 KPI 之前：它决定的是**下面所有卡片**的口径，先说清楚再看数。
+    available && keyOptions.length > 0
+      ? React.createElement(KeyScope, {
+          options: keyOptions,
+          value: activeKey,
+          onChange: setKeyScope,
+        })
+      : null,
+
     // ── ① KPI 4 卡（窗口口径） ──
     available && rows.length > 0
       ? React.createElement(React.Fragment, null,
           React.createElement('div', { className: 'dshc-ust-kpihead' },
             React.createElement('span', { className: 'dshc-ust-scope' },
               React.createElement('span', { className: 'dshc-ust-scope-tag' }, '窗口口径'),
+              // 收窄时把「只看谁」写进口径行：数字旁边必须能看见口径，
+              // 否则隔屏截图/导出之后没人知道这是单 key 的数。
+              keyScoped
+                ? React.createElement('span', { className: 'dshc-ust-scope-tag', 'data-scope-key': activeKey },
+                    `只看 ${activeKeyLabel}`)
+                : null,
               React.createElement('span', { style: type.text.caption, title: WINDOW_TIP },
                 `近 ${range} 天 · 数据落盘 data/usage.json，重启不清零`),
             ),
@@ -258,7 +313,7 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
           }),
 
           // ── ⑦ 模型占比 ──
-          React.createElement(ModelDonut, { rows: usage?.by_model ?? [], onTip: setTip }),
+          React.createElement(ModelDonut, { rows: scopedUsage?.by_model ?? [], onTip: setTip }),
         )
       : null,
 
@@ -273,7 +328,9 @@ export function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
       : null,
 
     // ── 折叠区一：积分燃尽投影（窗口口径的外推） ──
-    available && rows.length > 0
+    // 收窄到某把 key 时**整块不渲染**：它外推的是池子寿命，而池子是共享的
+    // （理由见上方 burn 的注释）—— 宁可不给，也不给一个错的数字。
+    available && rows.length > 0 && !keyScoped
       ? React.createElement(LazyFold, {
           id: 'burn',
           summary: React.createElement('span', { className: 'dshc-row' },

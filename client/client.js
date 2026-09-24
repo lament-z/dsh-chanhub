@@ -642,8 +642,21 @@ body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
 .dshc-ust-rank-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dshc-ust-rank-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--dsw-alias-bg-layer-2,#f1f3f6); overflow: hidden; min-width: 28px; }
 .dshc-ust-rank-bar > i { display: block; height: 100%; border-radius: 2px; background: var(--dsw-alias-brand-primary,#4f6ef7); }
-.dshc-ust-rank-val { flex: none; width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+/* \u5360\u6BD4\u4E00\u4F4D\u5C0F\u6570\uFF08\u300C100.0%\u300D6 \u5B57\u7B26\uFF09\u2192 \u5B9A\u5BBD 44px \u4F1A\u6324\u5230\u6362\u884C/\u6EA2\u51FA\uFF0C\u6545\u653E\u5BBD\u5230 52px
+   \u5E76\u7981\u6B62\u6362\u884C\uFF1A\u4E09\u5F20\u5361\u5171\u7528\u8FD9\u4E00\u5217\uFF0C\u4E00\u8D77\u6539\u624D\u4E0D\u4F1A\u5DE6\u53F3\u4E0D\u9F50\u3002 */
+.dshc-ust-rank-val { flex: none; width: 52px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 @media (max-width: 560px) { .dshc-ust-rank-name { width: 84px; } }
+
+/* \u2500\u2500 \u6D88\u8D39\u8005\uFF08API key\uFF09\u9009\u62E9\u5668\uFF1A\u628A\u6574\u9875\u6536\u7A84\u5230\u4E00\u628A key \u2500\u2500
+   \u590D\u7528 .dshc-seg \u7684\u89C6\u89C9\uFF08\u4E0E\u7A97\u53E3/\u7EF4\u5EA6\u5207\u6362\u540C\u65CF\uFF09\uFF0C\u53EA\u52A0\u4E00\u5C42\u6A2A\u5411\u6EDA\u52A8\uFF1A
+   key \u6570\u91CF\u4E0D\u5B9A\uFF0C\u7A84\u5C4F\u5FC5\u987B\u80FD\u6ED1\uFF0C\u4E0D\u80FD\u628A\u9875\u9762\u6491\u5BBD\u3002 */
+.dshc-ust-keyscope { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 10px; min-width: 0; }
+.dshc-ust-keyscope-label { flex: none; font-size: 12px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ust-keyscope-seg { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+/* flex: none \u662F\u8FD9\u6761\u7684\u5173\u952E\uFF1A\u9ED8\u8BA4 flex-shrink:1 \u4F1A\u8BA9\u6309\u94AE\u88AB**\u538B\u6241**\uFF08\u5185\u5BB9\u4E92\u76F8\u76D6\u4F4F\uFF09\uFF0C
+   \u800C\u4E0D\u662F\u628A\u5BB9\u5668\u6491\u51FA\u6EDA\u52A8\u6761 \u2014\u2014 \u771F\u673A\u4E0A 10 \u4E2A\u6309\u94AE\u6324\u5728 564px \u91CC\u5C31\u662F\u8FD9\u4E2A\u73B0\u8C61\u3002 */
+.dshc-ust-keyscope-seg > button { flex: none; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.dshc-ust-keyscope-note { font-size: 12px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 
 /* \u2500\u2500 \u2465 \u6A21\u578B\u5360\u6BD4\u73AF\u5F62\u56FE + \u5217\u8868 \u2500\u2500 */
 .dshc-models { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
@@ -1720,7 +1733,7 @@ var RANK_METRICS = [
   { id: "credit", field: "credit", label: "\u79EF\u5206", format: formatCredit }
 ];
 var DEFAULT_RANK_METRIC = "tokens";
-var DELETED_CONSUMER_KEY = "__deleted__";
+var DELETED_CONSUMERS = "__deleted__";
 function rankMetric(id) {
   return RANK_METRICS.find((item) => item.id === id) ?? RANK_METRICS[0];
 }
@@ -1753,7 +1766,8 @@ function accountShares(rows, total, accounts = [], channelOf = () => "workbuddy"
     barShare: row.value / max
   })).sort((a, b) => b.value - a.value);
 }
-function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
+function consumerShares(rows, metric = DEFAULT_RANK_METRIC, options = {}) {
+  const foldDeleted = options?.foldDeleted !== false;
   const list = Array.isArray(rows) ? rows : [];
   const field = rankMetric(metric).field;
   const decorated = list.map((row) => {
@@ -1784,11 +1798,18 @@ function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
     share: grand > 0 ? row.value / grand : 0,
     barShare: row.value / max
   });
-  const gone = decorated.filter((row) => row.deleted);
+  const gone = foldDeleted ? decorated.filter((row) => row.deleted) : [];
   const merged = gone.length === 0 ? null : {
-    key: DELETED_CONSUMER_KEY,
+    key: DELETED_CONSUMERS,
     label: "",
+    // 两个标记分工必须分清（曾经混用过一次，直接让面板崩了）：
+    //   `deleted`        = 这把 key 已不在 key 表里（**单个 key 也可能为真**，
+    //                      比如用户点名要看一把已删除的 key）；
+    //   `deletedSummary` = 这是**折叠出来的汇总行**，只有它才有 deletedIds。
+    // 卡片判「汇总行」只能看 deletedSummary —— 看 deleted 会把单把已删除的 key
+    // 当成汇总行去读 deletedIds.join()，于是 TypeError 白屏。
     deleted: true,
+    deletedSummary: true,
     deletedCount: gone.length,
     deletedIds: gone.map((row) => row.key),
     name: `\u5DF2\u5220\u9664\u7684 ${gone.length} \u4E2A key`,
@@ -1801,8 +1822,107 @@ function consumerShares(rows, metric = DEFAULT_RANK_METRIC) {
   if (merged) {
     merged.failRate = merged.requests > 0 ? merged.failed / merged.requests : 0;
   }
-  const ranked = decorated.filter((row) => !row.deleted).map(withShares).sort((a, b) => b.value - a.value);
+  const ranked = decorated.filter((row) => !(foldDeleted && row.deleted)).map(withShares).sort((a, b) => b.value - a.value);
   return merged ? [...ranked, withShares(merged)] : ranked;
+}
+var ALL_CONSUMERS = "__all__";
+function aggregateRows(rows, dim) {
+  const empty = (key) => ({
+    key,
+    label: "",
+    requests: 0,
+    success: 0,
+    failed: 0,
+    streaming: 0,
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
+    cache_hit_tokens: 0,
+    cache_miss_tokens: 0,
+    cache_write_tokens: 0,
+    cache_hit_rate: 0,
+    credit: 0,
+    avg_latency_ms: 0
+  });
+  const table = /* @__PURE__ */ new Map();
+  if (dim === null) table.set("total", empty("total"));
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row) continue;
+    const key = dim === null ? "total" : String(row[dim] ?? "");
+    if (dim !== null && key === "") continue;
+    let group = table.get(key);
+    if (!group) {
+      group = empty(key);
+      table.set(key, group);
+    }
+    const requests = Number(row.requests) || 0;
+    group.requests += requests;
+    group.success += Number(row.success) || 0;
+    group.failed += Number(row.failed) || 0;
+    group.streaming += Number(row.streaming) || 0;
+    group.prompt_tokens += Number(row.prompt_tokens) || 0;
+    group.completion_tokens += Number(row.completion_tokens) || 0;
+    group.total_tokens += Number(row.total_tokens) || 0;
+    group.cache_hit_tokens += Number(row.cache_hit_tokens) || 0;
+    group.cache_miss_tokens += Number(row.cache_miss_tokens) || 0;
+    group.cache_write_tokens += Number(row.cache_write_tokens) || 0;
+    group.credit += Number(row.credit) || 0;
+    group.avg_latency_ms += (Number(row.avg_latency_ms) || 0) * requests;
+  }
+  const out = [...table.values()];
+  for (const group of out) {
+    if (group.requests > 0) group.avg_latency_ms /= group.requests;
+    const denom = group.cache_hit_tokens + group.cache_miss_tokens;
+    group.cache_hit_rate = denom > 0 ? group.cache_hit_tokens / denom : 0;
+  }
+  return out.sort((a, b) => b.requests - a.requests || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+}
+function scopeUsage(usage, keyId) {
+  if (!usage || keyId == null || keyId === ALL_CONSUMERS) return usage;
+  const wanted = new Set(Array.isArray(keyId) ? keyId.map(String) : [String(keyId)]);
+  const buckets = (Array.isArray(usage.buckets) ? usage.buckets : []).filter((row) => wanted.has(String(row?.key ?? "")));
+  const labels = new Map(
+    (Array.isArray(usage.by_key) ? usage.by_key : []).map((row) => [String(row?.key ?? ""), row?.label ?? ""])
+  );
+  return {
+    ...usage,
+    buckets,
+    by_uid: aggregateRows(buckets, "uid"),
+    by_realm: aggregateRows(buckets, "realm"),
+    by_model: aggregateRows(buckets, "model"),
+    by_key: aggregateRows(buckets, "key").map((row) => ({ ...row, label: labels.get(row.key) ?? "" })),
+    total: aggregateRows(buckets, null)[0]
+  };
+}
+function consumerOptions(byKey, metric = DEFAULT_RANK_METRIC) {
+  const rows = consumerShares(byKey, metric, { foldDeleted: false });
+  const live = [];
+  const gone = [];
+  for (const row of rows) {
+    const item = {
+      id: row.key,
+      label: row.name,
+      deleted: row.deleted === true,
+      requests: row.requests,
+      tokens: row.tokens,
+      failRate: row.failRate
+    };
+    if (item.deleted) gone.push(item);
+    else live.push(item);
+  }
+  if (gone.length === 0) return live;
+  const sum = (field) => gone.reduce((acc, item) => acc + (Number(item[field]) || 0), 0);
+  const requests = sum("requests");
+  const failed = gone.reduce((acc, item) => acc + (Number(item.requests) || 0) * (Number(item.failRate) || 0), 0);
+  return [...live, {
+    id: DELETED_CONSUMERS,
+    label: `\u5DF2\u5220\u9664\u7684 ${gone.length} \u4E2A key`,
+    deleted: true,
+    deletedIds: gone.map((item) => item.id),
+    requests,
+    tokens: sum("tokens"),
+    failRate: requests > 0 ? failed / requests : 0
+  }];
 }
 function channelShares(rows, total, accounts = [], channelOf = () => "workbuddy", metric = DEFAULT_RANK_METRIC) {
   const accountsRows = accountShares(rows, total, accounts, channelOf, metric);
@@ -3143,6 +3263,36 @@ function mergeTail(series) {
   );
   return [...head, { ...merged, color: SEG_COLORS[SEG_COLORS.length - 1], rest: true }];
 }
+function KeyScope({ options, value, onChange }) {
+  const list = Array.isArray(options) ? options : [];
+  if (list.length === 0) return null;
+  const items = [{ id: ALL_CONSUMERS, label: "\u5168\u90E8", deleted: false, requests: 0, tokens: 0 }, ...list];
+  return import_react4.default.createElement(
+    "div",
+    { className: "dshc-ust-keyscope", "data-keyscope": "bar" },
+    import_react4.default.createElement("span", { className: "dshc-ust-keyscope-label" }, "\u6D88\u8D39\u8005"),
+    import_react4.default.createElement(
+      "div",
+      { className: "dshc-seg dshc-ust-keyscope-seg" },
+      ...items.map(
+        (item) => import_react4.default.createElement("button", {
+          key: item.id,
+          type: "button",
+          "data-key-scope": item.id,
+          className: value === item.id ? "on" : "",
+          title: item.id === ALL_CONSUMERS ? "\u4E0D\u6309 key \u6536\u7A84\uFF1A\u6240\u6709\u6D88\u8D39\u8005\u6DF7\u5728\u4E00\u8D77\uFF08\u9ED8\u8BA4\uFF09" : `${item.label}
+${formatNumber(item.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(item.tokens)} Tokens` + (item.deleted ? Array.isArray(item.deletedIds) ? "\n\u8FD9\u4E9B key \u5DF2\u4ECE key \u8868\u5220\u9664\uFF0C\u53EA\u5269\u5386\u53F2\u7528\u91CF" : "\n\u8BE5 key \u5DF2\u4ECE key \u8868\u5220\u9664\uFF0C\u53EA\u5269\u5386\u53F2\u7528\u91CF" : ""),
+          onClick: () => onChange?.(item.id)
+        }, item.label)
+      )
+    ),
+    value !== ALL_CONSUMERS ? import_react4.default.createElement(
+      "span",
+      { className: "dshc-ust-keyscope-note" },
+      "\u4EE5\u4E0B\u5361\u7247\u53EA\u770B\u6240\u9009\u6D88\u8D39\u8005\uFF08\u53EF\u7528\u79EF\u5206 / \u71C3\u5C3D\u662F\u6C60\u53E3\u5F84\uFF0C\u4E0D\u968F key \u53D8\uFF09"
+    ) : null
+  );
+}
 function RankCards({
   accounts,
   channels,
@@ -3154,10 +3304,10 @@ function RankCards({
   const current = rankMetric(metric);
   const options = RANK_METRICS.map((item) => [item.id, item.label]);
   const extra = `\u6309${current.label}`;
-  const consumerRanked = consumers.filter((row) => !row.deleted);
-  const consumerGone = consumers.find((row) => row.deleted) ?? null;
+  const consumerRanked = consumers.filter((row) => !row.deletedSummary);
+  const consumerGone = consumers.find((row) => row.deletedSummary) ?? null;
   const goneTitle = consumerGone ? `\u5DF2\u5220\u9664\u7684 ${consumerGone.deletedCount} \u4E2A key\uFF08\u540D\u5B57\u5DF2\u968F\u5220\u9664\u4E22\u5931\uFF0C\u5386\u53F2\u7528\u91CF\u4FDD\u7559\uFF09
-${consumerGone.deletedIds.join("\u3001")}
+${Array.isArray(consumerGone.deletedIds) ? consumerGone.deletedIds.join("\u3001") : ""}
 ${current.label} ${current.format(consumerGone.value)}\uFF08${formatPercent(consumerGone.share, 1)}\uFF09
 ${formatNumber(consumerGone.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(consumerGone.tokens)} \xB7 ${formatCredit(consumerGone.credit)} \u79EF\u5206` + (consumerGone.failed > 0 ? ` \xB7 \u88AB\u62D2 ${formatNumber(consumerGone.failed)} \u6B21\uFF08\u591A\u4E3A\u96C6\u5408\u5916\u6A21\u578B 403\uFF09` : "") : "";
   return import_react4.default.createElement(
@@ -3210,7 +3360,7 @@ ${formatNumber(consumerGone.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(consumer
               className: "dshc-ust-rank-val",
               title: `${current.label} ${current.format(row.value)}\uFF08${formatPercent(row.share, 1)}\uFF09
 ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206 \xB7 \u6210\u529F\u7387 ${formatPercent(row.successRate, 1)}`
-            }, formatPercent(row.share, 0))
+            }, formatPercent(row.share, 1))
           )
         )
       )
@@ -3248,7 +3398,7 @@ ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7
               className: "dshc-ust-rank-val",
               title: `${current.label} ${current.format(row.value)}\uFF08${formatPercent(row.share, 1)}\uFF09
 ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206`
-            }, formatPercent(row.share, 0))
+            }, formatPercent(row.share, 1))
           )
         )
       )
@@ -3291,7 +3441,7 @@ ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7
               className: "dshc-ust-rank-val",
               title: `${current.label} ${current.format(row.value)}\uFF08${formatPercent(row.share, 1)}\uFF09
 ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7 ${formatCredit(row.credit)} \u79EF\u5206` + (row.failed > 0 ? ` \xB7 \u88AB\u62D2 ${formatNumber(row.failed)} \u6B21` : "")
-            }, formatPercent(row.share, 0))
+            }, formatPercent(row.share, 1))
           )
         ),
         // 末行：已删除的 key 汇总（占位序号列 + 灰条 + 弱化，一眼可辨「这不是一个消费者」）。
@@ -3328,7 +3478,7 @@ ${formatNumber(row.requests)} \u8BF7\u6C42 \xB7 ${formatTokens(row.tokens)} \xB7
           import_react4.default.createElement("span", {
             className: "dshc-ust-rank-val",
             title: goneTitle
-          }, formatPercent(consumerGone.share, 0))
+          }, formatPercent(consumerGone.share, 1))
         ) : null
       )
     ) : null
@@ -3850,6 +4000,7 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   const [heatMetric, setHeatMetric] = import_react5.default.useState("requests");
   const [barMetric, setBarMetric] = import_react5.default.useState("tokens");
   const [rankMetricValue, setRankMetricValue] = import_react5.default.useState(DEFAULT_RANK_METRIC);
+  const [keyScope, setKeyScope] = import_react5.default.useState(ALL_CONSUMERS);
   const [tip, setTip] = import_react5.default.useState(null);
   const [exportOpen, setExportOpen] = import_react5.default.useState(false);
   const hasPayloadRef = import_react5.default.useRef(false);
@@ -3885,8 +4036,18 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
   const available = payload?.available === true;
   const reason = payload?.reason ?? "";
   const stats = payload?.stats ?? null;
-  const total = usage?.total ?? {};
-  const buckets = Array.isArray(usage?.buckets) ? usage.buckets : [];
+  const keyOptions = import_react5.default.useMemo(
+    () => Array.isArray(usage?.by_key) ? consumerOptions(usage.by_key, DEFAULT_RANK_METRIC) : [],
+    [usage]
+  );
+  const activeKey = keyOptions.some((option) => option.id === keyScope) ? keyScope : ALL_CONSUMERS;
+  const keyScoped = activeKey !== ALL_CONSUMERS;
+  const activeOption = keyOptions.find((option) => option.id === activeKey) ?? null;
+  const activeKeyLabel = activeOption?.label ?? "";
+  const scopeTarget = keyScoped ? activeOption?.deletedIds ?? activeKey : ALL_CONSUMERS;
+  const scopedUsage = import_react5.default.useMemo(() => scopeUsage(usage, scopeTarget), [usage, scopeTarget]);
+  const total = scopedUsage?.total ?? {};
+  const buckets = Array.isArray(scopedUsage?.buckets) ? scopedUsage.buckets : [];
   const rows = import_react5.default.useMemo(() => usageBySlot(buckets), [buckets]);
   const days = import_react5.default.useMemo(() => usageByDay(rows), [rows]);
   const scoped = import_react5.default.useMemo(() => daySeries(days, range), [days, range]);
@@ -3899,25 +4060,26 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
     [accounts, channelOf]
   );
   const burn = import_react5.default.useMemo(
-    () => creditBurn(stock.usable, Number(total?.credit) || 0, "720h"),
-    [stock.usable, total?.credit]
+    () => keyScoped ? null : creditBurn(stock.usable, Number(total?.credit) || 0, "720h"),
+    [keyScoped, stock.usable, total?.credit]
   );
   const kpis = import_react5.default.useMemo(
     () => kpiCards({ total, stock, days: scoped, burn }),
     [total, stock, scoped, burn]
   );
   const accountRows = import_react5.default.useMemo(
-    () => accountShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
-    [usage, total, accounts, channelOf, rankMetricValue]
+    () => accountShares(scopedUsage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [scopedUsage, total, accounts, channelOf, rankMetricValue]
   );
   const channelRows = import_react5.default.useMemo(
-    () => channelShares(usage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
-    [usage, total, accounts, channelOf, rankMetricValue]
+    () => channelShares(scopedUsage?.by_uid ?? [], total, accounts ?? [], channelOf, rankMetricValue),
+    [scopedUsage, total, accounts, channelOf, rankMetricValue]
   );
   const consumersAvailable = Array.isArray(usage?.by_key);
+  const scopeIsSingleKey = keyScoped && typeof scopeTarget === "string";
   const consumerRows = import_react5.default.useMemo(
-    () => consumerShares(usage?.by_key ?? [], rankMetricValue),
-    [usage, rankMetricValue]
+    () => consumerShares(scopedUsage?.by_key ?? [], rankMetricValue, { foldDeleted: !scopeIsSingleKey }),
+    [scopedUsage, rankMetricValue, scopeIsSingleKey]
   );
   const subtitle = subtitleText({ freshness, error, lastOkAt });
   const uptime = processUptime(stats);
@@ -3942,10 +4104,12 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         import_react5.default.createElement(ExportMenu, {
           open: exportOpen,
           onToggle: () => setExportOpen((prev) => !prev),
-          payload: { usage, stats, at: lastOkAt },
+          // 导出与**所见一致**：收窄到某把 key 时导出的就是那把 key 的载荷
+          // （想要全量就切回「全部」），否则 JSON 与屏幕上其它卡片会对不上。
+          payload: { usage: scopedUsage, stats, at: lastOkAt, keyScope: activeKey },
           days: scoped,
           byModelDaily,
-          modelRows: usage?.by_model ?? [],
+          modelRows: scopedUsage?.by_model ?? [],
           accountRows
         }),
         import_react5.default.createElement(
@@ -3986,6 +4150,13 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         "\u26A0\uFE0F \u5206\u6876\u952E\u5DF2\u8D85\u51FA\u5BB9\u91CF\u4E0A\u9650\uFF0C\u7F51\u5173\u5DF2\u964D\u7EA7\u4E3A\u300C\u69FD \xD7 \u57DF \xD7 \u6D88\u8D39\u8005\u300D\u4E09\u7EF4 \u2014\u2014 \u6309\u8D26\u53F7 / \u6309\u6A21\u578B\u4E0D\u518D\u7EC6\u5206\uFF08**\u6D88\u8D39\u8005\u7EF4\u5EA6\u4FDD\u7559**\uFF1A\u591A key \u4E0B\u300C\u8C01\u5728\u7528\u300D\u6700\u4E0D\u53EF\u66FF\u4EE3\uFF09\u3002"
       )
     ) : null,
+    // ── 消费者作用域选择器：多 key 下「不要全混在一起」的唯一入口 ──
+    // 放在 KPI 之前：它决定的是**下面所有卡片**的口径，先说清楚再看数。
+    available && keyOptions.length > 0 ? import_react5.default.createElement(KeyScope, {
+      options: keyOptions,
+      value: activeKey,
+      onChange: setKeyScope
+    }) : null,
     // ── ① KPI 4 卡（窗口口径） ──
     available && rows.length > 0 ? import_react5.default.createElement(
       import_react5.default.Fragment,
@@ -3997,6 +4168,13 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
           "span",
           { className: "dshc-ust-scope" },
           import_react5.default.createElement("span", { className: "dshc-ust-scope-tag" }, "\u7A97\u53E3\u53E3\u5F84"),
+          // 收窄时把「只看谁」写进口径行：数字旁边必须能看见口径，
+          // 否则隔屏截图/导出之后没人知道这是单 key 的数。
+          keyScoped ? import_react5.default.createElement(
+            "span",
+            { className: "dshc-ust-scope-tag", "data-scope-key": activeKey },
+            `\u53EA\u770B ${activeKeyLabel}`
+          ) : null,
           import_react5.default.createElement(
             "span",
             { style: type.text.caption, title: WINDOW_TIP },
@@ -4031,7 +4209,7 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
         onMetricChange: setRankMetricValue
       }),
       // ── ⑦ 模型占比 ──
-      import_react5.default.createElement(ModelDonut, { rows: usage?.by_model ?? [], onTip: setTip })
+      import_react5.default.createElement(ModelDonut, { rows: scopedUsage?.by_model ?? [], onTip: setTip })
     ) : null,
     available && rows.length === 0 ? import_react5.default.createElement(
       "div",
@@ -4048,7 +4226,9 @@ function UsageTab({ rpcCall, accounts, channelOf, onRefreshAll }) {
       )
     ) : null,
     // ── 折叠区一：积分燃尽投影（窗口口径的外推） ──
-    available && rows.length > 0 ? import_react5.default.createElement(
+    // 收窄到某把 key 时**整块不渲染**：它外推的是池子寿命，而池子是共享的
+    // （理由见上方 burn 的注释）—— 宁可不给，也不给一个错的数字。
+    available && rows.length > 0 && !keyScoped ? import_react5.default.createElement(
       LazyFold,
       {
         id: "burn",

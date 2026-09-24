@@ -641,8 +641,21 @@ body[data-ds-dark-theme] .dshc-ust-heat-legend > i.h4 { background: #60a5fa; }
 .dshc-ust-rank-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dshc-ust-rank-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--dsw-alias-bg-layer-2,#f1f3f6); overflow: hidden; min-width: 28px; }
 .dshc-ust-rank-bar > i { display: block; height: 100%; border-radius: 2px; background: var(--dsw-alias-brand-primary,#4f6ef7); }
-.dshc-ust-rank-val { flex: none; width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+/* 占比一位小数（「100.0%」6 字符）→ 定宽 44px 会挤到换行/溢出，故放宽到 52px
+   并禁止换行：三张卡共用这一列，一起改才不会左右不齐。 */
+.dshc-ust-rank-val { flex: none; width: 52px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 @media (max-width: 560px) { .dshc-ust-rank-name { width: 84px; } }
+
+/* ── 消费者（API key）选择器：把整页收窄到一把 key ──
+   复用 .dshc-seg 的视觉（与窗口/维度切换同族），只加一层横向滚动：
+   key 数量不定，窄屏必须能滑，不能把页面撑宽。 */
+.dshc-ust-keyscope { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 10px; min-width: 0; }
+.dshc-ust-keyscope-label { flex: none; font-size: 12px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
+.dshc-ust-keyscope-seg { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+/* flex: none 是这条的关键：默认 flex-shrink:1 会让按钮被**压扁**（内容互相盖住），
+   而不是把容器撑出滚动条 —— 真机上 10 个按钮挤在 564px 里就是这个现象。 */
+.dshc-ust-keyscope-seg > button { flex: none; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.dshc-ust-keyscope-note { font-size: 12px; color: var(--dsw-alias-label-tertiary,#8b93a1); }
 
 /* ── ⑥ 模型占比环形图 + 列表 ── */
 .dshc-models { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }

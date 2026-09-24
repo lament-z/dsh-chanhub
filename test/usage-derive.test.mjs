@@ -10,10 +10,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  ALL_CONSUMERS,
   accountExpiry,
   channelPalette,
   accountShares,
   channelShares,
+  consumerOptions,
   consumerShares,
   creditBurn,
   creditStock,
@@ -31,6 +33,7 @@ import {
   modelShares,
   niceMax,
   quartileThresholds,
+  scopeUsage,
   slotKind,
   slotLabel,
   tokenStructure,
@@ -540,6 +543,7 @@ test('U28 consumerShares：已删除的 key 折成一行且末位，分母与总
 
   const gone = out[2];
   assert.equal(gone.deleted, true, '汇总行必须带 deleted 标记（卡片据此判身份）');
+  assert.equal(gone.deletedSummary, true, '汇总行必须与「单把已删除的 key」区分开（卡片只认这个标记）');
   assert.equal(gone.deletedCount, 3);
   assert.deepEqual(gone.deletedIds, ['k_gone1', 'k_gone2', 'k_gone3'], 'id 明细必须保留（tooltip 是唯一出口）');
   assert.equal(gone.name, '已删除的 3 个 key');
@@ -573,3 +577,111 @@ test('U28b consumerShares：无已删除 key 时不多出空行；未鉴权/主 
   assert.equal(consumerShares([], 'tokens').length, 0);
   assert.equal(consumerShares(undefined, 'tokens').length, 0, '旧网关无 by_key 时不得抛错');
 });
+
+// U29 —— 消费者作用域（「只看某一把 key」）。
+//
+// 为什么必须钉死：网关的 /v1/stats/buckets **没有**按 key 过滤的参数，收窄全靠
+// 客户端重算 total / by_uid / by_model / by_key。重算一旦与网关的
+// accumulate/finalizeGroup 有半点不一致，就会静默出现「KPI 是全量、模型占比是
+// 单 key」这类半新半旧 —— 不会报错，只会给出错的数。
+test('U29 scopeUsage：收窄后各维重算与网关同口径（加权均值 / 命中率分母 / 空键）', () => {
+  const usage = scopeFixture();
+  const before = JSON.stringify(usage);
+
+  const scoped = scopeUsage(usage, 'k_a');
+  assert.equal(scoped.buckets.length, 2, '只保留该 key 的分桶行');
+  assert.equal(scoped.total.requests, 10);
+  assert.equal(scoped.total.total_tokens, 130);
+  assert.ok(Math.abs(scoped.total.credit - 0.75) < 1e-9);
+  // 均值必须**按请求数加权**：(300×6 + 200×4) / 10 = 260，直接平均会得 250
+  assert.ok(Math.abs(scoped.total.avg_latency_ms - 260) < 1e-9, '加权均值口径');
+  // 命中率分母 = 命中 + 未命中（**写入不进分母**）：20 / (20 + 20) = 0.5
+  assert.ok(Math.abs(scoped.total.cache_hit_rate - 0.5) < 1e-9, '写入不得进命中率分母');
+
+  assert.deepEqual(scoped.by_uid.map((r) => r.key), ['u1', 'u2'], '按账号维度同步收窄');
+  assert.deepEqual(scoped.by_model.map((r) => r.key), ['m1', 'm2'], '按模型维度同步收窄');
+  assert.deepEqual(scoped.by_realm.map((r) => r.key).sort(), ['cn', 'global']);
+  assert.equal(scoped.by_key.length, 1);
+  assert.equal(scoped.by_key[0].label, 'A', 'label 必须沿用网关读取时 join 的结果，客户端不重算');
+
+  // 「未鉴权」（空 key）是真实分组：可选、可看，且**只进 total**（与网关一致）
+  const unauth = scopeUsage(usage, '');
+  assert.equal(unauth.total.requests, 3);
+  assert.equal(unauth.by_uid.length, 0, '空 uid 不进按账号维度（网关 accumulate 跳过空键）');
+  assert.equal(unauth.by_model.length, 0);
+
+  // 不收窄 / 幂等 / 不存在的 key
+  assert.equal(scopeUsage(usage, ALL_CONSUMERS), usage, '「全部」必须原样返回同一引用（零开销）');
+  assert.deepEqual(scopeUsage(scoped, 'k_a').total, scoped.total, '重复收窄同一把 key 必须幂等');
+  const missing = scopeUsage(usage, 'k_nope');
+  assert.equal(missing.buckets.length, 0);
+  assert.equal(missing.total.requests, 0, '不存在的 key 要给全 0 total，不能是 undefined');
+  assert.equal(missing.by_uid.length, 0);
+
+  assert.equal(JSON.stringify(usage), before, 'scopeUsage 不得改动入参');
+});
+
+test('U29b consumerOptions：在用的逐把列出，已删除的折成一项（选择器不铺开废弃 key）', () => {
+  const options = consumerOptions(scopeFixture().by_key);
+  assert.deepEqual(options.map((o) => o.label), ['主 key', 'A', '（未鉴权）'], '没有已删除的 key 时不多一项');
+  assert.ok(options.every((o) => o.deleted === false));
+
+  const withGone = consumerOptions([
+    { key: 'master', label: '主 key', requests: 5, total_tokens: 50 },
+    { key: 'k_gone1', label: '', requests: 2, failed: 2, total_tokens: 0 },
+    { key: 'k_gone2', label: '', requests: 3, failed: 1, total_tokens: 30 },
+  ]);
+  assert.deepEqual(withGone.map((o) => o.label), ['主 key', '已删除的 2 个 key'], '废弃 key 必须折成一项');
+  const group = withGone[1];
+  assert.equal(group.deleted, true);
+  assert.deepEqual([...group.deletedIds].sort(), ['k_gone1', 'k_gone2'], '组内 id 必须保留（收窄时按这组过滤）');
+  assert.equal(group.requests, 5);
+  assert.equal(group.tokens, 30);
+  assert.ok(Math.abs(group.failRate - 3 / 5) < 1e-9, '组内被拒率按请求数加权');
+
+  // 折叠开关只影响汇总，不影响「指定某把 key 时要看得见它」
+  const noFold = consumerShares([{ key: 'k_gone', label: '', requests: 1, total_tokens: 1 }], 'tokens', { foldDeleted: false });
+  assert.equal(noFold.length, 1);
+  assert.equal(noFold[0].deleted, true, '不折叠 ≠ 抹掉「已删除」这个事实');
+  assert.equal(noFold[0].name, 'k_gone（已删除）');
+  // 单把已删除的 key **不是**汇总行：它没有 deletedIds。卡片若按 deleted 判汇总行
+  // 就会读到 undefined.join() 并整块白屏（真机踩过），故这里把两者的区别钉死。
+  assert.equal(noFold[0].deletedSummary, undefined, '单把 key 不得带汇总标记');
+  assert.equal(noFold[0].deletedIds, undefined);
+  assert.equal(noFold.some((row) => row.deletedSummary), false, '不折叠时不得出现任何汇总行');
+});
+
+test('U29c scopeUsage 收窄到一组 key（「已删除的 N 个 key」那一项）', () => {
+  const usage = scopeFixture();
+  const scoped = scopeUsage(usage, ['k_a', 'k_nope']);
+  assert.equal(scoped.buckets.length, 2, '只保留组内存在的 key');
+  assert.equal(scoped.total.requests, 10);
+  assert.equal(scoped.by_key.length, 1, '组内只有一把有数据');
+  assert.equal(scoped.by_key[0].key, 'k_a');
+  // 一组 key 也走同一条重算路径 —— 不会因为「组」就漏掉某个维度
+  assert.deepEqual(scoped.by_uid.map((r) => r.key), ['u1', 'u2']);
+});
+
+/** 消费者作用域用例的分桶 fixture（2 把真实 key + 1 组未鉴权历史桶）。 */
+function scopeFixture() {
+  return {
+    window: '720h',
+    degraded: false,
+    buckets: [
+      { slot: 'h:2026-09-24T10', realm: 'cn', uid: 'u1', model: 'm1', key: 'master', requests: 10, failed: 1, success: 9, prompt_tokens: 100, completion_tokens: 50, total_tokens: 150, cache_hit_tokens: 10, cache_miss_tokens: 40, cache_write_tokens: 5, credit: 1, avg_latency_ms: 100 },
+      { slot: 'h:2026-09-24T10', realm: 'cn', uid: 'u2', model: 'm2', key: 'k_a', requests: 4, failed: 0, success: 4, prompt_tokens: 40, completion_tokens: 10, total_tokens: 50, cache_hit_tokens: 0, cache_miss_tokens: 0, cache_write_tokens: 0, credit: 0.5, avg_latency_ms: 200 },
+      { slot: 'h:2026-09-24T11', realm: 'global', uid: 'u1', model: 'm1', key: 'k_a', requests: 6, failed: 2, success: 4, prompt_tokens: 60, completion_tokens: 20, total_tokens: 80, cache_hit_tokens: 20, cache_miss_tokens: 20, cache_write_tokens: 0, credit: 0.25, avg_latency_ms: 300 },
+      { slot: 'h:2026-09-24T11', realm: 'cn', uid: '', model: '', key: '', requests: 3, failed: 0, success: 3, total_tokens: 9, credit: 0.1 },
+    ],
+    by_uid: [],
+    by_realm: [],
+    by_model: [],
+    by_key: [
+      { key: 'master', label: '主 key', requests: 10, failed: 1, total_tokens: 150, credit: 1 },
+      { key: 'k_a', label: 'A', requests: 10, failed: 2, total_tokens: 130, credit: 0.75 },
+      { key: '', label: '', requests: 3, failed: 0, total_tokens: 9, credit: 0.1 },
+    ],
+    total: { key: 'total', requests: 23, failed: 3, total_tokens: 289, credit: 1.85 },
+  };
+}
+

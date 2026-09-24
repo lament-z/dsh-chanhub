@@ -1658,6 +1658,172 @@ test('渲染用量：已删除的 key 折成一行（不占排行、不挤真实
   }
 });
 
+test('渲染用量：消费者选择器 —— 选一把 key 后全页收窄，不留半新半旧', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    const value = (await base(endpoint, payload)).value;
+    if (endpoint !== 'getUsage') return { ok: true, value };
+    const usage = value.usage;
+    // 给每个分桶打上消费者：uid-1 → 主 key，uid-2/3 → workbuddyswitch。
+    // 分桶自带 key 是客户端收窄的前提（网关 /v1/stats/buckets 没有 key 过滤参数）。
+    const buckets = usage.buckets.map((b) => ({ ...b, key: b.uid === 'uid-1' ? 'master' : 'k_live' }));
+    return {
+      ok: true,
+      value: {
+        ...value,
+        usage: {
+          ...usage,
+          buckets,
+          by_key: [
+            // 与分桶逐行一致：master 12 行 ×150、k_live 24 行 ×150
+            { key: 'master', label: '主 key', requests: 42, failed: 0, total_tokens: 1800, credit: 3, avg_latency_ms: 300 },
+            { key: 'k_live', label: 'workbuddyswitch', requests: 84, failed: 9, total_tokens: 3600, credit: 6, avg_latency_ms: 300 },
+            { key: 'k_gone', label: '', requests: 2, failed: 2, total_tokens: 0, credit: 0, avg_latency_ms: 0 },
+          ],
+        },
+      },
+    };
+  };
+  const { cleanup, document } = await mount(rpc, { reducedMotion: true });
+  const click = (node) => React.act(async () => {
+    node.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+  });
+  try {
+    const app = await openUsage(document);
+    const bar = app.querySelector('[data-keyscope="bar"]');
+    assert.ok(bar, '网关给了 by_key 就必须渲染消费者选择器');
+    const labels = [...bar.querySelectorAll('button')].map((b) => b.textContent);
+    // 在用的逐把列出；已删除的折成一项（否则 7 把废弃 key 会把选择器挤爆 ——
+    // 与卡片同一个道理，选择器里也不能铺开）
+    assert.deepEqual(labels, ['全部', 'workbuddyswitch', '主 key', '已删除的 1 个 key'], '选择器条目');
+    assert.equal(bar.querySelector('button.on').textContent, '全部', '默认必须是「全部」');
+    assert.equal(app.querySelector('[data-scope-key]'), null, '未收窄时不得出现口径标记');
+
+    const kpi = (key) => app.querySelector(`[data-kpi="${key}"]`).textContent;
+    assert.match(kpi('requests'), /126/, '默认是全量 126');
+    const accAll = app.querySelector('[data-card="accounts"]').querySelectorAll('.dshc-ust-rank-row').length;
+
+    await click([...bar.querySelectorAll('button')].find((b) => b.textContent === 'workbuddyswitch'));
+
+    assert.match(app.querySelector('[data-scope-key]').textContent, /只看 workbuddyswitch/, '口径行必须写明只看谁');
+    assert.match(kpi('requests'), /84/, 'KPI 必须跟着收窄（84 = 该 key 的请求数）');
+    assert.match(kpi('tokens'), /3\.6K/, 'Tokens KPI 同步收窄（3.6K = 该 key 的 24 行 × 150）');
+    // 账号维度同步收窄：uid-1（甲）归主 key，不该再出现
+    const accCard = app.querySelector('[data-card="accounts"]');
+    assert.ok(!accCard.textContent.includes('甲'), '收窄后不得再出现别把 key 用到的账号');
+    assert.ok(accCard.querySelectorAll('.dshc-ust-rank-row').length < accAll, '账号卡行数应减少');
+
+    // 消费者卡：只剩这一把，且**不折叠**（用户点名要看它）
+    const consCard = app.querySelector('[data-card="consumers"]');
+    const rows = [...consCard.querySelectorAll('.dshc-ust-rank-row')];
+    assert.equal(rows.length, 1, '收窄后消费者卡只剩一行');
+    assert.match(rows[0].textContent, /workbuddyswitch/);
+    assert.match(rows[0].textContent, /100\.0%/, '占比必须一位小数');
+    assert.equal(consCard.querySelector('[data-row="deleted-consumers"]'), null, '指定某把 key 时不得折叠');
+
+    // 燃尽外推是**池口径**：收窄后整块不渲染（用单 key 的消耗率外推池子寿命是错的）
+    assert.equal(app.querySelector('details[data-fold="burn"]'), null, '收窄后不得给池口径的燃尽外推');
+
+    await click([...bar.querySelectorAll('button')].find((b) => b.textContent === '全部'));
+    assert.match(kpi('requests'), /126/, '切回全部必须恢复全量');
+    assert.ok(app.querySelector('details[data-fold="burn"]'), '切回全部后燃尽卡恢复');
+    assert.equal(app.querySelector('[data-scope-key]'), null);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：收窄到「已删除的 N 个 key」这一组不得崩（单把 key ≠ 汇总行）', { skip }, async () => {
+  // 真机回归：按 `deleted` 判汇总行时，点到一把已删除的 key 会去读
+  // deletedIds.join()（该行没有这个字段）→ TypeError → 整个设置区白屏。
+  const base = fakeRpc(realStatusFixture());
+  const rpc = async (endpoint, payload) => {
+    const value = (await base(endpoint, payload)).value;
+    if (endpoint !== 'getUsage') return { ok: true, value };
+    const usage = value.usage;
+    return {
+      ok: true,
+      value: {
+        ...value,
+        usage: {
+          ...usage,
+          buckets: usage.buckets.map((b) => ({ ...b, key: b.uid === 'uid-1' ? 'master' : 'k_gone' })),
+          by_key: [
+            { key: 'master', label: '主 key', requests: 42, failed: 0, total_tokens: 1800, credit: 3, avg_latency_ms: 300 },
+            { key: 'k_gone', label: '', requests: 84, failed: 9, total_tokens: 3600, credit: 6, avg_latency_ms: 300 },
+          ],
+        },
+      },
+    };
+  };
+  const { cleanup, document } = await mount(rpc, { reducedMotion: true });
+  try {
+    const app = await openUsage(document);
+    const bar = app.querySelector('[data-keyscope="bar"]');
+    await React.act(async () => {
+      [...bar.querySelectorAll('button')]
+        .find((b) => b.textContent === '已删除的 1 个 key')
+        .dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    });
+
+    assert.ok(app.querySelector('.dshc-ust-root'), '面板不得整块崩掉');
+    assert.ok(app.querySelectorAll('.dshc-ust-kpi').length > 0, '收窄后 KPI 仍应渲染');
+    assert.match(app.querySelector('[data-scope-key]').textContent, /只看 已删除的 1 个 key/);
+    // 整页只含这一组：KPI 与全量不同，且消费者卡仍折成**一行汇总**（组 ≠ 单把 key）
+    assert.match(app.querySelector('[data-kpi="requests"]').textContent, /84/);
+    const consCard = app.querySelector('[data-card="consumers"]');
+    assert.equal(consCard.querySelectorAll('.dshc-ust-rank-row').length, 1);
+    assert.ok(consCard.querySelector('[data-row="deleted-consumers"]'), '一组 key 仍应折成汇总行');
+    assert.match(consCard.textContent, /已删除的 1 个 key/);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('渲染用量：选中项消失时自动回落到「全部」，不留在空作用域', { skip }, async () => {
+  const base = fakeRpc(realStatusFixture());
+  let keys = [
+    { key: 'master', label: '主 key', requests: 42, failed: 0, total_tokens: 6300, credit: 3, avg_latency_ms: 300 },
+    { key: 'k_live', label: 'workbuddyswitch', requests: 84, failed: 9, total_tokens: 12600, credit: 6, avg_latency_ms: 300 },
+  ];
+  const rpc = async (endpoint, payload) => {
+    const value = (await base(endpoint, payload)).value;
+    if (endpoint !== 'getUsage') return { ok: true, value };
+    const usage = value.usage;
+    return {
+      ok: true,
+      value: {
+        ...value,
+        usage: {
+          ...usage,
+          buckets: usage.buckets.map((b) => ({ ...b, key: b.uid === 'uid-1' ? 'master' : 'k_live' })),
+          by_key: keys,
+        },
+      },
+    };
+  };
+  const { cleanup, document } = await mount(rpc, { reducedMotion: true });
+  const click = (node) => React.act(async () => {
+    node.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+  });
+  try {
+    const app = await openUsage(document);
+    const bar = () => app.querySelector('[data-keyscope="bar"]');
+    await click([...bar().querySelectorAll('button')].find((b) => b.textContent === 'workbuddyswitch'));
+    assert.match(app.querySelector('[data-kpi="requests"]').textContent, /84/);
+
+    // 数据刷新后这把 key 在窗口内没有任何记录了 → 必须回落到「全部」，
+    // 而不是留在一个空作用域上显示「该窗口内没有请求记录」（那像数据坏了）。
+    keys = [{ key: 'master', label: '主 key', requests: 42, failed: 0, total_tokens: 6300, credit: 3, avg_latency_ms: 300 }];
+    await click(app.querySelector('.dshc-ust-refresh'));
+    assert.equal(app.querySelector('[data-scope-key]'), null, '选中项消失后不得继续显示「只看 …」');
+    assert.equal(bar().querySelector('button.on').textContent, '全部', '必须回落到「全部」');
+    assert.match(app.querySelector('[data-kpi="requests"]').textContent, /126/, '回落显示全量');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('渲染接入方：列出 key、区分全量/空集、绝不出现明文', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {

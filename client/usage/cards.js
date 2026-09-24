@@ -13,6 +13,7 @@ import React from 'react';
 import { SEG_COLORS, s, tone, type } from '../theme.js';
 import { CardHead, ChannelChip, ChannelDot, Tag, useCountUp } from '../ui.js';
 import {
+  ALL_CONSUMERS,
   CHANNEL_LABEL,
   channelColor,
   channelPalette,
@@ -497,6 +498,52 @@ export function mergeTail(series) {
 /* ──────────────────── ④ 账号排行 / ⑤ 渠道用量（两列） ──────────────────── */
 
 /**
+ * 消费者（API key）选择器：把整个用量页收窄到一把 key。
+ *
+ * 为什么需要它：多消费者上线后，KPI / 热力图 / 每日柱 / 模型占比 / 账号归因
+ * 都是**所有 key 混在一起**的 —— 「某台下游今天用了多少、都打了哪些模型」
+ * 这个问题在面板上无解。选择器把同一份窗口分桶按 key 收窄（见 `scopeUsage`），
+ * 全部卡片跟着走，不新增请求、也不新增口径。
+ *
+ * 「全部」用哨兵 `ALL_CONSUMERS` 而不是空串：空串是「未鉴权」这一真实分组
+ * （多 key 上线之前的历史桶），必须能单独选出来看。
+ *
+ * @param props - `{options, value, onChange}`：`options` 是 `consumerOptions()` 的输出。
+ * @returns React 元素；没有可选 key 时返回 null（旧网关没有 by_key 维度）。
+ */
+export function KeyScope({ options, value, onChange }) {
+  const list = Array.isArray(options) ? options : [];
+  if (list.length === 0) return null;
+  const items = [{ id: ALL_CONSUMERS, label: '全部', deleted: false, requests: 0, tokens: 0 }, ...list];
+  return React.createElement('div', { className: 'dshc-ust-keyscope', 'data-keyscope': 'bar' },
+    React.createElement('span', { className: 'dshc-ust-keyscope-label' }, '消费者'),
+    React.createElement('div', { className: 'dshc-seg dshc-ust-keyscope-seg' },
+      ...items.map((item) =>
+        React.createElement('button', {
+          key: item.id,
+          type: 'button',
+          'data-key-scope': item.id,
+          className: value === item.id ? 'on' : '',
+          title: item.id === ALL_CONSUMERS
+            ? '不按 key 收窄：所有消费者混在一起（默认）'
+            : `${item.label}\n${formatNumber(item.requests)} 请求 · ${formatTokens(item.tokens)} Tokens`
+              + (item.deleted
+                ? (Array.isArray(item.deletedIds)
+                  ? '\n这些 key 已从 key 表删除，只剩历史用量'
+                  : '\n该 key 已从 key 表删除，只剩历史用量')
+                : ''),
+          onClick: () => onChange?.(item.id),
+        }, item.label),
+      ),
+    ),
+    value !== ALL_CONSUMERS
+      ? React.createElement('span', { className: 'dshc-ust-keyscope-note' },
+          '以下卡片只看所选消费者（可用积分 / 燃尽是池口径，不随 key 变）')
+      : null,
+  );
+}
+
+/**
  * 账号用量排行 + 渠道用量 + 消费者用量（三列并排）。
  *
  * 并排的理由：这三条是同一批请求的正交切法，读者常要对照看 ——
@@ -515,6 +562,10 @@ export function mergeTail(series) {
  * 维度切换（默认 Tokens = 按用量）：请求数多不等于用得多 —— 一次长上下文
  * 请求顶几百次短请求。三个维度取的是同一份数据的字段，不是跨口径。
  *
+ * 占比保留**一位小数**：主 key 常占 99%+，0 位小数会把「真在用的 key」和
+ * 「0.1% 的残留」显示成同一个「0%」—— 那张卡就白看了（tooltip 里一直是
+ * 一位小数，两者对齐）。
+ *
  * @param props - `{accounts, channels, consumers, consumersAvailable, metric, onMetricChange}`。
  * @returns React 元素。
  */
@@ -530,16 +581,20 @@ export function RankCards({
   const options = RANK_METRICS.map((item) => [item.id, item.label]);
   const extra = `按${current.label}`;
 
-  // 已删除的 key 在 derive 层已折成**一行**（`deleted: true`，见 consumerShares）。
+  // 已删除的 key 在 derive 层已折成**一行**（`deletedSummary: true`，见 consumerShares）。
   // 它**不进排行**：不是一个可比较的消费者，而是「认不出名字的历史」。
   // 故它不占 8 行预算、不占序号，固定渲染在末位 —— 否则 7 把废弃 key 会把
   // 真实消费者的位置挤光（这正是本次改动的起因：实测 8 行里 6 行是废弃 key）。
-  const consumerRanked = consumers.filter((row) => !row.deleted);
-  const consumerGone = consumers.find((row) => row.deleted) ?? null;
+  //
+  // 判据是 `deletedSummary` 而**不是** `deleted`：收窄到某一把已删除的 key 时，
+  // 那一行也带 `deleted`，但它是一把**具体**的 key（没有 deletedIds）——
+  // 曾经按 `deleted` 判，读到 undefined.join() 直接白屏。
+  const consumerRanked = consumers.filter((row) => !row.deletedSummary);
+  const consumerGone = consumers.find((row) => row.deletedSummary) ?? null;
   // 汇总行的 tooltip 是**唯一的** id 出口（行内放不下 7 个 14 字符的 id）。
   const goneTitle = consumerGone
     ? `已删除的 ${consumerGone.deletedCount} 个 key（名字已随删除丢失，历史用量保留）\n`
-      + `${consumerGone.deletedIds.join('、')}\n`
+      + `${Array.isArray(consumerGone.deletedIds) ? consumerGone.deletedIds.join('、') : ''}\n`
       + `${current.label} ${current.format(consumerGone.value)}（${formatPercent(consumerGone.share, 1)}）\n`
       + `${formatNumber(consumerGone.requests)} 请求 · ${formatTokens(consumerGone.tokens)}`
       + ` · ${formatCredit(consumerGone.credit)} 积分`
@@ -587,7 +642,7 @@ export function RankCards({
                   className: 'dshc-ust-rank-val',
                   title: `${current.label} ${current.format(row.value)}（${formatPercent(row.share, 1)}）\n`
                     + `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分 · 成功率 ${formatPercent(row.successRate, 1)}`,
-                }, formatPercent(row.share, 0)),
+                }, formatPercent(row.share, 1)),
               ),
             ),
           ),
@@ -617,7 +672,7 @@ export function RankCards({
                   className: 'dshc-ust-rank-val',
                   title: `${current.label} ${current.format(row.value)}（${formatPercent(row.share, 1)}）\n`
                     + `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分`,
-                }, formatPercent(row.share, 0)),
+                }, formatPercent(row.share, 1)),
               ),
             ),
           ),
@@ -657,7 +712,7 @@ export function RankCards({
                       title: `${current.label} ${current.format(row.value)}（${formatPercent(row.share, 1)}）\n`
                         + `${formatNumber(row.requests)} 请求 · ${formatTokens(row.tokens)} · ${formatCredit(row.credit)} 积分`
                         + (row.failed > 0 ? ` · 被拒 ${formatNumber(row.failed)} 次` : ''),
-                    }, formatPercent(row.share, 0)),
+                    }, formatPercent(row.share, 1)),
                   ),
                 ),
                 // 末行：已删除的 key 汇总（占位序号列 + 灰条 + 弱化，一眼可辨「这不是一个消费者」）。
@@ -689,7 +744,7 @@ export function RankCards({
                       React.createElement('span', {
                         className: 'dshc-ust-rank-val',
                         title: goneTitle,
-                      }, formatPercent(consumerGone.share, 0)),
+                      }, formatPercent(consumerGone.share, 1)),
                     )
                   : null,
               ),
