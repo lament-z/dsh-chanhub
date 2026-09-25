@@ -7534,7 +7534,7 @@ function createSidebarPrefs(settingsScope, options = {}) {
 // client/index.js
 var name = "dsh-chanhub";
 var SETTINGS_NAMESPACE = "dsh-chanhub";
-var inject = ["slots", "connection", "settingsScope"];
+var inject = ["slots", "connection"];
 var TASK_DEFS = [
   { name: "checkin", label: "\u7B7E\u5230", icon: "\u{1F4C5}", key: "checkin" },
   // balance 第七类任务（网关 balance.go）：逐号查余额不签到，签到后余额才解冻的
@@ -10488,7 +10488,8 @@ function apply(ctx) {
     if (typeof ctx.effect === "function") return ctx.effect(factory, label);
     return void 0;
   };
-  const prefs = createSidebarPrefs(ctx.settingsScope, { namespace: SETTINGS_NAMESPACE, key: "sidebarEntry" });
+  const settingsScope = typeof ctx.get === "function" ? ctx.get("settingsScope") : ctx.settingsScope;
+  const prefs = createSidebarPrefs(settingsScope, { namespace: SETTINGS_NAMESPACE, key: "sidebarEntry" });
   const store = createQuickStore(rpcCall);
   effect(() => () => store.dispose(), "dsh-chanhub: sidebar quick store");
   effect(() => () => prefs.dispose?.(), "dsh-chanhub: sidebar entry prefs");

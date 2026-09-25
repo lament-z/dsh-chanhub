@@ -90,9 +90,14 @@ const SETTINGS_NAMESPACE = 'dsh-chanhub';
 // inject 只放**必需**服务：客户端运行时会把缺依赖的插件 park 在 waitingFor
 // （`Object.keys(fiber.inject).filter(name => ctx.get(name) === undefined)`）。
 // 「渠道中心」弹窗是本插件自渲染的（portal 到 body），不需要宿主的 layout / remote.settings，
-// 所以这里只依赖 slots / connection / settingsScope。
-// settingsScope 有第三方插件先例（dsh-context / dsh-restart / dsh-univer-office）。
-const inject = ['slots', 'connection', 'settingsScope'];
+// 所以这里只依赖 slots / connection。
+//
+// ⚠️ settingsScope 不能放这里：dsh 0.1.7 起宿主（dsh-client-ui-settings）不再提供
+// `ctx.settingsScope`（改为 config-form 体系），声明在 inject 里会让整个插件被 park 在
+// waitingFor —— 面板与侧边栏入口一起消失。它是**可选**服务，改为惰性读取
+// （见 apply() 里的 `ctx.get('settingsScope')`），取不到就退回本浏览器存储。
+// 同款处理见 dsh-context：`ctx.inject(['settingsScope'], …)` + `binder === undefined` 早退。
+const inject = ['slots', 'connection'];
 
 /** RPC 端点（与宿主 lib/index.js 的 ENDPOINTS 保持一致）。 */
 
@@ -3424,8 +3429,10 @@ function apply(ctx) {
   };
 
   // 侧边栏入口偏好：宿主 settings 命名空间 `dsh-chanhub.sidebarEntry`（跨浏览器一致），
-  // 客户端用 settingsScope 读写；旧宿主没有该服务时降级为「默认开启、不可改」。
-  const prefs = createSidebarPrefs(ctx.settingsScope, { namespace: SETTINGS_NAMESPACE, key: 'sidebarEntry' });
+  // 客户端用 settingsScope 读写；宿主没有该服务时降级为「本浏览器存储 + 默认开启」。
+  // 惰性读取（不走模块级 inject）：0.1.7 起宿主不再提供 settingsScope，取不到不能炸。
+  const settingsScope = typeof ctx.get === 'function' ? ctx.get('settingsScope') : ctx.settingsScope;
+  const prefs = createSidebarPrefs(settingsScope, { namespace: SETTINGS_NAMESPACE, key: 'sidebarEntry' });
   // 侧边栏数据源：footer 按钮角标与 popover 读同一份快照（口径统一由 derive.js 保证）。
   const store = createQuickStore(rpcCall);
   effect(() => () => store.dispose(), 'dsh-chanhub: sidebar quick store');
