@@ -33,3 +33,6 @@ Thumbs.db
 
 # Credentials (never commit)
 .credentials
+
+# 本地草稿/设计笔记（不入库：含真机截图与个人路径）
+.scratch/

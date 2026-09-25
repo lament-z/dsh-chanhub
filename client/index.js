@@ -2460,7 +2460,7 @@ function KeepAwakeChip({ rpcCall, showToast }) {
     if (!wantOn && typeof window !== 'undefined') {
       const okGo = window.confirm(
         '关闭「保持唤醒」后，本机空闲约 9 分钟会进入休眠，\n' +
-          '网关地址 将不可达（官方客户端会连不上）。\n\n确认关闭？',
+          '你的网关地址将不可达（官方客户端会连不上）。\n\n确认关闭？',
       );
       if (!okGo) return;
     }
