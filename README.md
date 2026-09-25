@@ -1,198 +1,152 @@
 # dsh-chanhub
 
-A DeepSeek Harness client plugin that adds a **chanhub** panel to the Settings sidebar for observing and configuring the [lament-z/chanhub](https://github.com/lament-z/chanhub) (WorkBuddy2API) upstream gateway.
+English | [简体中文](./README.zh.md)
 
-The visual design mirrors [dsh-bridge-gateway](https://github.com/lament-z/dsh-bridge-gateway): it reuses the same design tokens and card structure, and registers its Settings entry via the same `ctx.slots.inject('settings.section', …)` mechanism, so the page looks consistent.
+Brings [chanhub](https://github.com/lament-z/chanhub) (the WorkBuddy2API upstream gateway) into the **DeepSeek Harness (DSH)** web UI: a sidebar quick entry for the account pool and usage, and a **Settings → Channel Center** panel for observing and configuring the gateway. The plugin is *not* the gateway — it reads the gateway's real endpoints over host RPC and maps the gateway `config.json` surface into a form.
+
+> **Division of labour**: the gateway (Go, default `:7866`) owns the account pool, channel logins, scheduled tasks, the model catalog and the OpenAI-compatible `/v1/*` surface; this plugin is its DSH client. The panel renders whatever the gateway **actually provides** — it probes the gateway's version/capabilities once at startup and honestly hides (with an explanation) anything the gateway does not serve.
 
 ## Features
 
-Six tabs, driven by real gateway endpoints (`GET /status`, `GET /v1/models`, `GET /v1/stats/buckets`, `GET /admin/tasks/status`, … — see the table below) plus the gateway `config.json`:
+Seven tabs (`client/index.js:122`), all driven by real gateway endpoints:
 
-| Tab | Content |
-|---|---|
-| Accounts | Overview counters, per-realm availability, **lifetime credits earned** (with coverage stated), current usable credits per channel, channel filter, **batch task triggers** (real gateway endpoints), account cards with expiry, per-account fold panels (health / quality / credits / schedule blocks) |
-| Tasks | Task trigger + run status (per-account check-in results), growth-task progress, school-season subtask status |
-| Usage | Single-page card flow: 6 KPIs (tokens / credit burn / usable credits · requests / cache hit / avg latency), activity heatmap, daily stacked bars, account & channel rankings (**switchable metric, defaults to tokens by usage**), model donut; one 720h fetch sliced client-side, `/v1/stats` limitation stated |
-| Models | DSH model config + multimodal capability governance: pull the gateway catalog / overwrite / roll back a backup, **three-way capability comparison** (vendor > cloud host > reseller; borrowed verdicts are never written), **fill missing fields** (`contextWindow` / `maxTokens` / reasoning efforts / vision `input`; missing-only, preview then confirm), the **behavioural vision probe** (send a real image with a colour + digit — it only counts as "sees images" if the model answers correctly), and **capability baseline settlement** (L0 measurement outranks catalog annotations) |
-| Logs | Live log ring buffer with channel chips (chat / task / sys) |
-| Config | All 53 gateway config fields, grouped and validated, plus service control |
-
-The API key never reaches the browser: every gateway call is made host-side and proxied over the `/dsh-chanhub` RPC channel.
-
-### Gateway endpoints this panel consumes
-
-All new endpoints live in `plugins/chanhub` (`internal/server/{tasks,credits,usage,logring}.go`)
-and are purely additive — `/v1/stats` responds with exactly its previous fields.
-
-| Endpoint | Powers | Gate |
+| Tab | Data source | What you can do |
 |---|---|---|
-| `GET /status` | Account pool, counters, per-realm availability | `withAuth` |
-| `GET /v1/models` | Model list | `withAuth` |
-| `GET /v1/stats` | Per-model statistics | `withAuth` |
-| `GET /v1/accounts/{uid}/credits` | Per-package credit breakdown | `withAuth` |
-| `GET /v1/accounts/{uid}/growth-tasks` | Per-code growth-task progress (incl. miniprogram context) | `withAuth` |
-| `GET /v1/accounts/{uid}/school-tasks` | School-season subtask status (with activity-period flag) | `withAuth` |
-| `GET /v1/stats/buckets` | Usage buckets (slot × realm × uid × model) | `withAuth` |
-| `GET /v1/logs` | Runtime log ring buffer | `logs.enabled=true` |
-| `GET /v1/models/probes` | Model measured output limits (manual probe results) | `withAuth` |
-| `GET /admin/tasks/status` | Task status + per-account check-in and balance results | `admin.enabled=true` |
-| `POST /admin/tasks/{name}` | Trigger one task (7 kinds incl. `balance`) | `admin.enabled=true` |
-| `GET /admin/tasks/scan` | Scan all accounts for pending automatable tasks | `admin.enabled=true` |
-| `POST /admin/tasks/queue/start` | Start the task queue (per-account serial, cross-account parallel) | `admin.enabled=true` |
-| `GET /admin/tasks/queue` | Queue progress | `admin.enabled=true` |
-| `GET /admin/school/status` | School-season status + lottery chances per account | `admin.enabled=true` |
-| `GET /admin/school/vouchers` | Voucher codes per account (read-only) | `admin.enabled=true` |
-| `POST /admin/growth-tasks/{uid}/accept` | Accept growth-task codes | `admin.enabled=true` |
-| `POST /admin/growth-tasks/{uid}/claim` | Claim growth-task rewards | `admin.enabled=true` |
-| `POST /admin/growth-tasks/{uid}/claim-claimable` | Claim all completed (unclaimed) rewards | `admin.enabled=true` |
-| `POST /admin/config` | Validate + atomically write config; hot-applies eligible fields | `admin.enabled=true` |
-| `POST /admin/accounts/{uid}/{disable,enable,revive}` | Account actions | `admin.enabled=true` |
-| `POST /admin/accounts/{uid}/{checkin,balance,remove}` | Per-account check-in / balance / removal | `admin.enabled=true` |
+| **Accounts** | `/status`, `/panel/api/*`, per-account credits endpoints | Five counters + per-realm availability bar + total credits + per-channel breakdown + lifetime credits earned (with coverage stated); channel filter, card/list views; per-account drawer (health / quality / credits / schedule blocks, per-package credits, token usage, model costs, soft-rate notice); disable (with reason) / enable / revive / remove, each behind a confirmation |
+| **Tasks** | `/admin/tasks/*` | Trigger any of 7 task kinds (check-in / balance / activity / cat travel / token keepalive / school season / night owl); structured per-account check-in results; growth-task per-code progress with accept / claim; school-season subtasks and vouchers; **Task Center**: scan all accounts → run the queue (serial per account, 2 in parallel) → poll progress every 5s |
+| **Usage** | `/v1/stats/buckets` (window buckets) | Four KPI cards, activity heatmap, daily stacked-by-model chart, account ranking, channel usage, consumer usage; **narrow by consumer key**; burn-down and process-scope fold-outs; CSV / JSON export; localStorage SWR cache with four states (loading / fresh / stale / fallback / error) |
+| **Models** | `/admin/models` (falls back to `/v1/models`) | Capability catalog with three-way verdicts (confirmed / borrowed / conflict / alias / missing) and provenance tiers (L1 vendor / L2 cloud host / L3 reseller); search, quick-filter chips, grouping by channel, sticky header; apply patch, fill missing fields, **probe the undecided** (a self-drawn PNG vision probe), settle confirmed entries, refresh catalog, roll back, clear records |
+| **Consumers** | `/admin/keys` | Create / edit / delete / rotate multi-consumer API keys; the three-state scope semantics (`["*"]` everything / `[]` empty (dangerous) / N patterns); plaintext shown exactly once after create/rotate (blocking confirmation); observation-surface switches; "computed from the rules" preview |
+| **Logs** | `/v1/logs` | Filter by channel (all / chat / task / sys), 500-line view, clear; host log section |
+| **Config** | gateway `config.json` | All 53 config fields in 11 groups; per-field validation and a "↻ restart required" badge; save results distinguished as `applied` / `hot_applied` / `restart_required`; gateway restart (command allowlist, off by default); the sidebar-entry switch lives in the "Interface" group |
 
-Capability probing uses the real `ServeMux` behaviour: an unregistered path returns
-a **plain-text** 404, a registered one returns a **JSON** envelope (or 405 on a method
-mismatch). The panel renders each area according to what it actually detects.
+> The **Consumers** tab only appears when the gateway serves `/admin/keys` (`client/index.js:3272`).
 
-### Data gaps from the original handoff are now closed
+**Top bar** (every tab): connection state, the API_KEY pill (reveals the plaintext on click; never logged), the "keep awake" toggle (polls every 20s while on, double confirmation to turn off), refresh.
 
-- **Per-code growth-task progress** (e.g. `2/3`) — `GET /v1/accounts/{uid}/growth-tasks`
-  (merges both download contexts, miniprogram included).
-- **School-season subtask status** — `GET /v1/accounts/{uid}/school-tasks`
-  (includes the `in_period` activity flag and per-day reset times).
-- **Per-account `channel`** — `/status` now carries `accounts[].channel` natively
-  (WB / Trae / Qoder), derived through the same chain the login flow writes
-  (`channel_ext` → `BackfillChannel` → `auth.Channel()`).
-- **Persisted counters now surfaced** — `credits_expiring` / `session_dead_fails` /
-  `retry_count` are exposed through `/status` (they were persisted in
-  `state.json` but invisible to the panel).
-- **Config writes hot-apply** — `POST /admin/config` validates with the same
-  `normalize()` semantics as startup, writes atomically (`tmp` + rename, with an
-  in-place fallback when `config.json` is a single-file bind mount, where rename
-  onto the mount point returns `EBUSY`), and applies eligible
-  fields (`pool.*`, `schedule.*`, `prompt.mode`, `cooldown.soft_rate`,
-  `features.sanitize_*`, `api_key`) in-place; restart-required fields are listed
-  explicitly in the response. The panel's per-field "↻ needs restart" badges mirror
-  that same list — `lib/config-spec.js` is kept in sync with the gateway's
-  `dispatchHotApply`.
-- **Sidebar quick entry** — a "渠道" entry in the sidebar foot (same area as the settings
-  button): collapsed shows `healthy/total · usable credits`, the 56px rail shows an icon
-  plus an alert dot; clicking opens a self-contained popover with a usable-credits KPI +
-  health ring, a 24h sparkline, a channel distribution bar, and one compact card per
-  account (channel color, relative credit bar, status/in-flight, expiry, 24h sparkline).
-  Automatic paths only hit read-only endpoints (`/status` every 60s, buckets on expand);
-  **only the explicit Refresh button** calls the upstream-refreshing `/admin/refresh`.
-  Unreachable gateways say so (with the address) instead of showing zeros. Toggle it in
-  **Settings → 渠道中心 → Config → 界面** (persisted in plugin settings, effective
-  immediately, and still reachable when the gateway `config.json` cannot be read).
-- **Fallback is never silent** — when the hot-apply endpoint is unusable
-  (e.g. `config.json` mounted `:ro`), the panel still writes the file on the host,
-  but reports *why* hot-apply failed, marks every changed field as
-  restart-required, and names the fields that would apply instantly once fixed.
-- **Model measured limits** — `scripts/probe_max_tokens.py` (manual, costs quota)
-  writes `data/model_probes.json`; `GET /v1/models/probes` surfaces it read-only.
-  The gateway never probes automatically.
+### Adding an account (closed loop in the panel)
 
-No known data gaps remain. If an older gateway lacks an endpoint, the panel renders
-a "网关未提供" placeholder naming the required endpoint, rather than inventing values.
-See `.scratch/chanhub-panel/execution-report.md` for the evidence.
+The right end of the tab bar has **+ Add account**, which drives the gateway's OAuth login; the panel polls every 2.5s (15-minute cap) and the account lands in the pool **without a gateway restart**:
 
-## Requirements
+| Channel | How the credential comes back | Works remotely |
+|---|---|---|
+| WorkBuddy | the gateway polls the upstream device-flow endpoint | ✅ as long as the gateway has egress |
+| QoderWork | the gateway polls `deviceToken/poll` | ✅ same |
+| TraeWork | the authorization page writes the credential into the **redirect URL**, and the upstream hard-validates the callback to `http://127.0.0.1:<port>/authorize` | ✅ but **you must paste**: after login the browser lands on an unreachable address (a Trae restriction) — copy the whole address bar back into the panel |
 
-- The plugin host must be able to reach the gateway (default `http://127.0.0.1:7866`).
-- Reading and writing the gateway `config.json` requires the plugin host and the
-  gateway to be on the same machine. Container deployments that mount
-  `./config.json:/app/config.json:ro` are read-only — remove `:ro` to allow edits,
-  otherwise the gateway's hot-apply endpoint answers `500` on every save and the
-  panel must fall back to a host-side file write (everything then needs a restart).
-  (Account channels come from `/status` natively; no same-machine credential reading
-  is needed for that anymore.)
+The entry renders according to the gateway's real capabilities: if the gateway has no `/panel/api/*`, or its `login_channels` does not include the target channel, the entry is hidden with an explicit "this gateway version does not support it, please upgrade".
+
+## Sidebar quick entry
+
+A "Channel accounts" entry at the bottom of the sidebar (same area as Settings, directly above it), in two shapes:
+
+- **Expanded**: takes a full row; the card shows a health bar, a health ring, a channel-distribution stacked bar and a counting animation, summarised as e.g. `渠道账号 5/5 · 1.02W`.
+- **Rail (collapsed)**: just a 36×36 icon matching the host's other entries.
+
+A second button opens the **Channel Center** modal (`CenterModal`, portalled to body, up to 1040×920 on desktop, full-screen sheet on mobile, Esc/overlay to close, body scroll locked). **The modal renders the very same panel as the Settings entry** (same component, same data source), so the two can never disagree. The popover shows usable credits, the health ring, a rolling 24h window, the channel distribution, and compact per-account cards (channel stripe / nickname / status pill with in-flight n/limit / relative balance bar / 24h sparkline / expiry / activity badge).
+
+Automatic paths only hit read-only endpoints (`/status` every 60s); **only pressing Refresh actually hits the upstream**. When the gateway is unreachable it says so (with the address) instead of showing zeros. With no panel injected, the icon and footer buttons are simply not rendered — no dead buttons.
+
+## Talking to the gateway
+
+- **Channel**: the plugin registers a prefix route `/dsh-chanhub` on its own `webServer` (`lib/rpc-channel.js`); the browser calls `ctx.connection.rpc.call('/dsh-chanhub', endpoint, payload, signal)`. Since DSH 0.1.5 third parties no longer get `connection.rpc.handle`, hence the prefix route; the wire format is unchanged.
+- **Auth**: browser → host goes through `connection`'s request gate; host → gateway uses `Authorization: Bearer <api_key>`.
+- **Where the api_key comes from** (three-step fallback): `ctx.credentials` resolving `apiKeyEnv` (default `WB2API_API_KEY`) → the same-named environment variable → `apiKey` in settings. The browser **never** talks to the gateway directly (no CORS headers, Bearer required, the bundle is plain text).
+- **Capability probe**: one probe at startup records the gateway version and features (stats / models / adminModels / adminKeys / admin / usageBuckets / logs / credits / growthTasks / schoolTasks / tasks / loginApi); the panel renders from it. The gateway identity must be `chanhub2api`; the legacy name `workbuddy2api` is rejected (no dual-name compatibility).
+- **Degradation**: a missing route on an older gateway is detected by `isMissingRoute` (404 + `upstream-error` / `not_found`) and falls back safely; a failed `refreshStatus` falls back to `/status` and says "credits may be stale"; every failure envelope is `{ok:false,error:{code,message,details}}` with `details` always carrying `issues:[]` (otherwise the host wire decoder takes the whole panel down).
+- **Timeouts**: 15s normally, 4s for liveness, 60s version-probe cache.
 
 ## Configuration
 
-The plugin registers the settings namespace `dsh-chanhub`:
+Settings namespace `dsh-chanhub`, 10 fields (`lib/index.js:380`):
 
 | Field | Default | Meaning |
 |---|---|---|
 | `baseURL` | `http://127.0.0.1:7866` | Gateway address |
-| `apiKeyEnv` | `WB2API_API_KEY` | Credential reference resolved through `ctx.credentials` |
-| `apiKey` | `""` | Fallback literal key (prefer `apiKeyEnv`) |
-| `gatewayConfigPath` | `""` | Absolute path to the gateway `config.json` on the host |
-| `authDir` | `""` | Gateway credential directory (for channel derivation) |
-| `restartCommand` | `""` | Restart command; only `docker restart …` / `docker compose … restart …` / `docker-compose restart …` / `./dev.sh restart` are accepted (absolute paths to the binary are allowed). If `docker` is not on PATH, the plugin falls back to known install locations (incl. Docker Desktop's bundled CLI) — see below |
-| `allowServiceControl` | `false` | Must be enabled to run the restart command |
-| `modelPullSnapshot` | `""` | Snapshot of the gateway model catalog from the last pull (JSON; `hasEfforts` marks whether reasoning efforts were captured). Basis for overwrite/fill, also used for rollback comparison |
-| `modelCapabilities` | `""` | The **capability baseline** (JSON, `{at, entries:{id:{image,status,tier,how,at}}}`). Only confirmed verdicts are settled (borrowed/conflict/alias/uncatalogued are never written); evidence tiers L0 measurement > L1 vendor > L2 cloud host > L3 reseller, and a weaker tier can never overwrite a stronger one. The effective vision set = manual whitelist ∪ `image` entries in the baseline |
+| `apiKeyEnv` | `WB2API_API_KEY` | Credential reference (resolved via `ctx.credentials`) |
+| `apiKey` | empty | Plaintext fallback; schema marks `role: 'secret'` |
+| `gatewayConfigPath` | empty | Absolute path to the gateway `config.json` on the host (for reading/writing gateway config) |
+| `restartCommand` | empty | Gateway restart command (allowlist: `docker restart` / `docker compose … restart` / `docker-compose restart` / `./dev.sh restart`) |
+| `allowServiceControl` | `false` | Must be explicitly enabled before a restart is executed |
+| `sidebarEntry` | `true` | Sidebar-entry switch (falls back to localStorage on remote pages) |
+| `modelPullSnapshot` | empty | Full snapshot of the model pull record |
+| `modelSyncBackup` | empty | Automatic backup taken before "overwrite the DSH config from the gateway" |
+| `modelCapabilities` | empty | Capability baseline JSON |
 
-### Restart gateway / `docker: command not found`
+Environment bypasses: `DSH_CHANHUB_BASE_URL`, `DSH_CHANHUB_CATALOG_CACHE`, `DSH_CHANHUB_KEEPAWAKE_STATE`.
 
-The "restart gateway" button runs the command **on the host**, not inside the container.
-A common failure is not the command but the missing binary: when dsh is launched by
-launchd its PATH is only `/usr/bin:/bin:/usr/sbin:/sbin`, and Docker Desktop does not
-always install a CLI symlink into `/usr/local/bin` → `/bin/sh: docker: command not found`.
+## Requirements
 
-The plugin now handles this: it looks up PATH first, then falls back to known install
-locations (including `/Applications/Docker.app/Contents/Resources/bin`), prepends that
-directory to the child process PATH, and ensures `HOME` is set (without it the CLI cannot
-resolve `~/.docker/run/docker.sock`). Failures report `binPath` and the searched dirs.
-
-You can also fix it once for every tool with a symlink:
-
-```bash
-sudo ln -s /Applications/Docker.app/Contents/Resources/bin/docker /usr/local/bin/docker
-```
+- A DSH web profile; host **0.1.7-rc.2 verified** (the 0.1.5 line works too).
+- A reachable chanhub gateway (default `http://127.0.0.1:7866`) whose `api_key` matches this plugin's configuration.
+- Node `^22.19.0 || >=24`.
 
 ## Install
 
-```bash
-dsh plugin --profile web add dsh-chanhub@latest
+```sh
+# From GitHub (recommended)
+dsh plugin --profile web add github:lament-z/dsh-chanhub
+
+# From a local clone / working copy
+dsh plugin --profile web add link:<this directory>
 ```
+
+Restart `dsh web` and reload: "Channel accounts" appears at the bottom of the sidebar and "Channel Center" under Settings.
 
 ## Develop
 
-```bash
-npm install
-npm run build:client   # writes client/client.js
-npm test
-npm pack --dry-run     # the tarball must contain client/client.js
+```sh
+npm run build:client   # esbuild bundles client/index.js → client/client.js (CJS + __ModuleLoader__ wrapper)
+npm test               # node --test test/*.test.mjs (20 files / ~396 cases)
 ```
 
-Client render tests need React and jsdom, which the plugin itself does not depend on
-(the host provides React). Point them at a scratch install:
-
-```bash
-mkdir -p /tmp/dshc-render && cd /tmp/dshc-render && npm init -y
-npm install react@19 react-dom@19 jsdom
-# then, from the plugin root:
-DSHC_REACT_DIR=/tmp/dshc-render npm test
-```
-
-Without them, the render tests skip; the host-side and unit tests still run.
-
-Gateway-backed tests (`B1`–`B6` in `test/rpc-channel.test.mjs`) skip automatically when no
-gateway answers on `127.0.0.1:7866`, so CI stays green without one.
+- `client/client.js` **is committed** (the build output ships with the package; `prepack` rebuilds it). After editing sources under `client/`, rebuild and commit the bundle together.
+- Render tests need React + jsdom: point `DSHC_REACT_DIR` at a directory with react / react-dom installed; those cases skip otherwise.
+- The live e2e (`test/e2e-live-gateway.test.mjs`) and RPC B1–B6 skip when no gateway is reachable; CI stays green.
+- CI (`.github/workflows/ci.yml`): install → build → render deps → `npm test` → `npm pack --dry-run` and assert the tarball contains `client/client.js`; a `v*` tag publishes to npm and creates a GitHub Release.
 
 ## Layout
 
-| Path | Purpose |
+| Path | Responsibility |
 |---|---|
-| `lib/index.js` | Host entry: RPC channel, endpoint dispatch, loader metadata |
-| `lib/rpc-channel.js` | RPC channel adapter (auth + IncomingMessage→Request→write back to res) |
-| `lib/chanhub-client.js` | Gateway HTTP client + version/capability probing |
-| `lib/gateway-config.js` | Gateway `config.json` read/write (atomic + fail-fast precheck) |
-| `lib/config-spec.js` | The 53-field config spec (shared by host validation and the UI) |
-| `lib/auths.js` | Read-only credential inventory (the only source for channel derivation) |
-| `lib/model-catalog.js` | Multimodal capability catalog: offline pi-ai data + models.dev + OpenRouter → normalisation/suffix stripping/fuzzy matching + three-tier voting (pure logic, offline-testable) |
-| `lib/model-patch.js` | Model config patching: whitelist, capability baseline (`mergeCapabilities`, tier-protected), pull snapshot, completion plan (`buildCompletionPatch`) |
-| `lib/model-probe.js` | The behavioural vision probe: self-drawn PNG (background colour + digit), answer-level verdicts, request-level attribution, serial batching |
-| `client/index.js` | Browser panel: the six-tab UI |
-| `client/model-ability.js` | The Models tab: capability badges, probe buttons, "contradicts catalog" warning, completion preview, settlement |
-| `client/derive.js` | Pure derivation logic, testable directly under Node |
-| `client/theme.js` | DSH visual tokens and fold CSS |
-| `client/build.mjs` | esbuild bundle script (same shape as dsh-bridge-gateway) |
-| `cordis.patch.yml` | cordis bundle patch (single row) |
-| `dsh-plugin.naming.json` | Naming declaration (validated by `plugin-write`) |
-| `docs/vision-probe-measured.md` | Measured vision capability for all 107 models (per-model evidence + catalog under/over-claim lists) |
-| `docs/apply-model-fix.mjs` | CLI equivalent of the settle + fill buttons (preview first, `--apply` to write) |
+| `lib/index.js` | Loader metadata, `ENDPOINTS`, settings schema, `createRuntime`, endpoint dispatch, route registration, keep-awake reconciliation and plaintext credential return |
+| `lib/rpc-channel.js` | RPC channel adapter: authenticate → collect body → `Request` → handler → write status/headers/body back to `res` |
+| `lib/chanhub-client.js` | Gateway HTTP client + version/capability probe + per-endpoint methods |
+| `lib/gateway-config.js` | Atomic read/write of the gateway `config.json` (reports `config-readonly` on a `:ro` mount) |
+| `lib/config-spec.js` | The 53-field config spec + groups + validation (shared by host and browser; no Node deps) |
+| `lib/auths.js` | Read-only inventory of credential files; **never returns accessToken / refreshToken** |
+| `lib/model-catalog.js` | Multimodal catalog: pi-ai offline catalog + models.dev + OpenRouter → normalisation / fuzzy matching + three-way vote |
+| `lib/model-patch.js` | Capability baseline + pull snapshot + completion plan + DSH `llm-pi-ai` config read/write |
+| `lib/model-probe.js` | Vision probe (self-drawn PNG, behavioural verdict, serial batches) |
+| `lib/model-scope.js` | Consumer model-set matching/validation (aligned line by line with the gateway's `internal/server/keys.go`) |
+| `lib/keepawake.js` | "Keep awake" caffeinate controller (reboot-zero guard, orphan prevention, 0600 state file) |
+| `client/index.js` | Browser half: the seven tabs, the sidebar entry, the settings registration |
+| `client/derive.js` | Derivations that share the gateway's own accounting (below) |
+| `client/usage/`, `client/model-ability.js`, `client/api-keys.js`, `client/add-account.js`, `client/quick-entry.js` | Usage page, models page, consumers page, add-account dialog, sidebar entry |
+
+## Data accounting
+
+The numbers in **Usage** and **Accounts** are not invented by the plugin: they are aligned **line by line** with the gateway's `internal/` (`client/derive.js`). Channel resolution follows `auth.ResolveChannel`; the in-flight cap follows `pool.inFlightLimit`; the hit-rate denominator follows `finalizeGroup()` (writes never enter the denominator); bucket keys follow `bucketSlot()`; window values follow `parseWindow`; consumer-set rules follow `internal/server/keys.go`; the growth-code table follows `task_runner.py`'s MAPPING table; the 53 config fields follow `cmd/server/config.go` + `internal/config/schedule.go`.
+
+Where evidence is missing it stays **honestly empty**: the browser cannot see the session-stickiness key, so it does not claim "which account is in use"; with no positive burn it does not compute burn-down days (it shows "—" instead of dividing by zero or inventing a number); `earnedCredits` is a lower bound and says "covered N/M".
+
+## Compatibility
+
+- Host **0.1.7-rc.2** verified; the 0.1.5 line works from the same code.
+- **0.1.7 no longer provides `settingsScope`**: declaring it in the module-level `inject` parks the whole plugin (panel *and* sidebar entry vanish, `[data-slot-error]` stays 0). This plugin injects only `['slots','connection']` and reads `settingsScope` lazily via `ctx.get()` (falling back to localStorage).
+- The host injects a **number** prop named `now` into every slot; the plugin's own clock is therefore called `clock`, so `now is not a function` can no longer paint the whole slot red.
+- `sidebar.footer.action` is a shared list slot and the host's row does not wrap: the entry sets `flex-wrap: wrap` and takes a full row, restoring it on unmount.
+
+## Credits and references
+
+The design, recipes and data accounting of this plugin are explicitly derived from the following projects — **this is not original work**:
+
+| Reference | What was borrowed | Evidence |
+|---|---|---|
+| [lament-z/dsh-bridge-gateway](https://github.com/lament-z/dsh-bridge-gateway) (same author) | **Design tokens and card structure** (`client/theme.js` is the same `s` object), the **`settings.section` registration**, the **TabBar clone** (pure front-end state, not a DSH slot), and the **RPC recipe** (prefix route, failure envelope keeping `issues:[]`, the esbuild bundling shape) | `client/index.js:7,2541,3419`, `lib/rpc-channel.js:6`, `lib/index.js:178`, `client/build.mjs:2` |
+| [AlfredChaos/dsh-usage-panel](https://github.com/AlfredChaos/dsh-usage-panel) | **The Usage page v4 single-page card flow**: one component per card, localStorage SWR, the export discipline, fixed-positioned tooltips, KPI cards and heatmap shapes | `client/usage/index.js:3`, `client/usage/cards.js:3`, `client/usage/export.js:3`, `client/usage/tooltip.js:3`, `client/usage/api.js:3` |
+| [Javis603/token-monitor](https://github.com/Javis603/token-monitor) (also `zhangzheng25/dsh-token-monitor`) | **Information architecture and the overview stat strip** (`overviewStats` follows its `STAT_CARDS`); three deliberate departures: money → credits, active time (the gateway does not record it) → not invented, session count → request count | `client/derive.js:1399-1403`, `CHANGELOG.md:763` |
+| [lament-z/chanhub](https://github.com/lament-z/chanhub) (the gateway, same author) | Not a "reference" but the **source of truth for the contract**: every derivation is aligned line by line with the gateway implementation (see "Data accounting") | `lib/model-scope.js:3`, `lib/auths.js:11`, `client/derive.js:813,596,2059,876` |
 
 ## License
 
