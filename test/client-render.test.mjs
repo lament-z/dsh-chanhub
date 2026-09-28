@@ -774,7 +774,15 @@ test('渲染账号池：账号卡片带到期时间（凭证读不到时降级�
   try {
     const cards = [...document.querySelectorAll('.dshc-acctcard')];
     assert.ok(cards.length >= 1, '缺账号卡片');
-    // fixture 的 auths 没有 expiresAt → 降级取套餐明细里最早的未耗尽到期日（10-01）
+    // fixture 的 auths 没有 expiresAt → 降级取套餐明细里最早的未耗尽到期日。
+    //
+    // 断言写 10-01（**北京日期**）是刻意的：fixture 的 expire_at 是
+    // `2026-10-01T00:00:00+08:00`，而到期日必须按 UTC+8 渲染、不按查看者本地时区
+    // （见 client/index.js 的 cstDayText）。所以这条断言在 UTC runner 上也成立。
+    //
+    // ⚠️ 不要再给它钉 TZ 来「修」：那会把「渲染随时区漂移」这个真 bug 一起藏掉。
+    // 这条用例自 2026-09-25 起在 CI 上红了三天，根因正是当时的本地时区渲染
+    // （UTC 下渲染出 09-30），修的是渲染而不是测试环境。
     const withExpiry = cards.filter((card) => card.textContent.includes('积分到期 10-01'));
     assert.equal(withExpiry.length, cards.length, '每个账号卡片都应渲染到期时间');
   } finally {

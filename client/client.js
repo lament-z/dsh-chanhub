@@ -8384,10 +8384,14 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
     )
   );
 }
-function ExpiryChip({ expiry }) {
-  const date = new Date(expiry.at);
+var CST_OFFSET_MS = 8 * 60 * 60 * 1e3;
+function cstDayText(at) {
+  const shifted = new Date(at + CST_OFFSET_MS);
   const pad = (value) => String(value).padStart(2, "0");
-  const dayText = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+function ExpiryChip({ expiry }) {
+  const dayText = cstDayText(expiry.at);
   const prefix = expiry.kind === "credential" ? "\u767B\u5F55\u5230\u671F" : "\u79EF\u5206\u5230\u671F";
   const left = expiry.days;
   const urgent = expiry.expired || left <= 3;

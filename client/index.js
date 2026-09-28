@@ -1014,6 +1014,28 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
 }
 
 /**
+ * 到期日一律按 **UTC+8（北京墙钟）** 渲染，不按查看者本地时区。
+ *
+ * 为什么不能按本地时区：`expire_at` 与凭证到期都是**北京墙钟的业务截止日**（网关按
+ * UTC+8 解析上游 `CycleEndTime` 后以 RFC3339 下发，见 chanhub 的 softRateResetLoc）。
+ * 按查看者时区渲染的话，UTC-5 的用户会把 `2026-10-01T00:00:00+08:00` 看成 **09-30**
+ * —— 在「积分哪天作废」这个要抢时间的事情上差一天，是真实的可用性 bug，而且与官方
+ * 客户端显示的日期不一致。
+ *
+ * 顺带的效果：这个值变成**与时区无关**，UTC runner 上的测试不再假失败（这条正是 CI
+ * 自 2026-09-25 起一直红的原因：断言写 10-01、runner 在 UTC 渲染出 09-30）。
+ *
+ * 实现用「平移后取 UTC 字段」而不是 Intl / toLocaleDateString：偏移固定（+08:00，
+ * 无夏令时），不需要 tzdata，宿主与 jsdom 两种环境结果都确定。
+ */
+const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
+function cstDayText(at) {
+  const shifted = new Date(at + CST_OFFSET_MS);
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
+/**
  * 到期小标签。
  *
  * 文案刻意带**语义前缀**（「登录到期」vs「积分到期」）：账号整体失效（需重新登录）
@@ -1026,9 +1048,7 @@ function AccountCard({ account, maxInFlight, channel, onOpen, liveCredits, authA
  * @returns React 元素。
  */
 function ExpiryChip({ expiry }) {
-  const date = new Date(expiry.at);
-  const pad = (value) => String(value).padStart(2, '0');
-  const dayText = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const dayText = cstDayText(expiry.at);
   const prefix = expiry.kind === 'credential' ? '登录到期' : '积分到期';
   const left = expiry.days;
   const urgent = expiry.expired || left <= 3;
