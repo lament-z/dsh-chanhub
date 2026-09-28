@@ -110,7 +110,6 @@ const TASK_DEFS = [
   { name: 'activity', label: '活跃地图', icon: '🗺', key: 'activity' },
   { name: 'travel', label: '猫猫旅行', icon: '🐱', key: 'travel' },
   { name: 'keepalive', label: 'token 保活', icon: '🔑', key: 'keepalive' },
-  { name: 'school', label: '开学季', icon: '🎓', key: 'school' },
   { name: 'cat', label: '夜猫子', icon: '🌙', key: 'cat' },
 ];
 
@@ -529,7 +528,7 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
 /**
  * 任务折叠组的摘要：启用数 + 成长码数（真实计数）。
  * @param scheduleConfig - config.json 的 schedule 段（可空）。
- * @returns 摘要文本，如「4/6 项排程启用 · 24 个成长码」。
+ * @returns 摘要文本，如「4/5 项排程启用 · 19 个成长码」。
  */
 function scheduleFoldSummary(scheduleConfig) {
   const enabled = SCHEDULE_ITEMS.filter((item) => scheduleState(item, scheduleConfig).key !== 'na').length;
@@ -1073,8 +1072,8 @@ function segmentButton(id, label, active, onChange, count, channel) {
 /**
  * 任务磁贴：一个任务一格，点即触发，状态就地显示。
  *
- * 为什么合并掉原来的「操作台按钮 + 执行历史表」：同一批 7 个任务被列了两遍
- * （7 个按钮 + 7 行 × 6 列），状态与触发入口分离，读一眼要跨两个区块对照。
+ * 为什么合并掉原来的「操作台按钮 + 执行历史表」：同一批 6 个任务被列了两遍
+ * （6 个按钮 + 6 行 × 6 列），状态与触发入口分离，读一眼要跨两个区块对照。
  * 磁贴把两者收进同一格 —— 表整张删除，状态在按下去的地方就有。
  *
  * 状态语义（三态，不用 Tag 以免与页面其它标签混淆）：
@@ -1138,16 +1137,16 @@ function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
  * @param props - `{status, channelOf, maxInFlight, taskData, onRunTask, runningName, onRefresh}`。
  * @returns React 元素。
  */
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, growthUid, setGrowthUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }) {
   const accounts = status?.accounts ?? [];
   // uid → 账号实时快照（含 credits）：签到卡余额列的实时来源（与账号池同源）。
   const accountsMap = React.useMemo(
     () => new Map(accounts.map((account) => [account.uid, account])),
     [accounts],
   );
-  // 成长任务/开学季是 workbuddy 专属能力（Trae/Qoder 渠道没有这套体系，
-  // 网关 /v1/accounts/{uid}/growth-tasks、school-tasks 对非 workbuddy 恒 501）。
-  // 选号器只列 workbuddy 账号；列表为空说明池里全是 trae/qoder，两张卡
+  // 成长任务是 workbuddy 专属能力（Trae/Qoder 渠道没有这套体系，
+  // 网关 /v1/accounts/{uid}/growth-tasks 对非 workbuddy 恒 501）。
+  // 选号器只列 workbuddy 账号；列表为空说明池里全是 trae/qoder，卡片
   // 走「网关未提供」的降级分支而非无限加载。
   const wbAccounts = accounts.filter((account) => (channelOf?.(account) ?? 'workbuddy') === 'workbuddy');
   // taskData 是宿主 getTasks 的 value，形如 {available, tasks:{tasks:[...]}}。
@@ -1168,8 +1167,8 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
   return React.createElement(
     'div',
     null,
-    // 任务磁贴：一行七个，点即触发，状态就地显示。
-    // 原先「操作台按钮」与「执行历史表」把同一批任务各列一遍（7 按钮 + 7 行 × 6 列），
+    // 任务磁贴：一行六个，点即触发，状态就地显示。
+    // 原先「操作台按钮」与「执行历史表」把同一批任务各列一遍（6 按钮 + 6 行 × 6 列），
     // 状态还得跨区块对照 —— 磁贴把触发与状态收进同一格，整张表随之删除。
     React.createElement('div', { style: s.card },
       React.createElement('div', { className: 'dshc-taskgrid' },
@@ -1231,7 +1230,6 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
                 : React.createElement(Tag, { text: '成长无待办', tone: 'ok' }),
               it.chances > 0 ? React.createElement(Tag, { text: `抽奖 ${it.chances}`, tone: 'info' }) : null,
               it.growthErr ? React.createElement(Tag, { text: '成长查询失败', tone: 'err', title: it.growthErr }) : null,
-              it.schoolErr ? React.createElement(Tag, { text: '开学季查询失败', tone: 'err', title: it.schoolErr }) : null,
             ),
           ),
         )
@@ -1253,7 +1251,7 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
                 ...queueData.items.map((it, i) =>
                   React.createElement('tr', { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
                     React.createElement('td', null, it.nickname || it.uid.slice(0, 8)),
-                    React.createElement('td', { style: { ...s.code }, title: it.kind === 'school' ? '开学季' : '成长' }, it.code),
+                    React.createElement('td', { style: { ...s.code }, title: '成长' }, it.code),
                     React.createElement('td', null,
                       React.createElement(Tag, {
                         text: { pending: '待执行', running: '执行中', done: '完成', skipped: '跳过', error: '失败' }[it.status] ?? it.status,
@@ -1268,25 +1266,6 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
           ),
         )
       : null,
-
-    // 开学季（真实子任务状态：来自网关 GET /v1/accounts/{uid}/school-tasks）
-    // 账号列表按渠道过滤：成长任务/开学季是 workbuddy 专属（Trae/Qoder 无此体系，
-    // 网关侧恒 501 unsupported）。不过滤的话 trae/qoder 账号会在选号器里显示成
-    // 永远「加载失败」的灰点，且可被点开 —— 纯噪音。
-    // 全是 workbuddy 账号时传全量（保持原行为，AccountPicker 单账号自动隐藏）。
-    React.createElement(SchoolTasksCard, {
-      schoolData: schoolData?.[schoolUid],
-      accounts: wbAccounts ?? accounts,
-      byUid: schoolData,
-      selectedUid: schoolUid,
-      onSelectUid: setSchoolUid,
-      running: runningName === 'school',
-      onRunTask,
-      vouchersData,
-      vouchersLoading,
-      onViewVouchers,
-      adminAvailable,
-    }),
 
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
     React.createElement(GrowthTasksCard, {
@@ -1374,176 +1353,6 @@ function useSelectedUid(selected, byUid, accounts) {
   const fallback = defaultAccountUid(byUid, accounts);
   if (selected && byUid?.[selected]) return selected;
   return fallback;
-}
-
-/** 开学季状态 → 视觉。 */
-const SCHOOL_STATUS = {
-  claimed: { text: '已领取', tone: 'ok' },
-  completed: { text: '已完成', tone: 'ok' },
-  pending: { text: '待完成', tone: 'warn' },
-};
-
-/**
- * 开学季子任务状态卡（真实数据）。
- *
- * 数据源：GET /v1/accounts/{uid}/school-tasks。
- * 关键语义：
- *   - in_period=false 时以下为**过期快照**，必须显示「活动未开始/已结束」；
- *   - recurring 任务每日重置：已领 + next_unlock_at → 显示「每日」角标，
- *     而不是让用户以为这个任务永远没了；
- *   - 人工项（学生认证）网关不可代做，如实标注。
- */
-function SchoolTasksCard({ schoolData, accounts, byUid, selectedUid, onSelectUid, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
-  if (schoolData && schoolData.available === false) {
-    return React.createElement(Unavailable, {
-      title: '开学季子任务状态',
-      needs: 'GET /v1/accounts/{uid}/school-tasks',
-      hint: schoolData.reason,
-    });
-  }
-  if (!schoolData || schoolData.available !== true) {
-    return React.createElement('div', { style: s.card },
-      React.createElement(CardHead, { title: '开学季' }),
-      React.createElement('div', { style: { ...s.muted, marginTop: 8 } }, '加载中…'),
-    );
-  }
-
-  const data = schoolData.school;
-  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-  const counts = data.counts ?? {};
-  const claimed = counts.claimed ?? 0;
-  const total = counts.total ?? tasks.length;
-
-  // in_period=false 时才需要警示（过期快照），true 是常态、不占版面。
-  const stale = data.in_period === false;
-
-  return React.createElement('div', { style: s.card },
-    React.createElement(CardHead, {
-      title: '🎓 开学季',
-      actions: [
-        React.createElement('button', {
-          key: 'run',
-          type: 'button',
-          className: `dshc-taskbtn${running ? ' running' : ''}`,
-          style: { ...s.btnGhost, height: 26, padding: '0 10px', fontSize: 12 },
-          disabled: running,
-          onClick: () => onRunTask('school'),
-        }, running ? '执行中…' : '执行'),
-        adminAvailable
-          ? React.createElement('button', {
-              key: 'vouchers',
-              type: 'button',
-              style: { ...s.btnLink, fontSize: 12 },
-              disabled: vouchersLoading, onClick: onViewVouchers,
-              title: '查询各账号抽中的第三方券码（KFC/瑞幸/酷狗等，只读）',
-            }, vouchersLoading ? '查询中…' : '券码')
-          : null,
-      ],
-    }),
-
-    // 账号选择器：逐账号数据必须能切换（此前固定显示第 1 个账号）
-    React.createElement(AccountPicker, {
-      accounts,
-      byUid,
-      value: selectedUid,
-      onChange: onSelectUid,
-    }),
-
-    // 进度条 + 计数（比 "已领 4/5" 标签更直观，且一眼看出还剩多少）
-    React.createElement('div', { className: 'dshc-row', style: { marginTop: 12 } },
-      React.createElement('span', { className: 'dshc-progress' },
-        React.createElement('span', {
-          style: {
-            width: `${total > 0 ? Math.round((claimed / total) * 100) : 0}%`,
-            background: claimed >= total ? tone.ok.fg : 'var(--dsw-alias-button-info-fill,#4176e6)',
-          },
-        })),
-      React.createElement('span', { style: { ...s.muted, whiteSpace: 'nowrap' } }, `${claimed}/${total}`),
-    ),
-
-    stale
-      ? React.createElement('div', { style: { ...s.warn, marginTop: 10 } },
-          '活动未开始或已结束 —— 以下为过期快照，不代表当前可操作。')
-      : null,
-
-    tasks.length === 0
-      ? React.createElement('div', { style: { ...s.muted, marginTop: 10 } }, '网关未返回子任务。')
-      : React.createElement('div', { className: 'dshc-sub', style: { marginTop: 12 } },
-          ...tasks.map((task) => {
-            const status = SCHOOL_STATUS[task.status] ?? { text: task.status ?? '—', tone: 'idle' };
-            const done = ['claimed', 'completed'].includes(task.status);
-            const recurring = task.task_type === 'recurring';
-            const manual = task.task_code === 'task_student_verify';
-            // 网格行：五列固定（勾 / 标题 / 进度 / 来源 / 状态），列宽由 CSS 定死。
-            // 之前用 flex 自然排版，缺一个标签整行后续列就左移一格 —— 5 行里有 4 行
-            // 是 5 个子元素、1 行是 4 个（desktop_chat_1_time 无「每日」），于是错位。
-            return React.createElement('div', { key: task.task_code, className: 'dshc-srow' },
-              React.createElement('span', {
-                className: done ? 'dshc-ck on' : manual ? 'dshc-ck na' : 'dshc-ck',
-                title: done ? '已领取' : manual ? '人工项（网关不可代做）' : status.text,
-              }, done ? '✓' : manual ? '—' : '○'),
-              React.createElement('span', { className: 'dshc-stitle', title: task.task_code },
-                task.title || task.task_code),
-              // 进度：claimed 但未满时（上游实测存在，如 desktop_chat_1_time 为
-              // claimed + 0/1）不隐藏也不改写 —— 如实显示，但加注说明这是上游口径，
-              // 避免与左侧「已领取」勾看起来自相矛盾。
-              React.createElement('span', {
-                className: `dshc-sprog${done && task.has_progress && task.current < task.target ? ' odd' : ''}`,
-                ...(done && task.has_progress && task.current < task.target
-                  ? { title: '上游口径：该任务已领取，但进度计数为 ' + `${task.current}/${task.target}` }
-                  : {}),
-              }, task.has_progress ? `${task.current}/${task.target}` : '—'),
-              React.createElement('span', { className: 'dshc-ssrc' },
-                recurring ? React.createElement(Tag, { text: '每日', tone: 'info' }) : null,
-                manual ? React.createElement(Tag, { text: '人工', tone: 'idle' }) : null,
-              ),
-              React.createElement(Tag, { text: status.text, tone: status.tone }),
-            );
-          }),
-        ),
-
-    // 券码（按需加载）：只读表格，折进结果区
-    vouchersData
-      ? React.createElement(
-          'details',
-          { className: 'dshc-fold', style: { marginTop: 10 }, open: true },
-          React.createElement('summary', null, React.createElement('span', { style: s.label }, '券码')),
-          React.createElement('div', { className: 'dshc-body' },
-            React.createElement('div', { className: 'dshc-tblwrap' },
-              React.createElement('table', null,
-                React.createElement('thead', null,
-                  React.createElement('tr', null,
-                    ...['账号', '奖品', '券码', '有效期'].map((h2) => React.createElement('th', { key: h2 }, h2)),
-                  ),
-                ),
-                React.createElement('tbody', null,
-                  ...(function () {
-                    const rows = [];
-                    for (const r of vouchersData.rows ?? []) {
-                      if ((r.vouchers ?? []).length === 0) continue;
-                      for (const v of r.vouchers) {
-                        rows.push(React.createElement('tr', { key: `${r.uid}-${v.grant_id}` },
-                          React.createElement('td', null, r.nickname || r.uid.slice(0, 8)),
-                          React.createElement('td', null, v.prize_name || v.sku_code || '—'),
-                          React.createElement('td', { style: { ...s.code, userSelect: 'all' } }, v.code || '—'),
-                          React.createElement('td', null, v.valid_to || '—'),
-                        ));
-                      }
-                    }
-                    if (rows.length === 0) {
-                      rows.push(React.createElement('tr', { key: 'empty' },
-                        React.createElement('td', { colSpan: 4, style: { ...s.muted, textAlign: 'center' } }, '暂无券码。'),
-                      ));
-                    }
-                    return rows;
-                  })(),
-                ),
-              ),
-            ),
-          ),
-        )
-      : null,
-  );
 }
 
 /**
@@ -1710,7 +1519,7 @@ function GrowthTasksCard({ growthData, accounts, byUid, selectedUid, onSelectUid
             title: '有进度未满、可继续推动的码',
           })
         : null,
-      // 事实②（定时覆盖只有 2/24）压成一个 chip：它的内容是「别的码没有定时入口」，
+      // 事实②（定时覆盖只有 2/19）压成一个 chip：它的内容是「别的码没有定时入口」，
       // 逐行看不到（缺席不可见），故必须有一处汇总 —— 但一句话即可，不写整段散文。
       React.createElement(Tag, {
         text: `定时覆盖 ${coverage.scheduled}/${coverage.total}`,
@@ -1771,7 +1580,7 @@ function CheckinOutcomesCard({ task, liveByUid }) {
   };
 
   // 摘要常驻、明细折起：签到「多数号都成功」是常态，逐号表格常驻会挤掉下面
-  // 更值得看的开学季/成长进度。失败与跳过的号才是要看的，故默认只展开它们。
+  // 更值得看的成长进度。失败与跳过的号才是要看的，故默认只展开它们。
   const attention = outcomes.filter((oc) => oc.status === 'fail' || oc.status === 'skipped');
 
   return React.createElement('div', { style: s.card },
@@ -2622,19 +2431,17 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   const [tasks, setTasks] = React.useState(null);
   const [creditsByUid, setCreditsByUid] = React.useState({});
   const [growthByUid, setGrowthByUid] = React.useState({});
-  const [schoolByUid, setSchoolByUid] = React.useState({});
 
   // 渠道解析器：account → 'workbuddy' | 'traework' | 'qoder'。
-  // 供账号列表分组、以及成长任务/开学季卡的 workbuddy 过滤共用。
+  // 供账号列表分组、以及成长任务卡的 workbuddy 过滤共用。
   // 声明须在 wbTaskAccounts/effectiveGrowthUid 等首次使用之前（TDZ）。
   const channelOf = React.useMemo(
     () => channelResolver(authInfo?.ok ? authInfo.accounts : []),
     [authInfo],
   );
-  // 逐账号卡各自记住选中的账号（两张卡独立 —— 开学季与成长任务的进度本就无关）。
+  // 逐账号卡记住选中的账号。
   // 空串 = 未显式选择 → 由 useSelectedUid 给出默认（账号池顺序里第一个有数据的）。
   const [growthUid, setGrowthUid] = React.useState('');
-  const [schoolUid, setSchoolUid] = React.useState('');
   const [logs, setLogs] = React.useState(null);
   const [logChannel, setLogChannel] = React.useState('all');
   const [runningTask, setRunningTask] = React.useState('');
@@ -2747,21 +2554,6 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
         if (creditsGeneration.current !== generation || unmountedRef.current) return;
         setGrowthByUid(Object.fromEntries(entries));
       });
-
-      // 开学季子任务状态按账号逐个拉（同上：上游一次只查一个账号）。
-      void Promise.all(
-        accounts.map(async (account) => {
-          try {
-            const result = await rpcCall(ENDPOINTS.getSchoolTasks, { uid: account.uid });
-            return [account.uid, result?.value ?? { available: false, reason: '加载失败' }];
-          } catch {
-            return [account.uid, { available: false, reason: '加载失败' }];
-          }
-        }),
-      ).then((entries) => {
-        if (creditsGeneration.current !== generation || unmountedRef.current) return;
-        setSchoolByUid(Object.fromEntries(entries));
-      });
     } catch (error) {
       setErr(error?.message ?? String(error));
     } finally {
@@ -2870,9 +2662,6 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   const [taskScanData, setTaskScanData] = React.useState(null);
   const [taskScanning, setTaskScanning] = React.useState(false);
   const [taskQueueData, setTaskQueueData] = React.useState(null);
-  // 开学季券码（任务 Tab 按需查看）。
-  const [vouchersData, setVouchersData] = React.useState(null);
-  const [vouchersLoading, setVouchersLoading] = React.useState(false);
   // 添加账号：弹窗开关 + 网关能力（loginChannels 为空 = 不渲染入口）。
   const [addOpen, setAddOpen] = React.useState(false);
   const [loginChannels, setLoginChannels] = React.useState(null);
@@ -3022,34 +2811,13 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
     [rpcCall],
   );
 
-  /** 查看开学季券码（全部账号，只读）。 */
-  const onViewVouchers = React.useCallback(
-    async () => {
-      setVouchersLoading(true);
-      try {
-        const result = await rpcCall(ENDPOINTS.schoolVouchersAll, {});
-        if (result?.ok === false) {
-          showToast(`券码查询失败：${result.error?.message ?? '未知错误'}`);
-        } else {
-          setVouchersData(result?.value ?? { rows: [] });
-        }
-      } catch (error) {
-        showToast(`券码查询异常：${error?.message ?? error}`);
-      } finally {
-        setVouchersLoading(false);
-      }
-    },
-    [rpcCall, showToast],
-  );
-
   // 逐账号卡的有效选中 uid：用户显式选择优先；刷新后账号池变化导致选中失效时，
   // 回落到「账号池顺序里第一个有数据的账号」（而不是显示空白）。
-  // 成长任务/开学季是 workbuddy 专属：兜底选号只在 wb 账号里挑，避免默认选中
+  // 成长任务是 workbuddy 专属：兜底选号只在 wb 账号里挑，避免默认选中
   // trae/qoder 账号后卡片一直显示「加载失败」（网关对非 workbuddy 恒 501）。
   const taskAccounts = data?.status?.accounts ?? [];
   const wbTaskAccounts = taskAccounts.filter((account) => (channelOf?.(account) ?? 'workbuddy') === 'workbuddy');
   const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
-  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
   /** 单码/批量成长码写操作（点亮 accept / 领取 claim / 全部领取）。 */
   const onGrowthWrite = React.useCallback(
     async (action, code) => {
@@ -3289,11 +3057,8 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
           maxInFlight,
           taskData: tasks,
           growthData: growthByUid,
-          schoolData: schoolByUid,
           growthUid: effectiveGrowthUid,
           setGrowthUid,
-          schoolUid: effectiveSchoolUid,
-          setSchoolUid,
           onRunTask,
           runningName: runningTask,
           onRefresh: refresh,
@@ -3306,9 +3071,6 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
           queueData: taskQueueData,
           onScan: onTaskScan,
           onQueueStart: onTaskQueueStart,
-          vouchersData: vouchersData,
-          vouchersLoading: vouchersLoading,
-          onViewVouchers: onViewVouchers,
         })
       : null,
     activeTab === 'usage'

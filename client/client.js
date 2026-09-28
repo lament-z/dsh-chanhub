@@ -429,8 +429,8 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 /* \u5230\u671F\u4E34\u8FD1 / \u5DF2\u8FC7\u671F\uFF1A\u552F\u4E00\u9700\u8981\u62A2\u6CE8\u610F\u529B\u7684\u5143\u4FE1\u606F\uFF0C\u6545\u7528\u8B66\u793A\u5E95\u800C\u975E\u7070\u5E95 */
 .dshc-chip-warn { background: var(--dsw-alias-state-warn-tertiary,#fffbeb); color: var(--dsw-alias-state-warn-primary,#b45309); }
 /* \u9010\u8D26\u53F7\u660E\u7EC6\u884C\uFF1A**\u7F51\u683C\u56FA\u5B9A\u5217**\uFF0C\u4FDD\u8BC1\u540C\u4E00\u5217\u5728\u6BCF\u884C\u4F4D\u7F6E\u4E00\u81F4\u3002
-   \u80CC\u666F\uFF1A\u5F00\u5B66\u5B63\u6709 5 \u884C\u4F46\u300C\u6BCF\u65E5\u300D\u6807\u7B7E\u53EA 4 \u884C\u6709\u3001\u6210\u957F\u4EFB\u52A1 22 \u884C\u91CC\u51FA\u73B0 3/4/5 \u4E2A\u5B50\u5143\u7D20
-   \u4E09\u79CD\u5F62\u6001 \u2014\u2014 \u7528 flex \u81EA\u7136\u6392\u7248\u65F6\u7F3A\u4E00\u5217\u5C31\u4F1A\u8BA9\u540E\u7EED\u5217\u5DE6\u79FB\uFF0C\u89C6\u89C9\u4E0A\u300C\u9519\u4F4D\u300D\u3002 */
+   \u80CC\u666F\uFF1A\u540C\u4E00\u5F20\u8868\u91CC\u5404\u884C\u7684\u53EF\u9009\u5B50\u5143\u7D20\u6570\u91CF\u4E0D\u7B49\uFF08\u6709\u7684\u884C\u6709\u300C\u6BCF\u65E5\u300D\u6807\u7B7E\u3001\u6709\u7684\u6CA1\u6709\uFF09\uFF0C
+   \u7528 flex \u81EA\u7136\u6392\u7248\u65F6\u7F3A\u4E00\u5217\u5C31\u4F1A\u8BA9\u540E\u7EED\u5217\u5DE6\u79FB\uFF0C\u89C6\u89C9\u4E0A\u300C\u9519\u4F4D\u300D\u3002 */
 .dshc-srow { display: grid; grid-template-columns: 20px minmax(0, 1fr) 54px 64px max-content; align-items: center; gap: 8px; padding: 3px 0; min-width: 0; }
 .dshc-growrow { display: grid; grid-template-columns: 3px minmax(0, 1fr) 54px minmax(74px, auto) max-content 74px; align-items: center; gap: 8px; padding: 3px 0; min-width: 0; }
 .dshc-stitle { font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -835,18 +835,16 @@ var CONFIG_FIELDS = (
       note: "0 = \u5173\u505C\u63A2\u7D22\uFF08\u5408\u6CD5\u503C\uFF0C\u4E0D\u56DE\u843D\u9ED8\u8BA4\uFF09",
       danger: true
     },
-    // ---- schedule（13 项；scheduler.Reconfigure 已接线 → 可热改）----
+    // ---- schedule（11 项；scheduler.Reconfigure 已接线 → 可热改）----
     { path: "schedule.checkin_hours", label: "\u7B7E\u5230\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: false, note: "\u70ED\u6539\u7ECF scheduler.Reconfigure\uFF08\u4E0B\u8F6E\u6392\u7A0B\u751F\u6548\uFF09" },
     { path: "schedule.travel_hours", label: "\u732B\u732B\u65C5\u884C\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: false },
     { path: "schedule.activity_hours", label: "\u6D3B\u8DC3\u5730\u56FE\u5C0F\u65F6", type: "hours", default: "[10]", restart: false },
     { path: "schedule.keepalive_hours", label: "token \u4FDD\u6D3B\u5C0F\u65F6", type: "hours", default: "[22]", restart: false },
-    { path: "schedule.school_hours", label: "\u5F00\u5B66\u5B63\u5C0F\u65F6", type: "hours", default: "[12]", restart: false },
     { path: "schedule.cat_hours", label: "\u591C\u732B\u5B50\u5C0F\u65F6", type: "hours", default: "[1]", restart: false, note: "\u7A97\u53E3 23:00\u201308:00 CST" },
     { path: "schedule.checkin_enabled", label: "\u542F\u7528\u7B7E\u5230", type: "bool", default: "true", restart: false },
     { path: "schedule.travel_enabled", label: "\u542F\u7528\u65C5\u884C", type: "bool", default: "true", restart: false },
     { path: "schedule.activity_enabled", label: "\u542F\u7528\u6D3B\u8DC3\u4E0A\u62A5", type: "bool", default: "true", restart: false },
     { path: "schedule.keepalive_enabled", label: "\u542F\u7528\u4FDD\u6D3B", type: "bool", default: "true", restart: false },
-    { path: "schedule.school_enabled", label: "\u542F\u7528\u5F00\u5B66\u5B63", type: "bool", default: "true", restart: false },
     { path: "schedule.cat_enabled", label: "\u542F\u7528\u591C\u732B\u5B50", type: "bool", default: "true", restart: false },
     {
       path: "schedule.activity_report_count",
@@ -1009,7 +1007,6 @@ var SCHEDULE_ITEMS = [
   { id: "activity", icon: "\u{1F5FA}", label: "\u6D3B\u8DC3\u5730\u56FE", hoursKey: "activity_hours", enabledKey: "activity_enabled" },
   { id: "travel", icon: "\u{1F431}", label: "\u732B\u732B\u65C5\u884C", hoursKey: "travel_hours", enabledKey: "travel_enabled" },
   { id: "keepalive", icon: "\u{1F511}", label: "token \u4FDD\u6D3B", hoursKey: "keepalive_hours", enabledKey: "keepalive_enabled" },
-  { id: "school", icon: "\u{1F393}", label: "\u5F00\u5B66\u5B63", hoursKey: "school_hours", enabledKey: "school_enabled", subtasks: 5 },
   { id: "cat", icon: "\u{1F319}", label: "\u591C\u732B\u5B50", hoursKey: "cat_hours", enabledKey: "cat_enabled", note: "\u7A97\u53E3 23:00\u201308:00 CST" }
 ];
 var GROWTH_CODES = [
@@ -1030,12 +1027,7 @@ var GROWTH_CODES = [
   { code: "first_buddy", label: "\u9886\u517B Buddy", target: 1 },
   { code: "RichMeow_Chat", label: "\u684C\u9762\u7AEF\u5BF9\u8BDD\u94FE", target: 1 },
   { code: "Library_read", label: "\u8D44\u6599\u5E93\u70B9\u51FB", target: 1 },
-  { code: "chat_3_times", label: "\u4E0E AI \u5BF9\u8BDD 3 \u6B21", target: 3 },
-  { code: "expert_use", label: "\u5F00\u5B66\u5B63\u4E13\u5BB6", target: 1 },
-  { code: "share_invite", label: "\u5206\u4EAB\u7ED9\u597D\u53CB", target: 1 },
-  { code: "desktop_chat_1_time", label: "\u684C\u9762\u7AEF\u5BF9\u8BDD 1 \u6B21", target: 1 },
   { code: "Sequential_Tasks_1", label: "\u5C0F\u7A0B\u5E8F\u8FDE\u7EED\u4EFB\u52A1", target: 1 },
-  { code: "school_season", label: "\u6821\u56ED\u65E5\u4EFB\u52A1", target: 1 },
   { code: "Expert_Philanthropy", label: "\u516C\u76CA\u63D0\u95EE\uFF08\u4E0D\u53EF\u4EE3\u505A\uFF09", target: 1, unforgeable: true }
 ];
 var SCHEDULED_CODES = { chat_5: "activity", black_cat: "cat" };
@@ -2400,7 +2392,6 @@ var ENDPOINTS = {
   getAccounts: "getAccounts",
   getCredits: "getCredits",
   getGrowthTasks: "getGrowthTasks",
-  getSchoolTasks: "getSchoolTasks",
   getUsage: "getUsage",
   getLogs: "getLogs",
   getTasks: "getTasks",
@@ -2409,8 +2400,6 @@ var ENDPOINTS = {
   taskScan: "taskScan",
   taskQueueStart: "taskQueueStart",
   taskQueueStatus: "taskQueueStatus",
-  schoolStatusAll: "schoolStatusAll",
-  schoolVouchersAll: "schoolVouchersAll",
   accountMore: "accountMore",
   accountDisable: "accountDisable",
   accountEnable: "accountEnable",
@@ -7543,7 +7532,6 @@ var TASK_DEFS = [
   { name: "activity", label: "\u6D3B\u8DC3\u5730\u56FE", icon: "\u{1F5FA}", key: "activity" },
   { name: "travel", label: "\u732B\u732B\u65C5\u884C", icon: "\u{1F431}", key: "travel" },
   { name: "keepalive", label: "token \u4FDD\u6D3B", icon: "\u{1F511}", key: "keepalive" },
-  { name: "school", label: "\u5F00\u5B66\u5B63", icon: "\u{1F393}", key: "school" },
   { name: "cat", label: "\u591C\u732B\u5B50", icon: "\u{1F319}", key: "cat" }
 ];
 var TASK_STATUS_TONE = { ok: "ok", already: "info", fail: "err", skipped: "idle" };
@@ -8454,7 +8442,7 @@ function TaskTile({ task, state, busy, onRun, scheduleConfig }) {
     )
   );
 }
-function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, schoolData, growthUid, setGrowthUid, schoolUid, setSchoolUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart, vouchersData, vouchersLoading, onViewVouchers }) {
+function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, growthUid, setGrowthUid, onRunTask, runningName, onRefresh, scheduleConfig, onGrowthWrite, growthWriteBusy, adminAvailable, scanData, scanning, queueData, onScan, onQueueStart }) {
   const accounts = status?.accounts ?? [];
   const accountsMap = React.useMemo(
     () => new Map(accounts.map((account) => [account.uid, account])),
@@ -8475,8 +8463,8 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
   return React.createElement(
     "div",
     null,
-    // 任务磁贴：一行七个，点即触发，状态就地显示。
-    // 原先「操作台按钮」与「执行历史表」把同一批任务各列一遍（7 按钮 + 7 行 × 6 列），
+    // 任务磁贴：一行六个，点即触发，状态就地显示。
+    // 原先「操作台按钮」与「执行历史表」把同一批任务各列一遍（6 按钮 + 6 行 × 6 列），
     // 状态还得跨区块对照 —— 磁贴把触发与状态收进同一格，整张表随之删除。
     React.createElement(
       "div",
@@ -8552,8 +8540,7 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
           React.createElement("span", { style: { ...s.label, minWidth: 0 } }, it.nickname || it.uid.slice(0, 8)),
           it.growth?.length > 0 ? React.createElement(Tag, { text: `\u6210\u957F\u5F85\u529E ${it.growth.length}`, tone: "warn", title: it.growth.join(" \xB7 ") }) : React.createElement(Tag, { text: "\u6210\u957F\u65E0\u5F85\u529E", tone: "ok" }),
           it.chances > 0 ? React.createElement(Tag, { text: `\u62BD\u5956 ${it.chances}`, tone: "info" }) : null,
-          it.growthErr ? React.createElement(Tag, { text: "\u6210\u957F\u67E5\u8BE2\u5931\u8D25", tone: "err", title: it.growthErr }) : null,
-          it.schoolErr ? React.createElement(Tag, { text: "\u5F00\u5B66\u5B63\u67E5\u8BE2\u5931\u8D25", tone: "err", title: it.schoolErr }) : null
+          it.growthErr ? React.createElement(Tag, { text: "\u6210\u957F\u67E5\u8BE2\u5931\u8D25", tone: "err", title: it.growthErr }) : null
         )
       )
     ) : null,
@@ -8589,7 +8576,7 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
                 "tr",
                 { key: `${it.uid}-${it.kind}-${it.code}-${i}` },
                 React.createElement("td", null, it.nickname || it.uid.slice(0, 8)),
-                React.createElement("td", { style: { ...s.code }, title: it.kind === "school" ? "\u5F00\u5B66\u5B63" : "\u6210\u957F" }, it.code),
+                React.createElement("td", { style: { ...s.code }, title: "\u6210\u957F" }, it.code),
                 React.createElement(
                   "td",
                   null,
@@ -8605,24 +8592,6 @@ function TasksTab({ status, channelOf, maxInFlight, taskData, growthData, school
         )
       )
     ) : null,
-    // 开学季（真实子任务状态：来自网关 GET /v1/accounts/{uid}/school-tasks）
-    // 账号列表按渠道过滤：成长任务/开学季是 workbuddy 专属（Trae/Qoder 无此体系，
-    // 网关侧恒 501 unsupported）。不过滤的话 trae/qoder 账号会在选号器里显示成
-    // 永远「加载失败」的灰点，且可被点开 —— 纯噪音。
-    // 全是 workbuddy 账号时传全量（保持原行为，AccountPicker 单账号自动隐藏）。
-    React.createElement(SchoolTasksCard, {
-      schoolData: schoolData?.[schoolUid],
-      accounts: wbAccounts ?? accounts,
-      byUid: schoolData,
-      selectedUid: schoolUid,
-      onSelectUid: setSchoolUid,
-      running: runningName === "school",
-      onRunTask,
-      vouchersData,
-      vouchersLoading,
-      onViewVouchers,
-      adminAvailable
-    }),
     // 成长任务进度（真实数据：来自网关 GET /v1/accounts/{uid}/growth-tasks）
     React.createElement(GrowthTasksCard, {
       growthData: growthData?.[growthUid],
@@ -8677,179 +8646,6 @@ function useSelectedUid(selected, byUid, accounts) {
   const fallback = defaultAccountUid(byUid, accounts);
   if (selected && byUid?.[selected]) return selected;
   return fallback;
-}
-var SCHOOL_STATUS = {
-  claimed: { text: "\u5DF2\u9886\u53D6", tone: "ok" },
-  completed: { text: "\u5DF2\u5B8C\u6210", tone: "ok" },
-  pending: { text: "\u5F85\u5B8C\u6210", tone: "warn" }
-};
-function SchoolTasksCard({ schoolData, accounts, byUid, selectedUid, onSelectUid, running, onRunTask, vouchersData, vouchersLoading, onViewVouchers, adminAvailable }) {
-  if (schoolData && schoolData.available === false) {
-    return React.createElement(Unavailable, {
-      title: "\u5F00\u5B66\u5B63\u5B50\u4EFB\u52A1\u72B6\u6001",
-      needs: "GET /v1/accounts/{uid}/school-tasks",
-      hint: schoolData.reason
-    });
-  }
-  if (!schoolData || schoolData.available !== true) {
-    return React.createElement(
-      "div",
-      { style: s.card },
-      React.createElement(CardHead, { title: "\u5F00\u5B66\u5B63" }),
-      React.createElement("div", { style: { ...s.muted, marginTop: 8 } }, "\u52A0\u8F7D\u4E2D\u2026")
-    );
-  }
-  const data = schoolData.school;
-  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-  const counts = data.counts ?? {};
-  const claimed = counts.claimed ?? 0;
-  const total = counts.total ?? tasks.length;
-  const stale = data.in_period === false;
-  return React.createElement(
-    "div",
-    { style: s.card },
-    React.createElement(CardHead, {
-      title: "\u{1F393} \u5F00\u5B66\u5B63",
-      actions: [
-        React.createElement("button", {
-          key: "run",
-          type: "button",
-          className: `dshc-taskbtn${running ? " running" : ""}`,
-          style: { ...s.btnGhost, height: 26, padding: "0 10px", fontSize: 12 },
-          disabled: running,
-          onClick: () => onRunTask("school")
-        }, running ? "\u6267\u884C\u4E2D\u2026" : "\u6267\u884C"),
-        adminAvailable ? React.createElement("button", {
-          key: "vouchers",
-          type: "button",
-          style: { ...s.btnLink, fontSize: 12 },
-          disabled: vouchersLoading,
-          onClick: onViewVouchers,
-          title: "\u67E5\u8BE2\u5404\u8D26\u53F7\u62BD\u4E2D\u7684\u7B2C\u4E09\u65B9\u5238\u7801\uFF08KFC/\u745E\u5E78/\u9177\u72D7\u7B49\uFF0C\u53EA\u8BFB\uFF09"
-        }, vouchersLoading ? "\u67E5\u8BE2\u4E2D\u2026" : "\u5238\u7801") : null
-      ]
-    }),
-    // 账号选择器：逐账号数据必须能切换（此前固定显示第 1 个账号）
-    React.createElement(AccountPicker, {
-      accounts,
-      byUid,
-      value: selectedUid,
-      onChange: onSelectUid
-    }),
-    // 进度条 + 计数（比 "已领 4/5" 标签更直观，且一眼看出还剩多少）
-    React.createElement(
-      "div",
-      { className: "dshc-row", style: { marginTop: 12 } },
-      React.createElement(
-        "span",
-        { className: "dshc-progress" },
-        React.createElement("span", {
-          style: {
-            width: `${total > 0 ? Math.round(claimed / total * 100) : 0}%`,
-            background: claimed >= total ? tone.ok.fg : "var(--dsw-alias-button-info-fill,#4176e6)"
-          }
-        })
-      ),
-      React.createElement("span", { style: { ...s.muted, whiteSpace: "nowrap" } }, `${claimed}/${total}`)
-    ),
-    stale ? React.createElement(
-      "div",
-      { style: { ...s.warn, marginTop: 10 } },
-      "\u6D3B\u52A8\u672A\u5F00\u59CB\u6216\u5DF2\u7ED3\u675F \u2014\u2014 \u4EE5\u4E0B\u4E3A\u8FC7\u671F\u5FEB\u7167\uFF0C\u4E0D\u4EE3\u8868\u5F53\u524D\u53EF\u64CD\u4F5C\u3002"
-    ) : null,
-    tasks.length === 0 ? React.createElement("div", { style: { ...s.muted, marginTop: 10 } }, "\u7F51\u5173\u672A\u8FD4\u56DE\u5B50\u4EFB\u52A1\u3002") : React.createElement(
-      "div",
-      { className: "dshc-sub", style: { marginTop: 12 } },
-      ...tasks.map((task) => {
-        const status = SCHOOL_STATUS[task.status] ?? { text: task.status ?? "\u2014", tone: "idle" };
-        const done = ["claimed", "completed"].includes(task.status);
-        const recurring = task.task_type === "recurring";
-        const manual = task.task_code === "task_student_verify";
-        return React.createElement(
-          "div",
-          { key: task.task_code, className: "dshc-srow" },
-          React.createElement("span", {
-            className: done ? "dshc-ck on" : manual ? "dshc-ck na" : "dshc-ck",
-            title: done ? "\u5DF2\u9886\u53D6" : manual ? "\u4EBA\u5DE5\u9879\uFF08\u7F51\u5173\u4E0D\u53EF\u4EE3\u505A\uFF09" : status.text
-          }, done ? "\u2713" : manual ? "\u2014" : "\u25CB"),
-          React.createElement(
-            "span",
-            { className: "dshc-stitle", title: task.task_code },
-            task.title || task.task_code
-          ),
-          // 进度：claimed 但未满时（上游实测存在，如 desktop_chat_1_time 为
-          // claimed + 0/1）不隐藏也不改写 —— 如实显示，但加注说明这是上游口径，
-          // 避免与左侧「已领取」勾看起来自相矛盾。
-          React.createElement("span", {
-            className: `dshc-sprog${done && task.has_progress && task.current < task.target ? " odd" : ""}`,
-            ...done && task.has_progress && task.current < task.target ? { title: `\u4E0A\u6E38\u53E3\u5F84\uFF1A\u8BE5\u4EFB\u52A1\u5DF2\u9886\u53D6\uFF0C\u4F46\u8FDB\u5EA6\u8BA1\u6570\u4E3A ${task.current}/${task.target}` } : {}
-          }, task.has_progress ? `${task.current}/${task.target}` : "\u2014"),
-          React.createElement(
-            "span",
-            { className: "dshc-ssrc" },
-            recurring ? React.createElement(Tag, { text: "\u6BCF\u65E5", tone: "info" }) : null,
-            manual ? React.createElement(Tag, { text: "\u4EBA\u5DE5", tone: "idle" }) : null
-          ),
-          React.createElement(Tag, { text: status.text, tone: status.tone })
-        );
-      })
-    ),
-    // 券码（按需加载）：只读表格，折进结果区
-    vouchersData ? React.createElement(
-      "details",
-      { className: "dshc-fold", style: { marginTop: 10 }, open: true },
-      React.createElement("summary", null, React.createElement("span", { style: s.label }, "\u5238\u7801")),
-      React.createElement(
-        "div",
-        { className: "dshc-body" },
-        React.createElement(
-          "div",
-          { className: "dshc-tblwrap" },
-          React.createElement(
-            "table",
-            null,
-            React.createElement(
-              "thead",
-              null,
-              React.createElement(
-                "tr",
-                null,
-                ...["\u8D26\u53F7", "\u5956\u54C1", "\u5238\u7801", "\u6709\u6548\u671F"].map((h2) => React.createElement("th", { key: h2 }, h2))
-              )
-            ),
-            React.createElement(
-              "tbody",
-              null,
-              ...(function() {
-                const rows = [];
-                for (const r of vouchersData.rows ?? []) {
-                  if ((r.vouchers ?? []).length === 0) continue;
-                  for (const v of r.vouchers) {
-                    rows.push(React.createElement(
-                      "tr",
-                      { key: `${r.uid}-${v.grant_id}` },
-                      React.createElement("td", null, r.nickname || r.uid.slice(0, 8)),
-                      React.createElement("td", null, v.prize_name || v.sku_code || "\u2014"),
-                      React.createElement("td", { style: { ...s.code, userSelect: "all" } }, v.code || "\u2014"),
-                      React.createElement("td", null, v.valid_to || "\u2014")
-                    ));
-                  }
-                }
-                if (rows.length === 0) {
-                  rows.push(React.createElement(
-                    "tr",
-                    { key: "empty" },
-                    React.createElement("td", { colSpan: 4, style: { ...s.muted, textAlign: "center" } }, "\u6682\u65E0\u5238\u7801\u3002")
-                  ));
-                }
-                return rows;
-              })()
-            )
-          )
-        )
-      )
-    ) : null
-  );
 }
 function GrowthTasksCard({ growthData, accounts, byUid, selectedUid, onSelectUid, onRefresh, onGrowthWrite, writeBusy, adminAvailable }) {
   if (growthData && growthData.available === false) {
@@ -8992,7 +8788,7 @@ function GrowthTasksCard({ growthData, accounts, byUid, selectedUid, onSelectUid
         tone: "warn",
         title: "\u6709\u8FDB\u5EA6\u672A\u6EE1\u3001\u53EF\u7EE7\u7EED\u63A8\u52A8\u7684\u7801"
       }) : null,
-      // 事实②（定时覆盖只有 2/24）压成一个 chip：它的内容是「别的码没有定时入口」，
+      // 事实②（定时覆盖只有 2/19）压成一个 chip：它的内容是「别的码没有定时入口」，
       // 逐行看不到（缺席不可见），故必须有一处汇总 —— 但一句话即可，不写整段散文。
       React.createElement(Tag, {
         text: `\u5B9A\u65F6\u8986\u76D6 ${coverage.scheduled}/${coverage.total}`,
@@ -9822,13 +9618,11 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   const [tasks, setTasks] = React.useState(null);
   const [creditsByUid, setCreditsByUid] = React.useState({});
   const [growthByUid, setGrowthByUid] = React.useState({});
-  const [schoolByUid, setSchoolByUid] = React.useState({});
   const channelOf = React.useMemo(
     () => channelResolver(authInfo?.ok ? authInfo.accounts : []),
     [authInfo]
   );
   const [growthUid, setGrowthUid] = React.useState("");
-  const [schoolUid, setSchoolUid] = React.useState("");
   const [logs, setLogs] = React.useState(null);
   const [logChannel, setLogChannel] = React.useState("all");
   const [runningTask, setRunningTask] = React.useState("");
@@ -9912,19 +9706,6 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
       ).then((entries) => {
         if (creditsGeneration.current !== generation || unmountedRef.current) return;
         setGrowthByUid(Object.fromEntries(entries));
-      });
-      void Promise.all(
-        accounts.map(async (account) => {
-          try {
-            const result = await rpcCall(ENDPOINTS.getSchoolTasks, { uid: account.uid });
-            return [account.uid, result?.value ?? { available: false, reason: "\u52A0\u8F7D\u5931\u8D25" }];
-          } catch {
-            return [account.uid, { available: false, reason: "\u52A0\u8F7D\u5931\u8D25" }];
-          }
-        })
-      ).then((entries) => {
-        if (creditsGeneration.current !== generation || unmountedRef.current) return;
-        setSchoolByUid(Object.fromEntries(entries));
       });
     } catch (error) {
       setErr(error?.message ?? String(error));
@@ -10013,8 +9794,6 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
   const [taskScanData, setTaskScanData] = React.useState(null);
   const [taskScanning, setTaskScanning] = React.useState(false);
   const [taskQueueData, setTaskQueueData] = React.useState(null);
-  const [vouchersData, setVouchersData] = React.useState(null);
-  const [vouchersLoading, setVouchersLoading] = React.useState(false);
   const [addOpen, setAddOpen] = React.useState(false);
   const [loginChannels, setLoginChannels] = React.useState(null);
   const [loginRealms, setLoginRealms] = React.useState([]);
@@ -10137,28 +9916,9 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
     async (channel, callback) => rpcCall(ENDPOINTS.loginCallback, { channel, callback }),
     [rpcCall]
   );
-  const onViewVouchers = React.useCallback(
-    async () => {
-      setVouchersLoading(true);
-      try {
-        const result = await rpcCall(ENDPOINTS.schoolVouchersAll, {});
-        if (result?.ok === false) {
-          showToast(`\u5238\u7801\u67E5\u8BE2\u5931\u8D25\uFF1A${result.error?.message ?? "\u672A\u77E5\u9519\u8BEF"}`);
-        } else {
-          setVouchersData(result?.value ?? { rows: [] });
-        }
-      } catch (error) {
-        showToast(`\u5238\u7801\u67E5\u8BE2\u5F02\u5E38\uFF1A${error?.message ?? error}`);
-      } finally {
-        setVouchersLoading(false);
-      }
-    },
-    [rpcCall, showToast]
-  );
   const taskAccounts = data?.status?.accounts ?? [];
   const wbTaskAccounts = taskAccounts.filter((account) => (channelOf?.(account) ?? "workbuddy") === "workbuddy");
   const effectiveGrowthUid = useSelectedUid(growthUid, growthByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
-  const effectiveSchoolUid = useSelectedUid(schoolUid, schoolByUid, wbTaskAccounts.length > 0 ? wbTaskAccounts : taskAccounts);
   const onGrowthWrite = React.useCallback(
     async (action, code) => {
       const uid = effectiveGrowthUid;
@@ -10374,11 +10134,8 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
       maxInFlight,
       taskData: tasks,
       growthData: growthByUid,
-      schoolData: schoolByUid,
       growthUid: effectiveGrowthUid,
       setGrowthUid,
-      schoolUid: effectiveSchoolUid,
-      setSchoolUid,
       onRunTask,
       runningName: runningTask,
       onRefresh: refresh,
@@ -10390,10 +10147,7 @@ function ChanhubPanel({ rpcCall, prefs, store }) {
       scanning: taskScanning,
       queueData: taskQueueData,
       onScan: onTaskScan,
-      onQueueStart: onTaskQueueStart,
-      vouchersData,
-      vouchersLoading,
-      onViewVouchers
+      onQueueStart: onTaskQueueStart
     }) : null,
     activeTab === "usage" ? React.createElement(UsageTab, {
       // 用量页自管数据（SWR 缓存 + 一次拉 720h + 前端切片）。

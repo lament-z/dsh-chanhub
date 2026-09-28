@@ -412,7 +412,7 @@ function fakeRpc(status) {
             baseURL: 'http://127.0.0.1:7866',
             // probe.features.admin/tasks=true → admin 端点在场（成长码写按钮与批量任务可渲染）。
             // adminKeys=true → 「接入方」Tab 出现（该 Tab 按此特性开关渲染，旧网关不出现）。
-            probe: { reachable: true, features: { admin: true, tasks: true, stats: false, usageBuckets: true, logs: true, credits: true, growthTasks: true, schoolTasks: true, adminModels: true, adminKeys: true } },
+            probe: { reachable: true, features: { admin: true, tasks: true, stats: false, usageBuckets: true, logs: true, credits: true, growthTasks: true, adminModels: true, adminKeys: true } },
             status,
             ...(endpoint === 'refreshStatus' ? { refreshed: true } : {}),
           },
@@ -491,7 +491,6 @@ function fakeRpc(status) {
                 { task: 'travel', running: true, run_count: 1 },
                 { task: 'activity', running: false, run_count: 0 },
                 { task: 'keepalive', running: false, run_count: 0 },
-                { task: 'school', running: false, run_count: 0 },
                 { task: 'cat', running: false, run_count: 1, last_error: 'task cat panicked: boom' },
               ],
             },
@@ -520,22 +519,6 @@ function fakeRpc(status) {
         };
       case 'runTask':
         return { ok: true, value: { started: true, busy: false, note: '已异步启动' } };
-      case 'getSchoolTasks':
-        return {
-          ok: true,
-          value: {
-            available: true,
-            school: {
-              uid: payload?.uid ?? 'uid-1',
-              in_period: true,
-              note: '状态来自上游开学季任务列表。',
-              tasks: [
-                { task_code: 'expert_use', title: '召唤1 次开学季专家', status: 'claimed', has_progress: true, current: 1, target: 1, task_type: 'recurring', next_unlock_at: '2026-09-20T00:00:00+08:00', reward_credit: 50 },
-                { task_code: 'task_student_verify', title: '学生认证', status: 'pending', has_progress: true, current: 0, target: 1, task_type: 'single' },
-              ],
-            },
-          },
-        };
       case 'getGrowthTasks':
         return {
           ok: true,
@@ -550,7 +533,6 @@ function fakeRpc(status) {
                 { task_code: 'template_5', title: '使用 5 个模板', accept_status: 'accepted', has_progress: true, current: 2, target: 5, reward_credit: 300 },
                 { task_code: 'create_canvas', title: '体验设计创意', accept_status: 'accepted', has_progress: true, current: 0, target: 1 },
                 { task_code: 'Expert_Philanthropy', title: '公益专家', accept_status: 'completed', has_progress: false },
-                { task_code: 'school_season', title: '校园日', accept_status: 'not_accepted', has_progress: false, from_mp: true, mp_only: true },
                 { task_code: 'black_cat', title: '夜猫子', accept_status: 'claimed', has_progress: true, current: 3, target: 3, scheduled: 'cat' },
               ],
             },
@@ -911,7 +893,7 @@ test('渲染：排程折叠（色块只表达配置与时间窗）在配置 Tab'
   try {
     await clickTab(document, '配置');
     const html = document.getElementById('app').innerHTML;
-    for (const label of ['签到', '猫猫旅行', '开学季', '夜猫子']) {
+    for (const label of ['签到', '猫猫旅行', '夜猫子']) {
       assert.ok(html.includes(label), `缺排程字段：${label}`);
     }
     assert.ok(html.includes('9,21'), '缺计划时刻（checkin_hours=[9,21]）');
@@ -1029,7 +1011,7 @@ test('渲染：账号详情抽屉默认展开明细（外层壳 + 健康/质量/
     assert.ok(taskFold, '找不到「任务」折叠组');
     assert.ok(
       !taskFold.hasAttribute('open'),
-      '任务组应保持折叠（展开是 6 项排程明细 + 说明，ui-design §6 刻意压成一行色块省高度）',
+      '任务组应保持折叠（展开是 5 项排程明细 + 说明，ui-design §6 刻意压成一行色块省高度）',
     );
   } finally {
     await cleanup();
@@ -1086,7 +1068,7 @@ test('渲染：配置 Tab 出现危险语义与「需重启」标注', { skip },
   }
 });
 
-test('渲染：任务 Tab 的三条反直觉事实都如实呈现', { skip }, async () => {
+test('渲染：任务 Tab 的反直觉事实（定时覆盖）如实呈现', { skip }, async () => {
   const { cleanup, document } = await mount(fakeRpc(realStatusFixture()));
   try {
     await clickTab(document, '任务');
@@ -1096,22 +1078,12 @@ test('渲染：任务 Tab 的三条反直觉事实都如实呈现', { skip }, as
     assert.ok(html.includes('签到'), '缺签到卡');
     assert.ok(html.includes('已签过'), '缺逐账号结果标签');
     assert.ok(html.includes('甲'), '缺逐账号结果行');
-    assert.ok(html.includes('开学季'), '缺开学季块');
-    assert.ok(html.includes('学生认证'), '缺人工子任务（真实上游标题）');
-    assert.ok(html.includes('人工项'), '缺人工项标签');
-    // 事实②：只有 2 个有定时覆盖，22 个没有。
+    // 事实②：只有 2 个有定时覆盖，21 个没有。
     // 表达方式从整段散文改成汇总 chip（逐行看不到「缺席」，故必须有汇总处）；
     // 详细说明移到该 chip 的 title。
-    assert.ok(html.includes('定时覆盖 2/24'), '缺事实②的定时覆盖汇总');
+    assert.ok(html.includes('定时覆盖 2/19'), '缺事实②的定时覆盖汇总');
     // 静态目录已被真实进度卡取代：码集合来自网关（与 task_runner.py MAPPING 同源）
     assert.ok(html.includes('chat_5') && html.includes('black_cat'), '缺真实任务码');
-    // 事实③：开学季 = 5 个子任务（现在有真实状态卡）
-    assert.ok(html.includes('开学季'), '缺开学季块');
-    // in_period=true 是常态，不再挂正向标签（省版面）；只有 false 才警示过期快照。
-    assert.ok(!html.includes('过期快照'), 'in_period=true 时不应出现过期快照警示');
-    assert.ok(html.includes('已领取'), '缺子任务真实状态');
-    assert.ok(html.includes('学生认证'), '缺人工子任务（真实数据）');
-    assert.ok(html.includes('每日'), '缺 recurring 重置标注');
     // 不可代做的码必须可见（有 title 与状态，无进度数据 → 「—」）
     assert.ok(html.includes('Expert_Philanthropy') || html.includes('公益专家'), '缺不可伪造码');
   } finally {

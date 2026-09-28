@@ -57,15 +57,23 @@ export const SCHEDULE_ITEMS = [
   { id: 'activity', icon: '🗺', label: '活跃地图', hoursKey: 'activity_hours', enabledKey: 'activity_enabled' },
   { id: 'travel', icon: '🐱', label: '猫猫旅行', hoursKey: 'travel_hours', enabledKey: 'travel_enabled' },
   { id: 'keepalive', icon: '🔑', label: 'token 保活', hoursKey: 'keepalive_hours', enabledKey: 'keepalive_enabled' },
-  { id: 'school', icon: '🎓', label: '开学季', hoursKey: 'school_hours', enabledKey: 'school_enabled', subtasks: 5 },
   { id: 'cat', icon: '🌙', label: '夜猫子', hoursKey: 'cat_hours', enabledKey: 'cat_enabled', note: '窗口 23:00–08:00 CST' },
 ];
 
 /**
- * 24 个成长任务码。
+ * 19 个成长任务码。
  *
  * 全部来自 `plugins/chanhub/scripts/task_runner.py` 的 MAPPING 表（逐条核对），
  * 不是从别处抄的。`target` 是该码的完成定义次数。
+ *
+ * ⚠️ 这张表是**手工镜像**，会与后端静默漂移：2026-09-28 开学季下线时实测发现它
+ * 多出 4 个后端早已不存在的码（chat_3_times / expert_use / share_invite /
+ * desktop_chat_1_time —— 全是开学季任务），界面因此一直渲染着点不亮的幽灵行。
+ * 核对方法（改动本表后请跑一次）：
+ *   comm -23 <(grep -o "code: '[^']*'" client/derive.js | sed "s/code: '//;s/'//" | sort -u) \
+ *            <(cd ../chanhub && python3 -c "import sys;sys.path.insert(0,'scripts');\
+ *               import task_runner as t;print('\n'.join(sorted(t.MAPPING)))" | sort -u)
+ * 两段输出都为空才算一致。
  */
 export const GROWTH_CODES = [
   { code: 'create_canvas', label: '自造画布', target: 1 },
@@ -85,12 +93,7 @@ export const GROWTH_CODES = [
   { code: 'first_buddy', label: '领养 Buddy', target: 1 },
   { code: 'RichMeow_Chat', label: '桌面端对话链', target: 1 },
   { code: 'Library_read', label: '资料库点击', target: 1 },
-  { code: 'chat_3_times', label: '与 AI 对话 3 次', target: 3 },
-  { code: 'expert_use', label: '开学季专家', target: 1 },
-  { code: 'share_invite', label: '分享给好友', target: 1 },
-  { code: 'desktop_chat_1_time', label: '桌面端对话 1 次', target: 1 },
   { code: 'Sequential_Tasks_1', label: '小程序连续任务', target: 1 },
-  { code: 'school_season', label: '校园日任务', target: 1 },
   { code: 'Expert_Philanthropy', label: '公益提问（不可代做）', target: 1, unforgeable: true },
 ];
 
@@ -98,7 +101,7 @@ export const GROWTH_CODES = [
  * 有定时排程覆盖的成长码 —— 这是 §5.6 事实② 的核心数据。
  *
  * 只有两个：`chat_5` 走活跃地图（间接，`ReportChatActivity`），
- * `black_cat` 走夜猫子（直接 `--only black_cat`）。**其余 22 个无任何定时入口。**
+ * `black_cat` 走夜猫子（直接 `--only black_cat`）。**其余 21 个无任何定时入口。**
  */
 export const SCHEDULED_CODES = { chat_5: 'activity', black_cat: 'cat' };
 
@@ -1489,7 +1492,7 @@ export const DAY_RANGES = [7, 14, 30];
  * 按天切片：取最后 N 天（纯前端，不再发请求）。
  *
  * 为什么要前端切片：原先每次切窗口都要重拉 7 个端点（含逐账号的
- * credits / growth / school），只为改一个时间范围。而网关分桶一次就能
+ * credits / growth），只为改一个时间范围。而网关分桶一次就能
  * 给到 30 天上限，范围切换只是「看多少」的问题 —— 本地切片即可。
  *
  * 边界：天数不足时返回全部（不是补零）—— 补零会画出并不存在的「安静日」。

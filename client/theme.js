@@ -428,8 +428,8 @@ body[data-ds-dark-theme] .dshc-heat > i.h4 { background: #60a5fa; }
 /* 到期临近 / 已过期：唯一需要抢注意力的元信息，故用警示底而非灰底 */
 .dshc-chip-warn { background: var(--dsw-alias-state-warn-tertiary,#fffbeb); color: var(--dsw-alias-state-warn-primary,#b45309); }
 /* 逐账号明细行：**网格固定列**，保证同一列在每行位置一致。
-   背景：开学季有 5 行但「每日」标签只 4 行有、成长任务 22 行里出现 3/4/5 个子元素
-   三种形态 —— 用 flex 自然排版时缺一列就会让后续列左移，视觉上「错位」。 */
+   背景：同一张表里各行的可选子元素数量不等（有的行有「每日」标签、有的没有），
+   用 flex 自然排版时缺一列就会让后续列左移，视觉上「错位」。 */
 .dshc-srow { display: grid; grid-template-columns: 20px minmax(0, 1fr) 54px 64px max-content; align-items: center; gap: 8px; padding: 3px 0; min-width: 0; }
 .dshc-growrow { display: grid; grid-template-columns: 3px minmax(0, 1fr) 54px minmax(74px, auto) max-content 74px; align-items: center; gap: 8px; padding: 3px 0; min-width: 0; }
 .dshc-stitle { font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary,currentColor); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

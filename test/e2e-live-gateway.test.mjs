@@ -120,7 +120,6 @@ function realRpcCall() {
               logs: await routeExists('/v1/logs'),
               credits: await routeExists('/v1/accounts/__probe__/credits'),
               growthTasks: await routeExists('/v1/accounts/__probe__/growth-tasks'),
-              schoolTasks: await routeExists('/v1/accounts/__probe__/school-tasks'),
               tasks: await routeExists('/admin/tasks/status'),
               admin: await routeExists('/admin/accounts/__probe__/revive'),
               refreshEndpoint: await routeExists('/admin/refresh'),
@@ -154,10 +153,6 @@ function realRpcCall() {
         case 'getLogs': {
           const { body } = await gw(`/v1/logs?channel=${payload.channel ?? 'all'}&limit=100`);
           return { ok: true, value: { available: true, logs: body } };
-        }
-        case 'getSchoolTasks': {
-          const { body } = await gw(`/v1/accounts/${encodeURIComponent(payload.uid)}/school-tasks`);
-          return { ok: true, value: { available: true, school: body } };
         }
         case 'getGrowthTasks': {
           const { body } = await gw(`/v1/accounts/${encodeURIComponent(payload.uid)}/growth-tasks`);
@@ -351,7 +346,7 @@ test('真机：任务 Tab 渲染真实任务状态与签到结果', { skip: fina
     // v2 收尾：触发与状态合并为磁贴，原「任务操作台 + 执行历史」两块消失。
     assert.ok(html.includes('dshc-tasktile'), '缺任务磁贴（形状不匹配会炸或空）');
     // 六类任务名都应在
-    for (const label of ['签到', '活跃地图', '猫猫旅行', 'token 保活', '开学季', '夜猫子']) {
+    for (const label of ['签到', '查余额', '活跃地图', '猫猫旅行', 'token 保活', '夜猫子']) {
       assert.ok(html.includes(label), `缺任务：${label}`);
     }
   } finally {
@@ -446,7 +441,7 @@ test('真机：能力探测识别新端点全部可用', { skip: finalSkip }, as
   const rpc = realRpcCall();
   const result = await rpc('getStatus', {});
   const features = result.value.probe.features;
-  for (const key of ['tasks', 'usageBuckets', 'logs', 'credits', 'growthTasks', 'schoolTasks']) {
+  for (const key of ['tasks', 'usageBuckets', 'logs', 'credits', 'growthTasks']) {
     assert.equal(features[key], true, `能力 ${key} 应被探测为可用`);
   }
 });
@@ -473,41 +468,14 @@ test('真机：成长任务进度卡渲染真实逐码进度', { skip: finalSkip
     assert.ok(html.includes('已完成 / 已领取'), '缺已完成折叠');
     // 定时覆盖角标（v2 收尾把「定时→x」简化为「定时 x」）
     assert.ok(html.includes('定时 activity') || html.includes('定时 cat'), '缺定时覆盖角标');
-    // 事实②汇总 chip：只有 2/24 个码有定时覆盖（逐行看不到「缺席」，必须汇总）
-    assert.ok(html.includes('定时覆盖 2/24'), '缺定时覆盖汇总');
+    // 事实②汇总 chip：只有 2/19 个码有定时覆盖（逐行看不到「缺席」，必须汇总）
+    assert.ok(html.includes('定时覆盖 2/19'), '缺定时覆盖汇总');
   } finally {
     await cleanup();
   }
 });
 
-test('真机：开学季子任务状态卡渲染真实 5 项与 in_period', { skip: finalSkip }, async () => {
-  const { document, cleanup } = await mountReal();
-  try {
-    await clickTab(document, '任务');
-    let html = '';
-    for (let i = 0; i < 40; i++) {
-      await React.act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      });
-      html = document.getElementById('app').innerHTML;
-      if (html.includes('expert_use') && (html.includes('已领取') || html.includes('待完成'))) break;
-    }
-    assert.ok(html.includes('开学季'), '缺开学季卡');
-    // in_period：正向标签已取消（进行中是常态、省版面），只在 false 时警示过期快照。
-    // 真机当前 in_period=true，故不应出现过期快照警示。
-    assert.ok(!html.includes('过期快照'), 'in_period=true 时不应出现过期快照警示');
-    // 真实子任务（上游必下发这 5 个）
-    for (const code of ['expert_use', 'share_invite', 'chat_3_times', 'desktop_chat_1_time', 'task_student_verify']) {
-      assert.ok(html.includes(code), `缺子任务 ${code}`);
-    }
-    // 人工项标注（v2 收尾把「人工项」简化为「人工」）
-    assert.ok(html.includes('人工'), '缺人工项标注');
-  } finally {
-    await cleanup();
-  }
-});
-
-test('真机：任务 Tab 的开学季/成长卡可切账号且数值随账号变化', { skip: finalSkip }, async () => {
+test('真机：任务 Tab 的成长卡可切账号且数值随账号变化', { skip: finalSkip }, async () => {
   const { document, cleanup } = await mountReal();
   const click = async (el) => {
     await React.act(async () => {
@@ -519,18 +487,18 @@ test('真机：任务 Tab 的开学季/成长卡可切账号且数值随账号�
   };
   try {
     await clickTab(document, '任务');
-    // 逐账号数据按号逐个补拉，等两张卡都到位
+    // 逐账号数据按号逐个补拉，等成长卡到位
     let pickers = [];
     for (let i = 0; i < 40; i++) {
       await React.act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 250));
       });
       pickers = [...document.querySelectorAll('.dshc-acctpick')];
-      if (pickers.length >= 2 && pickers[1].querySelectorAll('button').length >= 2) break;
-      // 开学季/成长数据按号逐个补拉，首屏可能还没到齐 —— 继续等（上限 10s）。
+      if (pickers.length >= 1 && pickers[0].querySelectorAll('button').length >= 2) break;
+      // 成长数据按号逐个补拉，首屏可能还没到齐 —— 继续等（上限 10s）。
     }
-    assert.equal(pickers.length, 2, '真实网关有 3 个账号 → 成长与开学季各应有账号选择器');
-    const growthPicker = pickers[1];
+    assert.equal(pickers.length, 1, '真实网关有 3 个账号 → 成长卡应有账号选择器');
+    const growthPicker = pickers[0];
     assert.ok(growthPicker.querySelectorAll('button').length >= 2, '成长卡应可切换账号');
 
     const cardProgress = (titleText) => {

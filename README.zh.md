@@ -13,7 +13,7 @@
 | Tab | 数据来源 | 能做什么 |
 |---|---|---|
 | **账号池** | `/status`、`/panel/api/*`、逐号积分端点 | 五联计数 + 分域（realm）可用性条 + 总积分 + 渠道竖排 + 「赚得积分」（累计获得，覆盖度如实标注）；渠道筛选、卡片/列表双视图；账号详情抽屉（健康 / 质量 / 积分 / 排程四组、逐套餐积分、token 用量、模型成本、软限流提示）；停用（带原因）/ 启用 / 复活 / 移除，动作均二次确认 |
-| **任务** | `/admin/tasks/*` | 7 类任务一键触发（签到 / 查余额 / 活跃地图 / 猫猫旅行 / token 保活 / 开学季 / 夜猫子）；签到逐号结构化结果；成长任务逐码进度与 accept / claim；开学季子任务与券码；**任务中心**：全账号扫描 → 队列执行（账号内串行、账号间并发 2）→ 5s 轮询进度 |
+| **任务** | `/admin/tasks/*` | 6 类任务一键触发（签到 / 查余额 / 活跃地图 / 猫猫旅行 / token 保活 / 夜猫子）；签到逐号结构化结果；成长任务逐码进度与 accept / claim；**任务中心**：全账号扫描 → 队列执行（账号内串行、账号间并发 2）→ 5s 轮询进度 |
 | **用量** | `/v1/stats/buckets`（窗口分桶） | KPI 4 卡、活跃热力图、每日按模型堆叠、账号排行、渠道用量、消费者用量；**按消费者 key 收窄**；燃尽与进程口径两个折叠区；CSV / JSON 导出；localStorage SWR 缓存 + 四态（loading / fresh / stale / fallback / error） |
 | **模型** | `/admin/models`（缺则回落 `/v1/models`） | 能力目录三态判定（confirmed / borrowed / conflict / alias / missing）与来源等级（L1 原厂 / L2 云托管 / L3 转售）；搜索、快捷筛选 chips、按渠道分组、吸顶表头；应用补丁、补齐配置字段、**实测未定项**（自绘 PNG 的视觉探针）、沉淀确认项、刷新目录、回滚、清记录 |
 | **接入方** | `/admin/keys` | 多消费者 API Key 增删改查与轮换；集合三态语义（`["*"]` 全量 / `[]` 空集（危险）/ N 条规则）；明文只在创建/轮换后出现一次（阻塞式确认）；观测面开关；「按规则推算」的预览 |
@@ -52,7 +52,7 @@ Tab 栏最右端有「**＋ 添加账号**」，走网关的 OAuth 登录，面�
 - **通道**：插件在自身 `webServer` 上注册 prefix 路由 `/dsh-chanhub`（`lib/rpc-channel.js`），浏览器侧统一走 `ctx.connection.rpc.call('/dsh-chanhub', endpoint, payload, signal)`。DSH 0.1.5 起第三方拿不到 `connection.rpc.handle`，因此走 prefix 路由，wire 格式不变。
 - **鉴权**：浏览器 → 宿主由 `connection` 的请求门禁把关；宿主 → 网关用 `Authorization: Bearer <api_key>`。
 - **api_key 三层取值**：`ctx.credentials` 解析 `apiKeyEnv`（默认 `WB2API_API_KEY`）→ 同名环境变量 → settings 里的 `apiKey`。浏览器**不直连**网关（网关无 CORS 头、要求 Bearer、bundle 是明文产物）。
-- **能力探测**：启动探一次网关版本与特性（stats / models / adminModels / adminKeys / admin / usageBuckets / logs / credits / growthTasks / schoolTasks / tasks / loginApi），面板据此决定显示什么。网关身份只认 `chanhub2api`，旧名 `workbuddy2api` 一律拒绝（不做双名兼容）。
+- **能力探测**：启动探一次网关版本与特性（stats / models / adminModels / adminKeys / admin / usageBuckets / logs / credits / growthTasks / tasks / loginApi），面板据此决定显示什么。网关身份只认 `chanhub2api`，旧名 `workbuddy2api` 一律拒绝（不做双名兼容）。
 - **降级**：旧网关缺路由时按 `isMissingRoute`（404 + `upstream-error` / `not_found`）安全回落；`refreshStatus` 失败时回落 `/status` 并显式提示「积分可能不是最新」；失败信封统一 `{ok:false,error:{code,message,details}}`，`details` 保底带 `issues:[]`（否则宿主 wire 解码器会让整块面板打不开）。
 - **超时**：常规 15s，探活 4s，版本探测缓存 60s。
 
