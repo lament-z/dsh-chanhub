@@ -528,7 +528,7 @@ function AccountFold({ account, maxInFlight, channel, onAction, busy, credits, s
 /**
  * 任务折叠组的摘要：启用数 + 成长码数（真实计数）。
  * @param scheduleConfig - config.json 的 schedule 段（可空）。
- * @returns 摘要文本，如「4/5 项排程启用 · 19 个成长码」。
+ * @returns 摘要文本，如「5/6 项排程启用 · 19 个成长码」。
  */
 function scheduleFoldSummary(scheduleConfig) {
   const enabled = SCHEDULE_ITEMS.filter((item) => scheduleState(item, scheduleConfig).key !== 'na').length;

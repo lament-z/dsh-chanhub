@@ -835,17 +835,19 @@ var CONFIG_FIELDS = (
       note: "0 = \u5173\u505C\u63A2\u7D22\uFF08\u5408\u6CD5\u503C\uFF0C\u4E0D\u56DE\u843D\u9ED8\u8BA4\uFF09",
       danger: true
     },
-    // ---- schedule（11 项；scheduler.Reconfigure 已接线 → 可热改）----
+    // ---- schedule（13 项；scheduler.Reconfigure 已接线 → 可热改）----
     { path: "schedule.checkin_hours", label: "\u7B7E\u5230\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: false, note: "\u70ED\u6539\u7ECF scheduler.Reconfigure\uFF08\u4E0B\u8F6E\u6392\u7A0B\u751F\u6548\uFF09" },
     { path: "schedule.travel_hours", label: "\u732B\u732B\u65C5\u884C\u5C0F\u65F6", type: "hours", default: "[9,21]", restart: false },
     { path: "schedule.activity_hours", label: "\u6D3B\u8DC3\u5730\u56FE\u5C0F\u65F6", type: "hours", default: "[10]", restart: false },
     { path: "schedule.keepalive_hours", label: "token \u4FDD\u6D3B\u5C0F\u65F6", type: "hours", default: "[22]", restart: false },
     { path: "schedule.cat_hours", label: "\u591C\u732B\u5B50\u5C0F\u65F6", type: "hours", default: "[1]", restart: false, note: "\u7A97\u53E3 23:00\u201308:00 CST" },
+    { path: "schedule.growth_hours", label: "\u6210\u957F\u961F\u5217\u5C0F\u65F6", type: "hours", default: "[1]", restart: false, note: "Sequential \u65CF\u6BCF\u65E5\u96F6\u70B9\u89E3\u9501\uFF0C\u6545\u53D6 01:00 \u800C\u975E 00:00 \u907F\u5F00\u89E3\u9501\u7ADE\u6001" },
     { path: "schedule.checkin_enabled", label: "\u542F\u7528\u7B7E\u5230", type: "bool", default: "true", restart: false },
     { path: "schedule.travel_enabled", label: "\u542F\u7528\u65C5\u884C", type: "bool", default: "true", restart: false },
     { path: "schedule.activity_enabled", label: "\u542F\u7528\u6D3B\u8DC3\u4E0A\u62A5", type: "bool", default: "true", restart: false },
     { path: "schedule.keepalive_enabled", label: "\u542F\u7528\u4FDD\u6D3B", type: "bool", default: "true", restart: false },
     { path: "schedule.cat_enabled", label: "\u542F\u7528\u591C\u732B\u5B50", type: "bool", default: "true", restart: false },
+    { path: "schedule.growth_enabled", label: "\u542F\u7528\u6210\u957F\u961F\u5217", type: "bool", default: "true", restart: false, note: "\u53EA\u5173\u5B9A\u65F6\u81EA\u52A8\u6267\u884C\uFF1B\u4EFB\u52A1\u4E2D\u5FC3\u300C\u6267\u884C\u5168\u90E8\u5F85\u529E\u300D\u4E0D\u53D7\u5F71\u54CD" },
     {
       path: "schedule.activity_report_count",
       label: "\u6BCF\u6B21\u4E0A\u62A5\u6761\u6570",
@@ -1007,7 +1009,10 @@ var SCHEDULE_ITEMS = [
   { id: "activity", icon: "\u{1F5FA}", label: "\u6D3B\u8DC3\u5730\u56FE", hoursKey: "activity_hours", enabledKey: "activity_enabled" },
   { id: "travel", icon: "\u{1F431}", label: "\u732B\u732B\u65C5\u884C", hoursKey: "travel_hours", enabledKey: "travel_enabled" },
   { id: "keepalive", icon: "\u{1F511}", label: "token \u4FDD\u6D3B", hoursKey: "keepalive_hours", enabledKey: "keepalive_enabled" },
-  { id: "cat", icon: "\u{1F319}", label: "\u591C\u732B\u5B50", hoursKey: "cat_hours", enabledKey: "cat_enabled", note: "\u7A97\u53E3 23:00\u201308:00 CST" }
+  { id: "cat", icon: "\u{1F319}", label: "\u591C\u732B\u5B50", hoursKey: "cat_hours", enabledKey: "cat_enabled", note: "\u7A97\u53E3 23:00\u201308:00 CST" },
+  // growth 与 cat 默认时点都是 01:00（Sequential 族每日零点解锁，故不取 00:00）。
+  // 刻意保留同刻：网关 nextWake 支持同刻多任务，且两者分属不同子系统。
+  { id: "growth", icon: "\u{1F9E9}", label: "\u6210\u957F\u961F\u5217", hoursKey: "growth_hours", enabledKey: "growth_enabled", note: "\u6BCF\u65E5\u81EA\u52A8\u626B\u63CF\u5F85\u529E\u5E76\u6267\u884C" }
 ];
 var GROWTH_CODES = [
   { code: "create_canvas", label: "\u81EA\u9020\u753B\u5E03", target: 1 },

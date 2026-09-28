@@ -1011,7 +1011,7 @@ test('渲染：账号详情抽屉默认展开明细（外层壳 + 健康/质量/
     assert.ok(taskFold, '找不到「任务」折叠组');
     assert.ok(
       !taskFold.hasAttribute('open'),
-      '任务组应保持折叠（展开是 5 项排程明细 + 说明，ui-design §6 刻意压成一行色块省高度）',
+      '任务组应保持折叠（展开是 6 项排程明细 + 说明，ui-design §6 刻意压成一行色块省高度）',
     );
   } finally {
     await cleanup();

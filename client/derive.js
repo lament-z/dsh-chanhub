@@ -58,6 +58,9 @@ export const SCHEDULE_ITEMS = [
   { id: 'travel', icon: '🐱', label: '猫猫旅行', hoursKey: 'travel_hours', enabledKey: 'travel_enabled' },
   { id: 'keepalive', icon: '🔑', label: 'token 保活', hoursKey: 'keepalive_hours', enabledKey: 'keepalive_enabled' },
   { id: 'cat', icon: '🌙', label: '夜猫子', hoursKey: 'cat_hours', enabledKey: 'cat_enabled', note: '窗口 23:00–08:00 CST' },
+  // growth 与 cat 默认时点都是 01:00（Sequential 族每日零点解锁，故不取 00:00）。
+  // 刻意保留同刻：网关 nextWake 支持同刻多任务，且两者分属不同子系统。
+  { id: 'growth', icon: '🧩', label: '成长队列', hoursKey: 'growth_hours', enabledKey: 'growth_enabled', note: '每日自动扫描待办并执行' },
 ];
 
 /**
