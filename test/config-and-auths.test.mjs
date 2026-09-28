@@ -35,14 +35,14 @@ import { ChanhubClient } from '../lib/chanhub-client.js';
 // A. 配置项规格表
 // ---------------------------------------------------------------------------
 
-test('A1 规格表恰好 53 项，且分组覆盖全部', () => {
-  assert.equal(CONFIG_FIELDS.length, 53, 'inventory.md 的权威口径是 53 项（开学季下线删两项、growth 排程加两项）');
+test('A1 规格表恰好 54 项，且分组覆盖全部', () => {
+  assert.equal(CONFIG_FIELDS.length, 54, 'inventory.md 的权威口径是 54 项（开学季下线删两项、growth 排程加两项、EDF 开关加一项）');
   const grouped = fieldsByGroup();
   const total = grouped.reduce((sum, group) => sum + group.fields.length, 0);
-  assert.equal(total, 53, '分组后不应丢项');
+  assert.equal(total, 54, '分组后不应丢项');
   // 各分组数量与 inventory.md §A 对齐
   const byId = Object.fromEntries(grouped.map((group) => [group.id, group.fields.length]));
-  assert.equal(byId.pool, 12);
+  assert.equal(byId.pool, 13);
   assert.equal(byId.schedule, 13);
   assert.equal(byId.upstream, 10);
   assert.equal(byId.cooldown, 2);

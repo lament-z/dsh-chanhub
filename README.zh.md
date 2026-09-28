@@ -13,12 +13,12 @@
 | Tab | 数据来源 | 能做什么 |
 |---|---|---|
 | **账号池** | `/status`、`/panel/api/*`、逐号积分端点 | 五联计数 + 分域（realm）可用性条 + 总积分 + 渠道竖排 + 「赚得积分」（累计获得，覆盖度如实标注）；渠道筛选、卡片/列表双视图；账号详情抽屉（健康 / 质量 / 积分 / 排程四组、逐套餐积分、token 用量、模型成本、软限流提示）；停用（带原因）/ 启用 / 复活 / 移除，动作均二次确认 |
-| **任务** | `/admin/tasks/*` | 6 类任务一键触发（签到 / 查余额 / 活跃地图 / 猫猫旅行 / token 保活 / 夜猫子）；签到逐号结构化结果；成长任务逐码进度与 accept / claim；**任务中心**：全账号扫描 → 队列执行（账号内串行、账号间并发 2）→ 5s 轮询进度 |
+| **任务** | `/admin/tasks/*` | 7 类任务一键触发（签到 / 查余额 / 活跃地图 / 猫猫旅行 / token 保活 / 夜猫子 / 成长队列）；签到逐号结构化结果；成长任务逐码进度与 accept / claim；**任务中心**：全账号扫描 → 队列执行（账号内串行、账号间并发 2）→ 5s 轮询进度 |
 | **用量** | `/v1/stats/buckets`（窗口分桶） | KPI 4 卡、活跃热力图、每日按模型堆叠、账号排行、渠道用量、消费者用量；**按消费者 key 收窄**；燃尽与进程口径两个折叠区；CSV / JSON 导出；localStorage SWR 缓存 + 四态（loading / fresh / stale / fallback / error） |
 | **模型** | `/admin/models`（缺则回落 `/v1/models`） | 能力目录三态判定（confirmed / borrowed / conflict / alias / missing）与来源等级（L1 原厂 / L2 云托管 / L3 转售）；搜索、快捷筛选 chips、按渠道分组、吸顶表头；应用补丁、补齐配置字段、**实测未定项**（自绘 PNG 的视觉探针）、沉淀确认项、刷新目录、回滚、清记录 |
 | **接入方** | `/admin/keys` | 多消费者 API Key 增删改查与轮换；集合三态语义（`["*"]` 全量 / `[]` 空集（危险）/ N 条规则）；明文只在创建/轮换后出现一次（阻塞式确认）；观测面开关；「按规则推算」的预览 |
 | **日志** | `/v1/logs` | 按频道（all / chat / task / sys）筛选、500 条视图、清空；宿主日志段 |
-| **配置** | 网关 `config.json` | 53 项配置 / 11 组；逐字段校验 + 「↻ 需重启」角标；保存结果区分 `applied` / `hot_applied` / `restart_required`；网关重启（命令白名单，默认关闭）；「界面」组里的侧边栏入口开关 |
+| **配置** | 网关 `config.json` | 54 项配置 / 11 组；逐字段校验 + 「↻ 需重启」角标；保存结果区分 `applied` / `hot_applied` / `restart_required`；网关重启（命令白名单，默认关闭）；「界面」组里的侧边栏入口开关 |
 
 > 「接入方」Tab 只在网关提供 `/admin/keys` 时出现（`client/index.js:3272`）。
 
@@ -113,7 +113,7 @@ npm test               # node --test test/*.test.mjs（20 个文件 / 约 396 �
 | `lib/rpc-channel.js` | RPC 通道适配：认证 → 收 body → `Request` → 处理器 → 把 status/headers/body 写回 `res` |
 | `lib/chanhub-client.js` | 网关 HTTP 客户端 + 版本/能力探测 + 各端点方法 |
 | `lib/gateway-config.js` | 网关 `config.json` 原子读写（`:ro` 挂载报 `config-readonly`） |
-| `lib/config-spec.js` | 53 项配置规格表 + 分组 + 校验（宿主与浏览器共用，不引 Node 依赖） |
+| `lib/config-spec.js` | 54 项配置规格表 + 分组 + 校验（宿主与浏览器共用，不引 Node 依赖） |
 | `lib/auths.js` | 凭证文件只读盘点；**绝不回传 accessToken / refreshToken** |
 | `lib/model-catalog.js` | 多模态目录：pi-ai 离线目录 + models.dev + OpenRouter → 归一化 / 模糊匹配 + 三态投票 |
 | `lib/model-patch.js` | 能力基线 + 拉取快照 + 补齐计划 + DSH `llm-pi-ai` 配置读写 |
@@ -126,7 +126,7 @@ npm test               # node --test test/*.test.mjs（20 个文件 / 约 396 �
 
 ## 数据口径
 
-「用量」「账号池」里的数字不是插件自创的，全部与网关 `internal/` 的口径**逐条对齐**（`client/derive.js`）：渠道判定对齐 `auth.ResolveChannel`、在途上限对齐 `pool.inFlightLimit`、命中率分母对齐 `finalizeGroup()`（写入不进分母）、分桶键对齐 `bucketSlot()`、窗口取值对齐 `parseWindow`、消费者集合规则对齐 `internal/server/keys.go`、成长码表对齐 `task_runner.py` 的 MAPPING 表、53 项配置对齐 `cmd/server/config.go` + `internal/config/schedule.go`。
+「用量」「账号池」里的数字不是插件自创的，全部与网关 `internal/` 的口径**逐条对齐**（`client/derive.js`）：渠道判定对齐 `auth.ResolveChannel`、在途上限对齐 `pool.inFlightLimit`、命中率分母对齐 `finalizeGroup()`（写入不进分母）、分桶键对齐 `bucketSlot()`、窗口取值对齐 `parseWindow`、消费者集合规则对齐 `internal/server/keys.go`、成长码表对齐 `task_runner.py` 的 MAPPING 表、54 项配置对齐 `cmd/server/config.go` + `internal/config/schedule.go`。
 
 拿不到证据的地方**如实留空**：会话粘性键浏览器侧看不到，就不显示「正在用哪个号」；没有正消耗就不算燃尽天数（显示「—」而不是除零或编造）；`earnedCredits` 是下界并标注「已覆盖 N/M」。
 
