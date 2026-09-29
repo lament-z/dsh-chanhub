@@ -1081,6 +1081,8 @@ function accountState(account, maxInFlight) {
     let text = "\u51B7\u5374\u4E2D";
     if (kind === "soft_rate") text = "\u8F6F\u9650\u6D41\uFF08429\uFF09";
     else if (kind === "hard_credit") text = "\u79EF\u5206\u8017\u5C3D\uFF0C\u51B7\u5374\u81F3\u6B21\u65E5 04:00";
+    else if (kind === "account_fault") text = "\u8D26\u53F7\u7EA7\u98CE\u63A7\u51B7\u5374\u4E2D";
+    else if (kind === "breaker") text = "\u7194\u65AD\u4E2D";
     else if (kind === "degrade") text = "\u8FDE\u8D25\u964D\u6743\u4E2D";
     else if (account.reason) text = account.reason;
     const suffix = typeof remaining === "number" && remaining > 0 ? ` \xB7 \u5269\u4F59 ${formatDuration(remaining)}` : "";

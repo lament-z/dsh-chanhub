@@ -1,5 +1,21 @@
 # Changelog
 
+### 补齐 cool_kind 的 breaker / account_fault 文案（对齐网关本轮吸收）
+
+网关的 `/status` 把 `cool_kind` 改成按「`until` / `breakerUntil` / `degradeUntil`
+三截止取最远者」派生（吸收 panel `5f6c7ca` #4）。此前它直接取存下来的 `coolKind`
+字段，而熔断与连败降权**从不写那个字段**，其零值又是 `CoolHard` —— 于是仅熔断的
+账号被渲染成「积分耗尽，冷却至次日 04:00」，把排查方向带偏。
+
+派生之后取值变成五个：`hard_credit` / `soft_rate` / `account_fault` / `breaker` /
+`degrade`。插件侧此前只认 `soft_rate` / `hard_credit` / `degrade`，`breaker` 与
+`account_fault` 会落到 `reason` 兜底 —— 而 `reason` 常是一句上游原文（如
+`6004 model rate limit`），运维看不出「这是熔断还是账号级风控」。本次补上两条文案。
+
+新增 `test/cool-kind.test.mjs` 把五个取值钉死：任何一边新增取值都会在那里显形；
+未知取值仍回落 `reason`（不编造文案）。`client/client.js` 已重新构建（宿主加载的是
+产物，改源不重建等于没改）。
+
 ### 下线开学季界面、暴露成长队列排程、新增「最早到期优先选号」开关
 
 三件事同批，都与网关侧对齐。

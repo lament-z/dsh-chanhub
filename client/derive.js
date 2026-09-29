@@ -155,8 +155,14 @@ export function accountState(account, maxInFlight) {
     const kind = account.cool_kind;
     const remaining = account.cool_remaining_sec;
     let text = '冷却中';
+    // 取值与 chanhub 的 Status.CoolKind 一一对应（那边由「三截止取最远者」派生，
+    // 不是直接取存下来的 coolKind 字段）：hard_credit / soft_rate / account_fault /
+    // breaker / degrade。breaker 与 account_fault 此前没有文案，会落到下面的
+    // reason 兜底——reason 常是一句上游原文，运维看不出「这是熔断还是风控」。
     if (kind === 'soft_rate') text = '软限流（429）';
     else if (kind === 'hard_credit') text = '积分耗尽，冷却至次日 04:00';
+    else if (kind === 'account_fault') text = '账号级风控冷却中';
+    else if (kind === 'breaker') text = '熔断中';
     else if (kind === 'degrade') text = '连败降权中';
     else if (account.reason) text = account.reason;
     const suffix = typeof remaining === 'number' && remaining > 0 ? ` · 剩余 ${formatDuration(remaining)}` : '';
